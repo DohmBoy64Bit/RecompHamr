@@ -167,6 +167,13 @@ func (m Model) applyVerifyResult(msg verifyResultMsg) (tea.Model, tea.Cmd) {
 // model response. The first non-blank line of output usually carries the
 // pass/fail summary in pytest, cargo, go test, grep, etc. — preferring
 // it over a blind tail keeps creative-open output legible too.
+//
+// ANSI is stripped from the snippet before the 160-byte cut: pytest, cargo
+// et al. emit colour codes on every line, and a mid-CSI truncation lands
+// on the terminal via tea.Println where it can flip the terminal into
+// sticky-colour mode (or worse) until the next stray escape clears it.
+// gysd.RecordVerify already scrubs the stored copy; the live UI line was
+// the only un-scrubbed path.
 func verifyOutcomeLine(o gysd.RunOutcome) string {
 	icon := "✓"
 	switch {
@@ -175,7 +182,7 @@ func verifyOutcomeLine(o gysd.RunOutcome) string {
 	case o.TimedOut, o.ExitCode != 0:
 		icon = "✗"
 	}
-	snippet := firstNonBlankLine(o.Output)
+	snippet := gysd.StripANSI(firstNonBlankLine(o.Output))
 	if snippet == "" {
 		return fmt.Sprintf("  %s (no output, exit %d)", icon, o.ExitCode)
 	}
@@ -189,7 +196,7 @@ func verifyOutcomeLine(o gysd.RunOutcome) string {
 // content. Used by verifyOutcomeLine; pulled out so the truncation logic
 // stays linear instead of nested.
 func firstNonBlankLine(s string) string {
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		if t := strings.TrimSpace(line); t != "" {
 			return t
 		}
@@ -208,6 +215,13 @@ func firstNonBlankLine(s string) string {
 // then propagate into time.Duration arithmetic and produce nonsense. The
 // JSON spec disallows non-finite numbers anyway, so a sane backend never
 // sends them — defensive only.
+//
+// Huge positive floats (1e20 etc.) are clamped to math.MaxInt before the
+// int conversion. Without this, `int(1e20)` overflows to MinInt64 on
+// amd64; PreVerify's `if timeoutSec > 0` then silently falls back to the
+// 60s default instead of clamping the request to MaxTimeout. A model that
+// asks for the maximum timeout must land at MaxTimeout, not at
+// `default-because-overflow`.
 func argInt(args map[string]any, name string) int {
 	v, ok := args[name]
 	if !ok {
@@ -217,6 +231,9 @@ func argInt(args map[string]any, name string) int {
 	case float64:
 		if n < 0 || math.IsNaN(n) || math.IsInf(n, 0) {
 			return 0
+		}
+		if n > math.MaxInt {
+			return math.MaxInt
 		}
 		return int(n)
 	case int:

@@ -1160,6 +1160,60 @@ func TestArgIntRejectsNaNAndInf(t *testing.T) {
 	}
 }
 
+// TestVerifyOutcomeLineStripsANSI: pytest, cargo, go test, grep —
+// everything that lights up an ANSI-friendly terminal — emits CSI colour
+// codes on every line. The live outcome banner truncates the first line at
+// 160 bytes; without scrubbing first, that cut can land mid-CSI and the
+// half-escape lands on the user's terminal via tea.Println where it can
+// stick the prompt in red, flip into alt-screen, or worse. RecordVerify
+// already scrubs the stored copy — this test pins the same scrub on the
+// live UI path so the two stay in lockstep.
+func TestVerifyOutcomeLineStripsANSI(t *testing.T) {
+	o := gysd.RunOutcome{
+		Output: "\x1b[31mFAIL test_thing.py::test_x\x1b[0m\nmore details below\n",
+	}
+	got := verifyOutcomeLine(o)
+	if strings.ContainsRune(got, 0x1b) {
+		t.Fatalf("ANSI escape leaked into outcome line: %q", got)
+	}
+	if !strings.Contains(got, "FAIL test_thing.py::test_x") {
+		t.Fatalf("snippet content lost during strip: %q", got)
+	}
+
+	// Trailing partial CSI at the byte-160 cut would otherwise survive
+	// (the 160-byte slice cleaves the sequence). Force the case: a long
+	// noise prefix, a trailing CSI, and verify nothing escapes.
+	long := strings.Repeat("x", 170) + "\x1b[31"
+	got = verifyOutcomeLine(gysd.RunOutcome{Output: long, ExitCode: 1})
+	if strings.ContainsRune(got, 0x1b) {
+		t.Fatalf("trailing partial CSI leaked through truncation: %q", got)
+	}
+}
+
+// TestArgIntClampsHugePositiveFloat pins down the overflow defence. JSON
+// numbers come through as float64; `int(1e20)` is implementation-defined and
+// on amd64 wraps to MinInt64. Without clamping, PreVerify's `if timeoutSec >
+// 0` would skip the clamp and silently fall back to DefaultTimeout — the
+// model asked for the maximum timeout and got 60s. Clamping to math.MaxInt
+// inside argInt keeps the value positive so PreVerify can clamp it down to
+// MaxTimeout where it belongs.
+func TestArgIntClampsHugePositiveFloat(t *testing.T) {
+	cases := []float64{1e18, 1e20, 1e30, math.MaxFloat64}
+	for _, in := range cases {
+		got := argInt(map[string]any{"timeout_seconds": in}, "timeout_seconds")
+		if got <= 0 {
+			t.Fatalf("argInt(%g) = %d — must be positive (negative leaks past PreVerify gate)", in, got)
+		}
+		// Round-trip through gysd.PreVerify: the model's huge value must land
+		// at MaxTimeout, not at DefaultTimeout (the silent-overflow regression).
+		s := &gysd.Session{}
+		_, timeout, _ := s.PreVerify("ls", got)
+		if timeout != gysd.MaxTimeout {
+			t.Fatalf("PreVerify(%g→%d) = %v, want MaxTimeout=%v", in, got, timeout, gysd.MaxTimeout)
+		}
+	}
+}
+
 // TestS2RepeatYieldsTurn: when the same tool call (name + canonical args)
 // would be the 3rd identical attempt within MaxRecentCalls, dispatchNextTool
 // must yield — pending dropped, ctx cancelled, phase=idle, scrollback explains

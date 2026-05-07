@@ -191,7 +191,7 @@ func (s *Session) RecordVerify(command, output string, exitCode int, canceled bo
 		return Result{ToolPayload: output + "\n(cancelled)"}
 	}
 
-	stripped := stripANSI(output)
+	stripped := StripANSI(output)
 	capped := capOutput(stripped)
 	green := exitCode == 0
 

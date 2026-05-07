@@ -23,7 +23,13 @@ var ansiRE = regexp.MustCompile(
 		"|(?:\x1b\\][^\x07\x1b]*$)" + // trailing partial OSC (no terminator)
 		"|(?:\x1b$)") // bare trailing ESC
 
-func stripANSI(s string) string {
+// StripANSI scrubs ANSI escape codes (CSI / OSC, complete or trailing-
+// partial) from s. Exported so the TUI can also scrub raw subprocess
+// output before slicing it into a one-line outcome banner — without that,
+// a snippet truncated mid-CSI would land on the terminal via tea.Println
+// and switch its mode (sticky color, alt-screen flip, …) until the next
+// stray escape happened to clear it.
+func StripANSI(s string) string {
 	if !needsStrip(s) {
 		return s
 	}

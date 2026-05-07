@@ -92,7 +92,7 @@ func TestStripANSITrailingPartialEscape(t *testing.T) {
 	}
 	for name, in := range cases {
 		t.Run(name, func(t *testing.T) {
-			out := stripANSI(in)
+			out := StripANSI(in)
 			if strings.Contains(out, "\x1b") {
 				t.Fatalf("trailing escape survived: in=%q out=%q", in, out)
 			}
