@@ -27,8 +27,17 @@ type streamClosedMsg struct {
 	ch <-chan llm.Event
 }
 
+// toolResultMsg carries one finished tool call back to Update. turnCtx is
+// the per-turn context the call was dispatched against; Update drops the
+// message when that ctx no longer matches m.turnCtx — i.e. the user has
+// already Ctrl+C'd the originating turn and (possibly) submitted a new
+// one. Without this guard the orphan tool result would be appended to the
+// new turn's history (its tool_call_id has no preceding assistant.tool_calls
+// in the live conversation) and immediately re-enter chat with startChat,
+// abandoning the legitimate stream that turn N+1 had just started.
 type toolResultMsg struct {
-	Msg chmctx.Message
+	Msg     chmctx.Message
+	turnCtx context.Context
 }
 
 // readEvent drains one event from the LLM stream and returns it as a tea.Msg.
@@ -46,7 +55,9 @@ func readEvent(ch <-chan llm.Event) tea.Cmd {
 }
 
 // runToolCall executes one tool call off the UI goroutine. The parent context
-// is the per-turn root; a Ctrl+C cancel of the turn aborts the tool mid-run.
+// is the per-turn root; a Ctrl+C cancel of the turn aborts the tool mid-run,
+// and the returned toolResultMsg carries that ctx so Update can drop the
+// message when it lands on a turn that has since moved on.
 //
 // No outer timeout is wrapped here — bash and write_file own their own
 // per-call timeouts (bash defaults to 2 min, capped at 3600s by the schema;
@@ -56,7 +67,7 @@ func readEvent(ch <-chan llm.Event) tea.Cmd {
 // inside an hour-long apparent allowance.
 func runToolCall(parent context.Context, call chmctx.ToolCall) tea.Cmd {
 	return func() tea.Msg {
-		return toolResultMsg{Msg: tools.Execute(parent, call)}
+		return toolResultMsg{Msg: tools.Execute(parent, call), turnCtx: parent}
 	}
 }
 

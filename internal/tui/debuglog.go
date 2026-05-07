@@ -65,17 +65,22 @@ func CloseDebugLog() {
 // it. Other slash commands have nothing sensitive in their args, but
 // the central hook means any future secret-bearing command is
 // covered by editing one place.
+//
+// The split mirrors `runSlash`'s `strings.Fields(text)` — both must agree
+// on what counts as the command name and its args, otherwise a multi-line
+// `/hamrpass\n<key>` (Alt+Enter inserts a literal newline into the
+// textarea, then submit forwards it to the dispatcher) activates the key
+// successfully via runSlash but slips past a literal-space prefix match
+// here, leaking the verbatim key into log.txt.
 func redactSlash(line string) string {
-	const prefix = "/hamrpass "
-	if !strings.HasPrefix(line, prefix) {
+	fields := strings.Fields(line)
+	if len(fields) == 0 || fields[0] != "/hamrpass" {
 		return line
 	}
-	rest := strings.TrimPrefix(line, prefix)
-	rest = strings.TrimSpace(rest)
-	if rest == "" {
-		return line
+	if len(fields) == 1 {
+		return line // no key portion to redact
 	}
-	return prefix + "<redacted>"
+	return "/hamrpass <redacted>"
 }
 
 // dbgWritef appends one timestamped record. No-op when logging is off.

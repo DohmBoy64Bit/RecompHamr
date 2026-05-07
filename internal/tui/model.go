@@ -245,8 +245,15 @@ var eraseScrollback tea.Cmd = func() tea.Msg {
 	return nil
 }
 
-// pingMsg carries the result of a backend-reachability probe.
-type pingMsg struct{ ok bool }
+// pingMsg carries the result of a backend-reachability probe. baseURL is
+// the URL the probe was issued against; Update drops the message when it
+// no longer matches the live client's URL — otherwise a stale ping from
+// the prior profile (user /models switched mid-flight) overwrites
+// connected state with the wrong endpoint's reachability.
+type pingMsg struct {
+	ok      bool
+	baseURL string
+}
 
 // quitArmResetMsg fires ~3s after Ctrl+C arms the quit — if we haven't
 // already been quit or re-armed, clear the hint from the status bar.
@@ -315,6 +322,12 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleResizeSettle(msg)
 
 	case pingMsg:
+		// Drop stale pings from a prior backend (e.g. user switched /models
+		// while a 2s ping was in flight). The live client's URL is the
+		// source of truth.
+		if msg.baseURL != m.cli.BaseURL {
+			return m, nil
+		}
 		m.connected = msg.ok
 		return m, nil
 
@@ -349,6 +362,16 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleStreamClosed()
 
 	case toolResultMsg:
+		// Stale result from a turn the user already cancelled. Without this
+		// drop the orphan tool message gets appended to the live turn's
+		// history (no preceding assistant.tool_calls means the next /v1
+		// request would 400) and startChat would abandon the in-flight
+		// stream. The turnCtx tag was captured when runToolCall /
+		// syntheticToolResult was created — endTurn nils m.turnCtx, and a
+		// fresh beginTurn installs a new one that cannot match the old.
+		if msg.turnCtx != m.turnCtx {
+			return m, nil
+		}
 		dbgWriteMessage("tool_result", msg.Msg)
 		m.history = append(m.history, msg.Msg)
 		m.phase = phaseThinking
@@ -749,12 +772,13 @@ func buildSystem(projectDir string) string {
 
 // pingBackend issues a short GET to the backend root via cloud.Reachable.
 // Any HTTP response counts as reachable; transport errors and timeouts mean
-// disconnected.
+// disconnected. The result carries the URL it was issued against so Update
+// can drop late results that arrive after a /models switch.
 func pingBackend(baseURL string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
 		defer cancel()
-		return pingMsg{ok: cloud.Reachable(ctx, baseURL) == nil}
+		return pingMsg{ok: cloud.Reachable(ctx, baseURL) == nil, baseURL: baseURL}
 	}
 }
 

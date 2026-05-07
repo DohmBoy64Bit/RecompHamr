@@ -511,6 +511,67 @@ func TestBootstrapRejectsNilProfile(t *testing.T) {
 
 // TestURLOverrideDoesNotPersist: a CODEHAMR_URL style override lives in
 // cfg.URLOverride, ActiveURL reflects it, but Save writes only the
+// TestBootstrapRefusesSymlinkedDir is the regression for "co-tenant on a
+// shared host plants .codehamr → /tmp/attacker before the user's first run,
+// and codehamr happily uses it". Bootstrap must Lstat (not Stat) and refuse
+// any symlink: even though the resulting config.yaml mode is 0o600, the
+// attacker controls the *parent* directory and can swap or read whatever
+// codehamr writes there. The same defence applies to a planted config.yaml
+// symlink.
+func TestBootstrapRefusesSymlinkedDir(t *testing.T) {
+	root := t.TempDir()
+	target := t.TempDir()
+	link := filepath.Join(root, DirName)
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlink unsupported: %v", err)
+	}
+	_, _, err := Bootstrap(root)
+	if err == nil {
+		t.Fatal("Bootstrap accepted a symlinked .codehamr — config-injection vector left open")
+	}
+	if !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("error should name the symlink defence: %v", err)
+	}
+	// The target must remain untouched — no config.yaml dropped into the
+	// attacker-controlled directory.
+	if _, err := os.Stat(filepath.Join(target, "config.yaml")); err == nil {
+		t.Fatal("Bootstrap wrote into the symlink target despite the rejection")
+	}
+}
+
+func TestBootstrapRefusesSymlinkedConfigYAML(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, DirName)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	// Plant config.yaml as a symlink pointing somewhere outside the project.
+	target := filepath.Join(t.TempDir(), "external.yaml")
+	cfgPath := filepath.Join(dir, "config.yaml")
+	if err := os.Symlink(target, cfgPath); err != nil {
+		t.Skipf("symlink unsupported: %v", err)
+	}
+	_, _, err := Bootstrap(root)
+	if err == nil {
+		t.Fatal("Bootstrap accepted a symlinked config.yaml")
+	}
+	// Attacker-controlled target must not have been clobbered with the seed.
+	if _, err := os.Stat(target); err == nil {
+		t.Fatal("Bootstrap wrote through the config.yaml symlink — seed bytes landed at attacker target")
+	}
+}
+
+func TestBootstrapRefusesNonDirectoryAtCodehamrPath(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, DirName), []byte("oops"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := Bootstrap(root)
+	if err == nil || !strings.Contains(err.Error(), "not a directory") {
+		t.Fatalf("Bootstrap should refuse a regular-file at .codehamr, got %v", err)
+	}
+}
+
 // on-disk URL so re-bootstrapping without the env var restores the
 // original endpoint.
 func TestURLOverrideDoesNotPersist(t *testing.T) {

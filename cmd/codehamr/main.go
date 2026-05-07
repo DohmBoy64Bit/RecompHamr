@@ -73,6 +73,15 @@ func main() {
 	abs, _ := filepath.Abs(cwd)
 	m := tui.New(cfg, client, abs, version)
 
+	// Hard clear before the TUI takes over: \x1b[2J wipes the visible
+	// viewport, \x1b[3J erases the scrollback buffer, \x1b[H homes the
+	// cursor. Coding sessions live for hours in the same devcontainer
+	// terminal, so prior shell history is mental noise the user almost
+	// never scrolls back to during a session. Wiping it gives a clean
+	// canvas — "hamrtime" — and is compatible with inline-mode (the
+	// session's own scrollback still accumulates via tea.Println below).
+	os.Stdout.WriteString("\x1b[2J\x1b[3J\x1b[H")
+
 	// Inline mode (no AltScreen, no mouse capture): the TUI renders only
 	// the prompt + status bar live region at the bottom of the terminal,
 	// and pushes everything else into native scrollback via tea.Println.

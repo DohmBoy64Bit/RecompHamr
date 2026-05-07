@@ -222,6 +222,67 @@ func TestFetchHashHandlesCorruptManifest(t *testing.T) {
 	}
 }
 
+// TestCheckHonoursEnvDisableFlag: the air-gap escape hatch
+// CODEHAMR_NO_UPDATE_CHECK=1 must short-circuit Check before any HTTP work.
+// Without it, CI runs and offline launches would each pay the full 2-second
+// fetch deadline on every start.
+func TestCheckHonoursEnvDisableFlag(t *testing.T) {
+	t.Setenv("CODEHAMR_NO_UPDATE_CHECK", "1")
+	if Check(context.Background(), "/nonexistent/binary") {
+		t.Fatal("Check must return false when the env disable flag is set")
+	}
+}
+
+// TestCheckUnsupportedPlatform: when assetName returns ok=false, Check
+// must return false without hitting the network at all — no manifest fetch
+// would help on a platform that has no published asset.
+func TestCheckUnsupportedPlatform(t *testing.T) {
+	asset, ok := assetName("plan9", "riscv")
+	if ok || asset != "" {
+		t.Fatalf("plan9/riscv should not have an asset, got %q ok=%v", asset, ok)
+	}
+}
+
+// TestCheckReportsUpToDate: the running binary's hash matches the
+// published manifest entry → Check returns false (no update needed). This
+// is the happy steady-state path that keeps the spinner from firing on
+// every launch once a release is rolled out.
+func TestCheckReportsUpToDate(t *testing.T) {
+	asset := platformAsset(t)
+	tmpDir := t.TempDir()
+	exec := filepath.Join(tmpDir, "codehamr")
+	body := []byte("running binary content\n")
+	if err := os.WriteFile(exec, body, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r := newFakeRelease(t, asset, body, hashOf(body))
+	withReleaseURLs(t, r.srv.URL)
+	t.Setenv("CODEHAMR_NO_UPDATE_CHECK", "")
+
+	if Check(context.Background(), exec) {
+		t.Fatal("Check should return false when local hash matches published")
+	}
+}
+
+// TestCheckReportsStale: published hash differs from local → Check
+// returns true (update available). Drives the maybeSelfUpdate trigger
+// in main.go.
+func TestCheckReportsStale(t *testing.T) {
+	asset := platformAsset(t)
+	tmpDir := t.TempDir()
+	exec := filepath.Join(tmpDir, "codehamr")
+	if err := os.WriteFile(exec, []byte("local v1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r := newFakeRelease(t, asset, []byte("remote v2\n"), hashOf([]byte("remote v2\n")))
+	withReleaseURLs(t, r.srv.URL)
+	t.Setenv("CODEHAMR_NO_UPDATE_CHECK", "")
+
+	if !Check(context.Background(), exec) {
+		t.Fatal("Check should return true when local hash differs from published")
+	}
+}
+
 // TestApplyRespectsContextCancel: a cancelled ctx aborts the download and
 // the local exec stays untouched.
 func TestApplyRespectsContextCancel(t *testing.T) {

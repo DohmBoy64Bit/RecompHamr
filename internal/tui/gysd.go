@@ -18,38 +18,49 @@ import (
 // mutates from a tea.Cmd. Includes the original tool-call ID and the
 // command we sent to /bin/sh so the result message and ANSI/exit logging
 // stay traceable to a single dispatch.
+//
+// turnCtx is the per-turn context this verify was launched against; Update
+// compares it against m.turnCtx and drops a result whose owning turn is no
+// longer live. Without this guard a verify subprocess from turn N that
+// completes after the user has Ctrl+C'd and submitted turn N+1 would mutate
+// gysd.Session of turn N+1 (false RedStreak bumps, evidence pool poisoned by
+// stale green output, even an accepted `done` evidenced by a prior turn's
+// verify). The phase.active() check in applyVerifyResult is not enough on its
+// own — a fresh turn's phase is also active.
 type verifyResultMsg struct {
 	callID   string
 	callName string
 	command  string
 	outcome  gysd.RunOutcome
+	turnCtx  context.Context
 }
 
 // handleGYSDTool routes verify/done/ask to the gysd Session. verify spawns
 // a subprocess (async — runs in tea.Cmd, lands as verifyResultMsg);
 // done/ask are pure state mutations and apply synchronously.
 func (m Model) handleGYSDTool(call chmctx.ToolCall) (tea.Model, tea.Cmd) {
+	turnCtx := m.turnCtx
 	switch call.Name {
 	case gysd.ToolVerify:
 		cmdStr, _ := call.Arguments["command"].(string)
 		timeoutSec := argInt(call.Arguments, "timeout_seconds")
 		run, timeout, r := m.gysd.PreVerify(cmdStr, timeoutSec)
 		if !run {
-			return m.applyGYSDResult(r, call.ID, call.Name)
+			return m.applyGYSDResult(r, call.ID, call.Name, turnCtx)
 		}
 		m.phase = phaseRunning
-		return m, dispatchVerify(m.turnCtx, call, cmdStr, timeout)
+		return m, dispatchVerify(turnCtx, call, cmdStr, timeout)
 
 	case gysd.ToolDone:
 		summary, _ := call.Arguments["summary"].(string)
 		evidence, _ := call.Arguments["evidence"].(string)
 		r := m.gysd.HandleDone(summary, evidence)
-		return m.applyGYSDResult(r, call.ID, call.Name)
+		return m.applyGYSDResult(r, call.ID, call.Name, turnCtx)
 
 	case gysd.ToolAsk:
 		question, _ := call.Arguments["question"].(string)
 		r := m.gysd.HandleAsk(question)
-		return m.applyGYSDResult(r, call.ID, call.Name)
+		return m.applyGYSDResult(r, call.ID, call.Name, turnCtx)
 	}
 	// Unreachable — IsLoopTool gates this in dispatchNextTool. Defensive
 	// fallthrough so a future tool-name mismatch surfaces visibly.
@@ -61,7 +72,11 @@ func (m Model) handleGYSDTool(call chmctx.ToolCall) (tea.Model, tea.Cmd) {
 // applyGYSDResult turns a gysd.Result into a state mutation + tea.Cmd
 // pair. Three outcomes: end the loop (accepted done), yield to user
 // (rejected for S1-S5 / ask), or feed a tool-result back to the model.
-func (m Model) applyGYSDResult(r gysd.Result, callID, callName string) (tea.Model, tea.Cmd) {
+// turnCtx travels into the synthetic tool-result so a stale GYSD result
+// (e.g., a verifyResultMsg path that already passed its own staleness gate
+// and is feeding back into chat) cannot land in a turn that has since been
+// cancelled.
+func (m Model) applyGYSDResult(r gysd.Result, callID, callName string, turnCtx context.Context) (tea.Model, tea.Cmd) {
 	switch {
 	case r.EndLoop:
 		m.flushStreaming()
@@ -85,12 +100,14 @@ func (m Model) applyGYSDResult(r gysd.Result, callID, callName string) (tea.Mode
 		// Synthetic tool-result — flows through the same toolResultMsg
 		// path as a real tool, so the chat loop continues uniformly.
 		m.phase = phaseThinking
-		return m, syntheticToolResult(r.ToolPayload, callID, callName)
+		return m, syntheticToolResult(r.ToolPayload, callID, callName, turnCtx)
 	}
 }
 
 // dispatchVerify spawns the verify subprocess in a tea.Cmd. PreVerify has
-// already validated and clamped; this just runs.
+// already validated and clamped; this just runs. The owning turnCtx travels
+// on the result so applyVerifyResult can drop the message when the turn it
+// came from is no longer live (Ctrl+C → resubmit during a long verify).
 func dispatchVerify(parent context.Context, call chmctx.ToolCall, command string, timeout time.Duration) tea.Cmd {
 	return func() tea.Msg {
 		outcome := gysd.RunCommand(parent, command, timeout)
@@ -99,30 +116,39 @@ func dispatchVerify(parent context.Context, call chmctx.ToolCall, command string
 			callName: call.Name,
 			command:  command,
 			outcome:  outcome,
+			turnCtx:  parent,
 		}
 	}
 }
 
 // syntheticToolResult builds the closure that fakes a tool-result message
 // arriving from a real tool dispatch. The chat loop in Update treats the
-// resulting msg identically to a runToolCall response.
-func syntheticToolResult(payload, callID, callName string) tea.Cmd {
+// resulting msg identically to a runToolCall response, including the
+// turnCtx staleness check.
+func syntheticToolResult(payload, callID, callName string, turnCtx context.Context) tea.Cmd {
 	return func() tea.Msg {
-		return toolResultMsg{Msg: chmctx.Message{
-			Role:       chmctx.RoleTool,
-			Content:    payload,
-			ToolCallID: callID,
-			ToolName:   callName,
-		}}
+		return toolResultMsg{
+			Msg: chmctx.Message{
+				Role:       chmctx.RoleTool,
+				Content:    payload,
+				ToolCallID: callID,
+				ToolName:   callName,
+			},
+			turnCtx: turnCtx,
+		}
 	}
 }
 
 // applyVerifyResult is called from Update on verifyResultMsg. Renders the
 // inline outcome marker for the user (live UX), then calls RecordVerify
 // and turns the resulting Result into the appropriate state transition.
-// Stale results from a cancelled turn are dropped before any mutation.
+// Stale results from a cancelled turn are dropped before any mutation: the
+// turnCtx tag must match the live turn (cancelled turn → idle phase →
+// turnCtx nil; resubmit installs a fresh ctx that won't match the old one),
+// AND phase must still be active (covers the brief window between cancel
+// and resubmit where m.turnCtx happens to also be nil).
 func (m Model) applyVerifyResult(msg verifyResultMsg) (tea.Model, tea.Cmd) {
-	if !m.phase.active() {
+	if msg.turnCtx != m.turnCtx || !m.phase.active() {
 		return m, nil
 	}
 	m.appendLine(styleDim.Render(verifyOutcomeLine(msg.outcome)))
@@ -133,7 +159,7 @@ func (m Model) applyVerifyResult(msg verifyResultMsg) (tea.Model, tea.Cmd) {
 		msg.outcome.ExitCode,
 		msg.outcome.Canceled,
 	)
-	return m.applyGYSDResult(r, msg.callID, msg.callName)
+	return m.applyGYSDResult(r, msg.callID, msg.callName, msg.turnCtx)
 }
 
 // verifyOutcomeLine renders one indented status line per verify outcome

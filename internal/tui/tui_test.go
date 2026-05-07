@@ -19,6 +19,7 @@ import (
 	"github.com/codehamr/codehamr/internal/cloud"
 	"github.com/codehamr/codehamr/internal/config"
 	chmctx "github.com/codehamr/codehamr/internal/ctx"
+	"github.com/codehamr/codehamr/internal/gysd"
 	"github.com/codehamr/codehamr/internal/llm"
 )
 
@@ -565,10 +566,18 @@ func TestRedactSlashHidesHamrpassKey(t *testing.T) {
 	cases := map[string]string{
 		"/hamrpass hp_secret_1234567890abcdef": "/hamrpass <redacted>",
 		"/hamrpass":                            "/hamrpass",  // no arg, nothing to redact
-		"/hamrpass ":                           "/hamrpass ", // trailing space, nothing useful
+		"/hamrpass ":                           "/hamrpass ", // trailing space, no key to redact
 		"/clear":                               "/clear",     // unrelated commands pass through
 		"/models hamrpass":                     "/models hamrpass",
 		"hello /hamrpass key":                  "hello /hamrpass key", // not at line start = not a hamrpass invocation
+		// Multi-line / tab-separated bypass: Alt+Enter in the textarea inserts
+		// a literal newline; runSlash uses strings.Fields which splits on any
+		// whitespace, so the key activates — and previously slipped past the
+		// literal "/hamrpass " prefix matcher in redactSlash, leaving the key
+		// verbatim in .codehamr/log.txt. The two paths must agree on tokenisation.
+		"/hamrpass\nhp_secret_1234567890abcdef":   "/hamrpass <redacted>",
+		"/hamrpass\thp_secret_1234567890abcdef":   "/hamrpass <redacted>",
+		"  /hamrpass hp_secret_1234567890abcdef":  "/hamrpass <redacted>",
 	}
 	for in, want := range cases {
 		if got := redactSlash(in); got != want {
@@ -746,6 +755,49 @@ func TestHandleProbeSuccessUpdatesLiveCtxAndPrintsActivation(t *testing.T) {
 	}
 	if !strings.Contains(scroll, "ctx: 262,144") {
 		t.Fatalf("expected ctx suffix in activation line, got:\n%s", scroll)
+	}
+}
+
+// TestProbeForVanishedProfileLeavesNoOrphanMapEntry pins down the small leak
+// where probeMsg blindly wrote into liveContextSize before checking that the
+// targeted profile still exists. A user who switches /models repeatedly
+// while their previous probe is in flight would otherwise accumulate orphan
+// keys for every dropped profile.
+func TestProbeForVanishedProfileLeavesNoOrphanMapEntry(t *testing.T) {
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+	// Simulate the user having already removed the targeted profile.
+	delete(m.cfg.Models, "vanished-profile")
+
+	out, _ := m.handleProbe(probeMsg{
+		profile:       "vanished-profile",
+		contextWindow: 262144,
+	})
+	if _, ok := out.(Model).liveContextSize["vanished-profile"]; ok {
+		t.Fatalf("liveContextSize gained an orphan entry for a profile that no longer exists")
+	}
+}
+
+// TestStalePingForOldBackendDoesNotOverwriteConnectedFlag pins down the
+// race where a 2s ping launched against the old profile's URL lands AFTER
+// the user has /models'd to a new (reachable) profile. Without the URL tag
+// the stale "unreachable" ping would flicker the connected flag false, and
+// the user would see a momentary "!" warning that has nothing to do with
+// the live backend.
+func TestStalePingForOldBackendDoesNotOverwriteConnectedFlag(t *testing.T) {
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+	m.connected = true
+	live := m.cli.BaseURL
+
+	// pingMsg from a stale URL (different from the live client's BaseURL):
+	out, _ := m.Update(pingMsg{ok: false, baseURL: "http://stale-prior-backend"})
+	if !out.(Model).connected {
+		t.Fatal("stale ping for old backend overwrote live connected=true")
+	}
+
+	// Sanity: a ping with the matching URL DOES update.
+	out, _ = m.Update(pingMsg{ok: false, baseURL: live})
+	if out.(Model).connected {
+		t.Fatal("ping for the live backend must update connected")
 	}
 }
 
@@ -1498,6 +1550,102 @@ func TestStaleStreamCloseDoesNotKillLiveTurn(t *testing.T) {
 	}
 }
 
+// TestStaleVerifyResultDoesNotMutateNewTurn pins down the cross-turn race
+// where a verify subprocess from turn N completes after the user has Ctrl+C'd
+// AND submitted turn N+1. Without the turnCtx tag the late verifyResultMsg
+// would mutate the live turn's gysd.Session — bumping RedStreak from a stale
+// red, or worse poisoning the evidence pool with a stale green that would let
+// the model claim done in turn N+1 with quotes from turn N. The phase.active()
+// guard alone passes here because turn N+1 is genuinely active; only the
+// turnCtx mismatch can save us.
+func TestStaleVerifyResultDoesNotMutateNewTurn(t *testing.T) {
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+
+	// Turn N: spawn a verify under ctxN, then cancel.
+	_, cancelN := context.WithCancel(context.Background())
+	ctxN, cancelN2 := context.WithCancel(context.Background())
+	t.Cleanup(cancelN)
+	t.Cleanup(cancelN2)
+
+	// Turn N+1 is now live with a fresh ctx.
+	ctxLive, cancelLive := context.WithCancel(context.Background())
+	t.Cleanup(cancelLive)
+	m.turnCtx = ctxLive
+	m.cancel = cancelLive
+	m.phase = phaseThinking
+
+	// Stale RED verifyResultMsg from turn N (already cancelled).
+	stale := verifyResultMsg{
+		callID:   "v-stale",
+		callName: "verify",
+		command:  "pytest",
+		outcome:  gysd.RunOutcome{Output: "FAIL", ExitCode: 1},
+		turnCtx:  ctxN,
+	}
+	out, _ := m.applyVerifyResult(stale)
+	om := out.(Model)
+	if om.gysd.RedStreak != 0 {
+		t.Fatalf("stale red verify bumped live turn's RedStreak: %d", om.gysd.RedStreak)
+	}
+	if len(om.gysd.VerifyLog) != 0 {
+		t.Fatalf("stale verify polluted live turn's VerifyLog: %+v", om.gysd.VerifyLog)
+	}
+
+	// Stale GREEN verify — the dangerous one. If we recorded it, a `done` in
+	// turn N+1 quoting "passed in 0.34s" would succeed using turn N's evidence.
+	staleGreen := verifyResultMsg{
+		callID:   "v-stale-green",
+		callName: "verify",
+		command:  "pytest",
+		outcome:  gysd.RunOutcome{Output: "===== 1 passed in 0.34s =====", ExitCode: 0},
+		turnCtx:  ctxN,
+	}
+	out2, _ := om.applyVerifyResult(staleGreen)
+	om2 := out2.(Model)
+	if len(om2.gysd.VerifyLog) != 0 {
+		t.Fatalf("stale green verify entered evidence pool: %+v", om2.gysd.VerifyLog)
+	}
+}
+
+// TestStaleToolResultDoesNotEnterLiveHistory pins down the parallel race
+// for runToolCall: a bash result from a cancelled turn N must not be
+// appended to turn N+1's history (it would carry an unmatched tool_call_id
+// the next /v1 request would 400 on) and must not steal the live stream by
+// triggering startChat against the live turn.
+func TestStaleToolResultDoesNotEnterLiveHistory(t *testing.T) {
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+
+	// Live turn N+1.
+	ctxLive, cancelLive := context.WithCancel(context.Background())
+	t.Cleanup(cancelLive)
+	m.turnCtx = ctxLive
+	m.cancel = cancelLive
+	m.stream = make(chan llm.Event, 1)
+	m.phase = phaseStreaming
+	m.history = []chmctx.Message{{Role: chmctx.RoleUser, Content: "live prompt"}}
+	beforeLen := len(m.history)
+	beforeStream := m.stream
+
+	// Stale toolResultMsg carrying turn N's (already-cancelled) ctx.
+	ctxStale, cancelStale := context.WithCancel(context.Background())
+	cancelStale()
+	stale := toolResultMsg{
+		Msg:     chmctx.Message{Role: chmctx.RoleTool, ToolCallID: "stale", Content: "ghost"},
+		turnCtx: ctxStale,
+	}
+	out, cmd := m.Update(stale)
+	om := out.(Model)
+	if len(om.history) != beforeLen {
+		t.Fatalf("stale tool result entered live history: %+v", om.history)
+	}
+	if om.stream != beforeStream {
+		t.Fatal("stale tool result triggered a fresh startChat — live stream replaced")
+	}
+	if cmd != nil {
+		t.Fatalf("stale tool result returned a Cmd; should be no-op: %T", cmd)
+	}
+}
+
 // TestRunToolCallHonorsBashTimeoutBeyondLegacyCap is the regression case for
 // the silent 3-minute cap that runToolCall used to wrap the parent context
 // in. Before the fix, a model that set bash.timeout_seconds=600 (10 min) saw
@@ -1854,6 +2002,44 @@ func TestHamrpassRejectsTooShort(t *testing.T) {
 	// "N/16 chars · keep typing".
 	if !strings.Contains(out, "/16 chars") || !strings.Contains(out, "keep typing") {
 		t.Fatalf("expected length hint in scrollback:\n%s", out)
+	}
+}
+
+// TestHamrpassRejectsControlChars pins down the regression for "user pastes
+// a key with an embedded escape / NUL / DEL — validation passes, key gets
+// persisted to config.yaml, every subsequent dial-out errors with a cryptic
+// 'invalid header field value for Authorization' from net/http". Real hamrpass
+// keys are ASCII-printable; anything else must be rejected by hamrpassValidate
+// rather than slip through to http.Client.Do.
+func TestHamrpassRejectsControlChars(t *testing.T) {
+	cases := map[string]string{
+		"NUL":         "hp_secret_key_with\x00null",
+		"ESC":         "hp_secret_key_with\x1bescape",
+		"DEL":         "hp_secret_key_with\x7fdel",
+		"non-ASCII":   "hp_secret_key_with_ümlaut123",
+		"raw newline": "hp_key_one\nhp_key_two_X12",
+	}
+	for name, badKey := range cases {
+		t.Run(name, func(t *testing.T) {
+			m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+			beforeActive := m.cfg.Active
+			beforeKey := m.cfg.Models["hamrpass"].Key
+
+			_, _, ok := hamrpassValidate(badKey)
+			if ok {
+				t.Fatalf("hamrpassValidate(%q) returned ok=true; control chars must be rejected", badKey)
+			}
+
+			// And the inline /hamrpass <key> handler must not persist or activate.
+			out, _ := m.runSlash("/hamrpass " + badKey)
+			final := out.(Model)
+			if final.cfg.Active != beforeActive {
+				t.Fatalf("active changed despite invalid key: %q", final.cfg.Active)
+			}
+			if final.cfg.Models["hamrpass"].Key != beforeKey {
+				t.Fatalf("invalid key persisted to config: %q", final.cfg.Models["hamrpass"].Key)
+			}
+		})
 	}
 }
 

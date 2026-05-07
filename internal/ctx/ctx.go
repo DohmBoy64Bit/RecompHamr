@@ -150,16 +150,24 @@ func Pack(history []Message, budget int) PackResult {
 // budget-trimming cut the assistant that issued the call; sending the
 // orphaned tool response on its own returns a 400 from every OpenAI-
 // compatible backend ("tool message without preceding tool_calls").
+//
+// Empty IDs are treated as orphans on both ends: a server bug that ships an
+// assistant.tool_call with empty `id` would otherwise let *every* subsequent
+// empty-ToolCallID tool message ride through `seen[""] = true`, which is
+// exactly the 400 we set out to prevent. An unidentifiable tool message has
+// no legitimate pairing — drop it.
 func dropOrphanTools(kept []Message) []Message {
 	seen := map[string]bool{}
 	out := kept[:0]
 	for _, m := range kept {
 		if m.Role == RoleAssistant {
 			for _, tc := range m.ToolCalls {
-				seen[tc.ID] = true
+				if tc.ID != "" {
+					seen[tc.ID] = true
+				}
 			}
 		}
-		if m.Role == RoleTool && !seen[m.ToolCallID] {
+		if m.Role == RoleTool && (m.ToolCallID == "" || !seen[m.ToolCallID]) {
 			continue
 		}
 		out = append(out, m)

@@ -29,6 +29,21 @@ func TestBashEmptyCommand(t *testing.T) {
 	}
 }
 
+// TestBashHonorsAlreadyCancelledParent: a pre-cancelled parent (Ctrl+C raced
+// the dispatch goroutine) must report "(cancelled)" rather than "(empty
+// command)" or — worse — kicking off a fresh /bin/sh process. Without this
+// guard the cancel was effectively ignored on the empty-cmd fast path.
+func TestBashHonorsAlreadyCancelledParent(t *testing.T) {
+	parent, cancel := context.WithCancel(context.Background())
+	cancel()
+	if got := Bash(parent, "", time.Second); got != "(cancelled)" {
+		t.Fatalf("pre-cancelled bash returned %q, want (cancelled)", got)
+	}
+	if got := Bash(parent, "echo nope", time.Second); got != "(cancelled)" {
+		t.Fatalf("pre-cancelled bash with command returned %q, want (cancelled)", got)
+	}
+}
+
 func TestBashTimeout(t *testing.T) {
 	out := Bash(context.Background(), "sleep 2", 100*time.Millisecond)
 	if !strings.Contains(out, "timeout") {
@@ -90,6 +105,30 @@ func TestBashTimeoutOverflowClamped(t *testing.T) {
 	msg := Execute(context.Background(), call)
 	if !strings.Contains(msg.Content, "ok") {
 		t.Fatalf("overflow clamp: expected echo output, got %q", msg.Content)
+	}
+}
+
+// TestBashParentCancelMidRun: when the parent context is cancelled while a
+// long sleep is in flight, Bash returns "(cancelled)" — not the misleading
+// "(timeout after Xs)" or a stale exit code. Mirrors the runner contract:
+// parent cancel always wins over timeout because it's the user's signal.
+func TestBashParentCancelMidRun(t *testing.T) {
+	parent, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+	start := time.Now()
+	out := Bash(parent, "sleep 5", 10*time.Second)
+	elapsed := time.Since(start)
+	if elapsed > 2*time.Second {
+		t.Fatalf("parent cancel didn't propagate; elapsed %s", elapsed)
+	}
+	if !strings.Contains(out, "cancelled") {
+		t.Fatalf("expected (cancelled) marker, got %q", out)
+	}
+	if strings.Contains(out, "timeout") {
+		t.Fatalf("parent-cancel must not be reported as timeout: %q", out)
 	}
 }
 

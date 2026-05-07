@@ -197,6 +197,13 @@ const hamrpassMinKeyLen = 16
 // /hamrpass <key> handler and the arg popover hint. ok=false with an empty
 // trimmed key is the "show status block" signal — the caller decides
 // whether to print the help screen or simply keep the user typing.
+//
+// Non-printable ASCII (NUL/ESC/DEL/CR/etc.) and non-ASCII runes are rejected
+// up front: http.Header.Set accepts the bytes but http.Client.Do then errors
+// with `net/http: invalid header field value for "Authorization"` on the
+// wire, leaving the user staring at a cryptic transport message after the
+// key has already been *persisted* to config.yaml. Real hamrpass keys are
+// ASCII-printable; reject anything else loud and early.
 func hamrpassValidate(raw string) (key, hint string, ok bool) {
 	key = strings.TrimSpace(raw)
 	switch {
@@ -204,7 +211,13 @@ func hamrpassValidate(raw string) (key, hint string, ok bool) {
 		return "", "paste your hamrpass key, or Enter for status", false
 	case strings.ContainsAny(key, " \t\r\n"):
 		return key, "no whitespace allowed", false
-	case len(key) < hamrpassMinKeyLen:
+	}
+	for _, r := range key {
+		if r < 0x21 || r > 0x7e {
+			return key, "key must be printable ASCII (no control chars)", false
+		}
+	}
+	if len(key) < hamrpassMinKeyLen {
 		return key, fmt.Sprintf("%d/%d chars · keep typing", len(key), hamrpassMinKeyLen), false
 	}
 	return key, "Enter to activate", true

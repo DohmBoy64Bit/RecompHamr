@@ -75,6 +75,31 @@ func TestVerifyANSIStripped(t *testing.T) {
 	}
 }
 
+// TestStripANSITrailingPartialEscape pins down "verify killed mid-color
+// leaves raw ESC bytes in VerifyLog". A subprocess interrupted between the
+// CSI / OSC opener and its final byte writes a ragged tail; without the
+// trailing-anchor patterns those bytes survive into evidence and into the
+// red-streak user-block, where tea.Println dumps them straight to the
+// terminal and (a) corrupts the prompt re-render, (b) breaks evidence
+// substring match if the model quotes the displayed (post-strip) form.
+func TestStripANSITrailingPartialEscape(t *testing.T) {
+	cases := map[string]string{
+		"trailing CSI, no final byte": "ran tests\n\x1b[31",
+		"trailing OSC, no terminator": "title set: \x1b]0;mywin",
+		"trailing bare ESC":           "data\x1b",
+		"complete then trailing":      "\x1b[31mFAIL\x1b[0m more output \x1b[3",
+		"no escape":                   "plain output, nothing to strip",
+	}
+	for name, in := range cases {
+		t.Run(name, func(t *testing.T) {
+			out := stripANSI(in)
+			if strings.Contains(out, "\x1b") {
+				t.Fatalf("trailing escape survived: in=%q out=%q", in, out)
+			}
+		})
+	}
+}
+
 func TestVerifyCancelDoesNotBumpStreak(t *testing.T) {
 	s := newSession(t)
 	s.RedStreak = 1

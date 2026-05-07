@@ -72,18 +72,19 @@ func (m Model) handleProbe(msg probeMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.connected = true
-	if msg.contextWindow > 0 {
-		m.liveContextSize[msg.profile] = msg.contextWindow
-	}
 	if msg.budget.Set && msg.profile == m.cfg.Active {
 		m.budget = msg.budget
 	}
 	p, ok := m.cfg.Models[msg.profile]
 	if !ok {
 		// Profile vanished between probe dispatch and return (user hand-
-		// edited config). Nothing meaningful to print; the live window is
-		// still cached in case the profile reappears.
+		// edited config or /models switched and the old profile got
+		// pruned). Skip the cache write — leaving an orphan key would
+		// pile up on every probe-of-a-stale-profile in long sessions.
 		return m, nil
+	}
+	if msg.contextWindow > 0 {
+		m.liveContextSize[msg.profile] = msg.contextWindow
 	}
 	if msg.silent {
 		return m, nil

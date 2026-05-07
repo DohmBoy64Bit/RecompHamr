@@ -114,10 +114,26 @@ func Default() *Config {
 // Bootstrap returns the config for the current project, creating .codehamr/
 // and config.yaml on first use. config.yaml is never overwritten. The system
 // prompt is not written to disk — it's embedded.
+//
+// The directory check uses Lstat (not Stat) and refuses any pre-existing
+// .codehamr that isn't a regular directory: a symlink in its place would let
+// a co-tenant on a shared host redirect config.yaml to an attacker-controlled
+// path, planting a malicious models.<name>.url that quietly proxies the
+// user's hamrpass key on the next dial-out. Refusing rather than silently
+// honouring the symlink keeps config-injection off the table.
 func Bootstrap(projectRoot string) (*Config, bool, error) {
 	dir := filepath.Join(projectRoot, DirName)
 	created := false
-	if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
+	info, err := os.Lstat(dir)
+	switch {
+	case err == nil:
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil, false, fmt.Errorf("%s: refuses to follow symlink — remove or replace with a real directory", dir)
+		}
+		if !info.IsDir() {
+			return nil, false, fmt.Errorf("%s: exists but is not a directory", dir)
+		}
+	case errors.Is(err, os.ErrNotExist):
 		// 0o700 because config.yaml inside this directory may carry the
 		// hamrpass key (a long-lived bearer token tied to the user's pass
 		// budget). World-listable parents would let other local users see
@@ -127,9 +143,18 @@ func Bootstrap(projectRoot string) (*Config, bool, error) {
 			return nil, false, err
 		}
 		created = true
+	default:
+		return nil, false, err
 	}
 
 	cfgPath := filepath.Join(dir, "config.yaml")
+	// Same symlink defence as the directory check: a config.yaml planted as a
+	// symlink would let an attacker redirect either the read (deciding what
+	// config we honour) or the write (clobbering an arbitrary user-writable
+	// file with the default seed). Refuse and surface a readable error.
+	if li, err := os.Lstat(cfgPath); err == nil && li.Mode()&os.ModeSymlink != 0 {
+		return nil, false, fmt.Errorf("%s: refuses to follow symlink — remove or replace with a real file", cfgPath)
+	}
 	var cfg *Config
 	if b, err := os.ReadFile(cfgPath); err == nil {
 		cfg = &Config{} // do NOT merge Default here — strict means strict

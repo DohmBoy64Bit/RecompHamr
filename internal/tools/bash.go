@@ -29,7 +29,17 @@ const maxBashTimeoutSeconds = 3600
 // Bash runs a single shell command through /bin/sh -c. Output (stdout +
 // stderr combined) is returned as a single string. Non-zero exit is not an
 // error — the model gets to see the failure and react.
+//
+// A pre-cancelled parent (Ctrl+C raced the dispatch goroutine) returns the
+// "(cancelled)" sentinel rather than the synthetic "(empty command)" path
+// when command is blank — otherwise a trivially-cancelled bash call would
+// look like a valid empty-args invocation and the resulting toolResultMsg
+// would still be appended to history; the toolResultMsg.turnCtx staleness
+// guard catches that downstream, but reporting cancel up front is clearer.
 func Bash(parent context.Context, command string, timeout time.Duration) string {
+	if parent.Err() != nil {
+		return "(cancelled)"
+	}
 	if strings.TrimSpace(command) == "" {
 		return "(empty command)"
 	}

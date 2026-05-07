@@ -117,6 +117,31 @@ func TestPackDropsOrphanToolMessage(t *testing.T) {
 	}
 }
 
+// TestPackDropsEmptyIDToolMessages is the regression for "an assistant message
+// with an empty-ID tool_call lets every subsequent empty-ToolCallID tool
+// message ride past dropOrphanTools via seen[\"\"] = true". The OpenAI-compat
+// backends 400 on a bare tool message; an unidentifiable tool message can
+// never be paired so it must always be dropped, regardless of which
+// (possibly malformed) assistant came before.
+func TestPackDropsEmptyIDToolMessages(t *testing.T) {
+	history := []Message{
+		// A malformed assistant whose tool_call id is missing — server bug.
+		{Role: RoleAssistant, ToolCalls: []ToolCall{{ID: "", Name: "bash"}}},
+		// First empty-ID tool message looks paired only because of seen[""]
+		// = true. It must be dropped anyway.
+		{Role: RoleTool, ToolCallID: "", Content: "from empty1"},
+		// Second empty-ID is even more clearly orphan — nothing to pair with.
+		{Role: RoleTool, ToolCallID: "", Content: "TRULY ORPHAN"},
+		{Role: RoleAssistant, Content: "final"},
+	}
+	r := Pack(history, 100000)
+	for _, m := range r.Messages {
+		if m.Role == RoleTool {
+			t.Fatalf("empty-ID tool message survived pack: %+v (full kept set: %+v)", m, r.Messages)
+		}
+	}
+}
+
 // TestPackKeepsPairedToolMessage: when both the assistant and its tool
 // response fit in the budget, the pair stays intact — we must not regress
 // and drop healthy pairs.
