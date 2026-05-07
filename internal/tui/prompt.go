@@ -106,9 +106,11 @@ func chipLabel(lines int) string {
 // shifted the value.
 func (p promptInput) Update(msg tea.Msg) (promptInput, tea.Cmd) {
 	if kmsg, ok := msg.(tea.KeyMsg); ok {
-		if looksLikePaste(kmsg) && shouldChip(string(kmsg.Runes)) {
-			p.insertChip(string(kmsg.Runes))
-			return p, nil
+		if looksLikePaste(kmsg) {
+			if pasted := string(kmsg.Runes); shouldChip(pasted) {
+				p.insertChip(pasted)
+				return p, nil
+			}
 		}
 		if handled, next := p.handlePageKey(kmsg); handled {
 			return next, nil

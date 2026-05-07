@@ -163,14 +163,9 @@ func (s *Session) PreVerify(command string, timeoutSec int) (run bool, timeout t
 	// makes context.WithTimeout fire immediately — verify "succeeds" in
 	// negative time without ever running. A model that asks for 1e18 seconds
 	// (or any obviously-bad value) must land at MaxTimeout, not at -∞.
-	if timeoutSec <= 0 {
-		timeout = DefaultTimeout
-	} else {
-		maxSec := int(MaxTimeout / time.Second)
-		if timeoutSec > maxSec {
-			timeoutSec = maxSec
-		}
-		timeout = time.Duration(timeoutSec) * time.Second
+	timeout = DefaultTimeout
+	if timeoutSec > 0 {
+		timeout = time.Duration(min(timeoutSec, int(MaxTimeout/time.Second))) * time.Second
 	}
 
 	// S1: verify cap per loop.

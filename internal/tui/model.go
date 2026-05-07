@@ -279,15 +279,12 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(msg)
 	nm := next.(Model)
-	if len(nm.outbox) == 0 {
-		return nm, cmd
+	if len(nm.outbox) > 0 {
+		printCmd := tea.Println(strings.Join(nm.outbox, "\n"))
+		nm.outbox = nil
+		cmd = tea.Batch(printCmd, cmd)
 	}
-	printCmd := tea.Println(strings.Join(nm.outbox, "\n"))
-	nm.outbox = nil
-	if cmd == nil {
-		return nm, printCmd
-	}
-	return nm, tea.Batch(printCmd, cmd)
+	return nm, cmd
 }
 
 func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
