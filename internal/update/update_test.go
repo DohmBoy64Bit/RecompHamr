@@ -308,4 +308,3 @@ func TestApplyRespectsContextCancel(t *testing.T) {
 		t.Fatalf("exec was replaced after cancelled Apply, got %q", got)
 	}
 }
-

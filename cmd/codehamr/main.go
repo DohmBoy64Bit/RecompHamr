@@ -205,4 +205,3 @@ func applyEnvOverrides(cfg *config.Config) {
 		cfg.URLOverride = envURL
 	}
 }
-

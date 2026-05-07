@@ -158,12 +158,15 @@ func TestPackKeepsPairedToolMessage(t *testing.T) {
 }
 
 func TestBudget(t *testing.T) {
+	// Use the constants directly so a future tweak to FixedSystem /
+	// FixedTools doesn't trip a magic-number mismatch here without surfacing
+	// a real budgeting regression.
 	// 65k: ctxSize/8 = 8192, just above the 8k floor.
-	if got := Budget(65536); got != 65536-3000-1500-8192 {
+	if got := Budget(65536); got != 65536-FixedSystem-FixedTools-8192 {
 		t.Fatalf("budget wrong at 65k: %d", got)
 	}
 	// 262k: ctxSize/8 = 32768, matches Qwen3 thinking-mode default.
-	if got := Budget(262144); got != 262144-3000-1500-32768 {
+	if got := Budget(262144); got != 262144-FixedSystem-FixedTools-32768 {
 		t.Fatalf("budget wrong at 262k: %d", got)
 	}
 	if Budget(1000) != 0 {
@@ -179,11 +182,11 @@ func TestResponseReserveScales(t *testing.T) {
 		ctxSize int
 		want    int
 	}{
-		{32_768, 8000},     // floor — ctxSize/8 = 4096 < 8000
-		{64_000, 8000},     // floor — ctxSize/8 = 8000, not >
-		{65_536, 8192},     // just above the floor
-		{128_000, 16_000},  // linear
-		{262_144, 32_768},  // Qwen3 thinking-mode default
+		{32_768, 8000},    // floor — ctxSize/8 = 4096 < 8000
+		{64_000, 8000},    // floor — ctxSize/8 = 8000, not >
+		{65_536, 8192},    // just above the floor
+		{128_000, 16_000}, // linear
+		{262_144, 32_768}, // Qwen3 thinking-mode default
 		{1_000_000, 125_000},
 	}
 	for _, c := range cases {

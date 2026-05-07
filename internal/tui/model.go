@@ -781,4 +781,3 @@ func pingBackend(baseURL string) tea.Cmd {
 		return pingMsg{ok: cloud.Reachable(ctx, baseURL) == nil, baseURL: baseURL}
 	}
 }
-

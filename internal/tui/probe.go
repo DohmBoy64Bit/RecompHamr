@@ -58,9 +58,19 @@ func probeBackend(cli *llm.Client, profileName string, silent bool) tea.Cmd {
 // the active profile as set — the user can /models back if they want.
 // Late probes whose profile is no longer active still update
 // liveContextSize so the value is ready next time the user switches back.
+//
+// Connection-state mutations (m.connected, m.budget) are gated on
+// msg.profile == m.cfg.Active: without this gate, a user who /models'd
+// to b while a probe for a was still in flight would see the live "b"
+// reachability indicator briefly flip based on the stale "a" probe outcome
+// — exactly the same staleness class pingMsg dispatch already guards
+// against via its baseURL tag.
 func (m Model) handleProbe(msg probeMsg) (tea.Model, tea.Cmd) {
+	active := msg.profile == m.cfg.Active
 	if msg.err != nil {
-		m.connected = false
+		if active {
+			m.connected = false
+		}
 		// Silent startup probes don't print activation banners on success,
 		// so they shouldn't print error banners on failure either —
 		// otherwise an offline launch greets the user with a noisy "⚠ probe"
@@ -71,8 +81,10 @@ func (m Model) handleProbe(msg probeMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	m.connected = true
-	if msg.budget.Set && msg.profile == m.cfg.Active {
+	if active {
+		m.connected = true
+	}
+	if msg.budget.Set && active {
 		m.budget = msg.budget
 	}
 	p, ok := m.cfg.Models[msg.profile]

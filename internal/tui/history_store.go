@@ -88,9 +88,9 @@ func appendPromptHistory(dir, value string) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	// Lazy trim: only when the file has clearly outgrown the cap. Counting
-	// lines is O(file) but bounded — we cap fast-path opportunism at 4× the
-	// limit, past which we always rewrite.
+	// Lazy trim: scan the file's line count after each append and rewrite
+	// only when it has grown past historyMaxEntries. countHistoryLines is
+	// O(file) but bounded by historyMaxEntryBytes × historyMaxEntries.
 	count, err := countHistoryLines(path)
 	if err != nil || count <= historyMaxEntries {
 		return nil

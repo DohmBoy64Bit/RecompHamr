@@ -60,6 +60,25 @@ func TestSystemPromptIncludesWorkingDirAndInvestigateRule(t *testing.T) {
 	}
 }
 
+// TestSystemPromptFitsFixedSystemReservation pins ctx.FixedSystem against
+// the actual embedded system prompt (PROMPT_SYS.md + working-dir anchor).
+// Without this guard, an editor who grows the prompt past the budget
+// silently shifts the packer into over-budget territory on small-ctx
+// profiles — Pack hands the model a request that, system + tools + history
+// + reserve, is bigger than the server allows, and the next chat returns
+// 400 (or the server silently truncates). When this fails, raise
+// ctx.FixedSystem; do not loosen the assertion.
+func TestSystemPromptFitsFixedSystemReservation(t *testing.T) {
+	cfg, _, _ := config.Bootstrap(t.TempDir())
+	m := New(cfg, llm.New("http://x", cfg.ActiveProfile().LLM, ""), "/workspaces/codehamr", "test")
+	cost := chmctx.Message{Role: chmctx.RoleSystem, Content: m.system}.Tokens()
+	if cost > chmctx.FixedSystem {
+		t.Fatalf("system prompt costs %d tokens, FixedSystem reserves only %d — "+
+			"raise ctx.FixedSystem so Budget() doesn't over-allocate to history",
+			cost, chmctx.FixedSystem)
+	}
+}
+
 // TestCtrlDEmptyQuits: Ctrl+D on empty textarea returns a Quit command.
 func TestCtrlDEmptyQuits(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -575,9 +594,9 @@ func TestRedactSlashHidesHamrpassKey(t *testing.T) {
 		// whitespace, so the key activates — and previously slipped past the
 		// literal "/hamrpass " prefix matcher in redactSlash, leaving the key
 		// verbatim in .codehamr/log.txt. The two paths must agree on tokenisation.
-		"/hamrpass\nhp_secret_1234567890abcdef":   "/hamrpass <redacted>",
-		"/hamrpass\thp_secret_1234567890abcdef":   "/hamrpass <redacted>",
-		"  /hamrpass hp_secret_1234567890abcdef":  "/hamrpass <redacted>",
+		"/hamrpass\nhp_secret_1234567890abcdef":  "/hamrpass <redacted>",
+		"/hamrpass\thp_secret_1234567890abcdef":  "/hamrpass <redacted>",
+		"  /hamrpass hp_secret_1234567890abcdef": "/hamrpass <redacted>",
 	}
 	for in, want := range cases {
 		if got := redactSlash(in); got != want {
@@ -822,6 +841,38 @@ func TestStalePingForOldBackendDoesNotOverwriteConnectedFlag(t *testing.T) {
 	out, _ = m.Update(pingMsg{ok: false, baseURL: live})
 	if out.(Model).connected {
 		t.Fatal("ping for the live backend must update connected")
+	}
+}
+
+// TestStaleProbeForOldProfileDoesNotOverwriteConnectedFlag mirrors the
+// pingMsg staleness guard for probeMsg: a probe for a profile that is no
+// longer active (user /models switched while a slow probe was still in
+// flight) must not mutate the live reachability indicator. Without the
+// guard the user would see a brief flicker showing the stale profile's
+// outcome on the new profile's badge.
+func TestStaleProbeForOldProfileDoesNotOverwriteConnectedFlag(t *testing.T) {
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+	m.cfg.Active = "local"
+	m.connected = true
+
+	// Stale success probe for a profile other than the active one must not
+	// confirm "connected" on behalf of the live backend.
+	out, _ := m.handleProbe(probeMsg{profile: "hamrpass", contextWindow: 262144})
+	if !out.(Model).connected {
+		t.Fatal("stale success probe overwrote live connected=true")
+	}
+
+	// Stale failure probe must not flip the live backend to disconnected.
+	m.connected = true
+	out, _ = m.handleProbe(probeMsg{profile: "hamrpass", err: cloud.ErrUnauthorized, silent: true})
+	if !out.(Model).connected {
+		t.Fatal("stale failure probe overwrote live connected=true")
+	}
+
+	// Sanity: a probe for the live profile DOES update.
+	out, _ = m.handleProbe(probeMsg{profile: "local", err: cloud.ErrUnauthorized, silent: true})
+	if out.(Model).connected {
+		t.Fatal("probe for the live profile must update connected")
 	}
 }
 

@@ -24,7 +24,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -208,7 +207,7 @@ func fetchHash(ctx context.Context, asset string) (string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", errors.New("non-200")
+		return "", fmt.Errorf("non-200: %d", resp.StatusCode)
 	}
 	sc := bufio.NewScanner(resp.Body)
 	for sc.Scan() {
