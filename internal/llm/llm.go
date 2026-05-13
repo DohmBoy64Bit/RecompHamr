@@ -173,12 +173,19 @@ type Client struct {
 	noReasoningEffort atomic.Bool
 }
 
+// New builds a Client whose lifetime is governed by the caller's context,
+// not by http.Client.Timeout. That field is end-to-end — it covers reading
+// the response body — and would kill a legitimately slow SSE stream mid-flight
+// (the "context deadline exceeded … while reading body" abort on slow local
+// backends generating long outputs). The per-turn context in tui.Model
+// (turnCtx) is the single source of truth for cancellation; connect-level
+// safety (DNS / TCP) is already bounded by Go's default Dialer (30 s).
 func New(base, model, token string) *Client {
 	return &Client{
 		BaseURL: strings.TrimRight(base, "/"),
 		Model:   model,
 		Token:   token,
-		HTTP:    &http.Client{Timeout: 10 * time.Minute},
+		HTTP:    &http.Client{},
 	}
 }
 

@@ -630,3 +630,17 @@ func TestChatFallsBackWhenOllamaRejectsThinking(t *testing.T) {
 		t.Fatalf("second turn must not resend reasoning_effort: %s", bodies[0])
 	}
 }
+
+// TestNewHasNoHTTPTimeout pins the invariant that the streaming Client must
+// NOT set http.Client.Timeout. That field is end-to-end — it covers body
+// reads — and would kill a legitimately slow SSE stream with the
+// "context deadline exceeded … while reading body" abort on slow local
+// backends. Per-turn context cancellation (turnCtx in tui.Model) governs
+// request lifetime; this test stops a well-meaning future refactor from
+// silently reintroducing the wall-clock cap.
+func TestNewHasNoHTTPTimeout(t *testing.T) {
+	c := New("http://example.test", "model", "token")
+	if c.HTTP.Timeout != 0 {
+		t.Fatalf("http.Client.Timeout must be 0 so per-turn context governs SSE lifetime; got %v", c.HTTP.Timeout)
+	}
+}
