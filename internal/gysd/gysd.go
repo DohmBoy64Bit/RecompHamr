@@ -189,7 +189,12 @@ func (s *Session) RecordVerify(command, output string, exitCode int, canceled bo
 	s.LoopToolThisTurn = true
 	s.MissingStreak = 0
 	if canceled {
-		return Result{ToolPayload: output + "\n(cancelled)"}
+		// Same hygiene as the non-cancelled branch — strip ANSI so raw ESC
+		// bytes don't survive into history (where the next pack would emit
+		// them through tea.Println on render), and truncate so a verify
+		// that streamed megabytes of output before Ctrl+C lands here can't
+		// blow the context window via a single tool-result message.
+		return Result{ToolPayload: chmctx.Truncate(StripANSI(output)) + "\n(cancelled)"}
 	}
 
 	stripped := StripANSI(output)

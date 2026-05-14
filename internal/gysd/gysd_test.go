@@ -116,6 +116,31 @@ func TestVerifyCancelDoesNotBumpStreak(t *testing.T) {
 	}
 }
 
+// TestVerifyCancelSanitizesPayload: the cancelled-verify ToolPayload feeds
+// into history as a synthetic tool-result message. Without the same hygiene
+// the non-cancelled path enforces (ANSI strip + token truncate), a verify
+// that produced megabytes of coloured output before the user Ctrl+C'd would
+// (a) drop raw ESC bytes into history that re-emerge on the next pack, and
+// (b) blow the context window with a single tool message. Pin the contract:
+// the cancelled payload must be bounded and ANSI-free.
+func TestVerifyCancelSanitizesPayload(t *testing.T) {
+	s := newSession(t)
+	// ~120 KB of coloured output — well past the chmctx.Truncate budget
+	// (~16 KB head+tail + marker). Without truncation the cancelled
+	// payload would carry the full ~120 KB into history.
+	colored := "\x1b[31mFAIL\x1b[0m " + strings.Repeat("noise ", 20_000) + "\x1b[1mtail\x1b[0m"
+	r := s.RecordVerify("pytest", colored, 0, true)
+	if strings.ContainsRune(r.ToolPayload, 0x1b) {
+		t.Fatalf("ANSI leaked into cancelled payload (first 200 bytes): %q", r.ToolPayload[:200])
+	}
+	if !strings.Contains(r.ToolPayload, "cancelled") {
+		t.Fatalf("payload missing cancel notice")
+	}
+	if got := len(r.ToolPayload); got > 50_000 {
+		t.Fatalf("cancelled payload not truncated: len=%d bytes, want <= 50000", got)
+	}
+}
+
 func TestPreVerifyEmptyCommandRejected(t *testing.T) {
 	s := newSession(t)
 	run, _, r := s.PreVerify("   \t\n", 0)
