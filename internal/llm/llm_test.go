@@ -225,6 +225,35 @@ func TestChatDispatchesToolCallsOnFinishStop(t *testing.T) {
 	}
 }
 
+// TestChatToolCallLateIDPreserved: OpenAI's spec ships the tool_call `id`
+// in the first fragment of a call, but a sloppy provider may delay it. The
+// client must update slot.id on any non-empty value (same forgiveness it
+// already has for `name`) — otherwise the resulting assistant.tool_calls[0].id
+// is "" and the subsequent /v1 request 400s on the unpaired tool message.
+func TestChatToolCallLateIDPreserved(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		sseOK(w, []string{
+			`{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"bash"}}]}}]}`,
+			`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_late","function":{"arguments":"{\"cmd\":\"ls\"}"}}]}}]}`,
+			`{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}`,
+		})
+	}))
+	defer srv.Close()
+	c := New(srv.URL, "m", "")
+	var got *chmctx.ToolCall
+	for _, e := range collect(c.Chat(context.Background(), nil, nil)) {
+		if e.Kind == EventToolCall {
+			got = e.ToolCall
+		}
+	}
+	if got == nil {
+		t.Fatal("tool call event missing")
+	}
+	if got.ID != "call_late" {
+		t.Fatalf("late-arriving id lost: got %q, want %q", got.ID, "call_late")
+	}
+}
+
 // TestChatToolCallMalformedArgsPreservesMarker: when the streamed
 // `arguments` string isn't valid JSON (provider bug), the client must not
 // silently hand the tool an empty args map — it surfaces a sentinel key

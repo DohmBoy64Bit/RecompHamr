@@ -77,10 +77,11 @@ type Model struct {
 	// without threading a Cmd back manually.
 	outbox []string
 
-	// scroll is a passive write-only transcript of every line emitted via
-	// appendLine / flushStreaming. Never rendered — the actual scrollback
-	// lives in the user's terminal. Kept solely so tests and the optional
-	// debug log can verify what was emitted.
+	// scroll is the in-memory transcript of every line emitted via
+	// appendLine / flushStreaming. The actual scrollback lives in the
+	// user's terminal; this copy is replayed via tea.Println in
+	// handleResizeSettle after a width change wipes the terminal, and
+	// tests use it to verify what was emitted.
 	scroll *strings.Builder
 
 	ta       promptInput

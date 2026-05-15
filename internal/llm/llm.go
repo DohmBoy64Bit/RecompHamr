@@ -483,9 +483,17 @@ func dispatchDelta(parent context.Context, d streamDelta, budget cloud.BudgetSta
 	for _, tc := range d.ToolCalls {
 		slot, existed := slots[tc.Index]
 		if !existed {
-			slot = &toolSlot{id: tc.ID}
+			slot = &toolSlot{}
 			slots[tc.Index] = slot
 			*order = append(*order, tc.Index)
+		}
+		// id and name are typically populated on the first fragment, but
+		// updating on any non-empty value keeps a sloppy provider that
+		// ships them in a later chunk from losing them — without this an
+		// empty tool_call_id would round-trip into history and the next
+		// /v1 request would 400 on the unpaired tool message.
+		if tc.ID != "" {
+			slot.id = tc.ID
 		}
 		if tc.Function.Name != "" {
 			slot.name = tc.Function.Name
