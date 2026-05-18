@@ -73,22 +73,34 @@ func Check(ctx context.Context, execPath string) bool {
 	return !strings.EqualFold(local, remote)
 }
 
-// assetName mirrors the name_template in .goreleaser.yaml. Unsupported
-// platforms (e.g. freebsd) return ok=false so we skip the check entirely
-// instead of probing for an asset that was never built.
+// assetName mirrors the name_template in .goreleaser.yaml. Every goos
+// goreleaser builds for must be reachable here — TestAssetNameCoversEvery
+// ReleasedPlatform pins this contract so a future target added to
+// .goreleaser.yaml without a corresponding switch case can't ship a
+// "release" that silently locks one platform's users out of auto-updates,
+// which is exactly the regression Windows hit pre-2026-05.
+//
+// Truly unsupported platforms (e.g. freebsd, plan9, linux/386) return
+// ok=false so Check short-circuits before touching the network.
 func assetName(goos, goarch string) (string, bool) {
+	ext := ""
 	switch goos {
 	case "linux":
 		// keep as-is
 	case "darwin":
 		goos = "macos"
+	case "windows":
+		// goreleaser appends .exe to Windows binary archives; the manifest
+		// row reads `<hash>  codehamr-windows-<arch>.exe` — match that or
+		// the asset 404s on download.
+		ext = ".exe"
 	default:
 		return "", false
 	}
 	if goarch != "amd64" && goarch != "arm64" {
 		return "", false
 	}
-	return fmt.Sprintf("codehamr-%s-%s", goos, goarch), true
+	return fmt.Sprintf("codehamr-%s-%s%s", goos, goarch, ext), true
 }
 
 // hashFile streams a file through sha256. Used against os.Executable(); a
@@ -183,7 +195,44 @@ func Apply(ctx context.Context, execPath string) error {
 	if err := os.Chmod(tmpPath, 0o755); err != nil {
 		return err
 	}
-	return os.Rename(tmpPath, execPath)
+	// Cross-platform rename-aside. Windows blocks MoveFileEx(...,
+	// REPLACE_EXISTING) against a running .exe's sharing lock, so the
+	// running binary at execPath cannot be overwritten in place — but
+	// Windows DOES allow renaming a running .exe to a new name. So we
+	// move the current binary aside to execPath+".old" first, then move
+	// the verified download into the now-vacant execPath. Unix doesn't
+	// need the dance (the kernel keeps the running inode alive across
+	// an overwriting rename) but we do it anyway to keep one identical
+	// codepath across linux/macos/windows × amd64/arm64 — the same
+	// single-codepath discipline the rest of the package follows.
+	// CleanupOld, called from main() at next launch, removes the .old
+	// once the previous process has released its handle to it.
+	oldPath := execPath + ".old"
+	// A leftover .old from a prior failed cleanup would make the next
+	// Rename fail on Windows (REPLACE_EXISTING against a locked stale
+	// file). Remove eagerly; ENOENT is fine.
+	_ = os.Remove(oldPath)
+	if err := os.Rename(execPath, oldPath); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, execPath); err != nil {
+		// Promote attempt failed after we already moved the running
+		// binary aside — restore it so the caller still has something
+		// to exec, then surface the error.
+		_ = os.Rename(oldPath, execPath)
+		return err
+	}
+	return nil
+}
+
+// CleanupOld removes the execPath+".old" left behind by a previous Apply.
+// Called from main() at the very start of the next launch — on Windows,
+// the .old is locked for the lifetime of the previous codehamr process,
+// so unlink-at-Apply-time would fail; unlink-at-next-launch always wins.
+// Any failure (file missing, permission denied) is silent — a leftover
+// .old wastes disk space but never breaks the running session.
+func CleanupOld(execPath string) {
+	_ = os.Remove(execPath + ".old")
 }
 
 // fetchHash downloads codehamr_checksums.txt and returns the hash for the

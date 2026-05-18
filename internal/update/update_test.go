@@ -233,13 +233,56 @@ func TestCheckHonoursEnvDisableFlag(t *testing.T) {
 	}
 }
 
-// TestCheckUnsupportedPlatform: when assetName returns ok=false, Check
-// must return false without hitting the network at all — no manifest fetch
-// would help on a platform that has no published asset.
-func TestCheckUnsupportedPlatform(t *testing.T) {
-	asset, ok := assetName("plan9", "riscv")
-	if ok || asset != "" {
-		t.Fatalf("plan9/riscv should not have an asset, got %q ok=%v", asset, ok)
+// TestAssetNameCoversEveryReleasedPlatform is the regression guard: every
+// goos/goarch combination .goreleaser.yaml publishes a binary for MUST be
+// reachable from assetName. Without this test, adding a target to the
+// goreleaser matrix (or, historically, forgetting to wire one of the
+// existing targets through) silently locks that platform's users out of
+// auto-updates — the symptom Check returns false → no fetch → no update,
+// with zero visible signal. The published checksums.txt at the URL in the
+// package doc currently lists exactly these six rows; this table mirrors
+// that contract.
+func TestAssetNameCoversEveryReleasedPlatform(t *testing.T) {
+	cases := []struct {
+		goos, goarch, want string
+	}{
+		{"linux", "amd64", "codehamr-linux-amd64"},
+		{"linux", "arm64", "codehamr-linux-arm64"},
+		{"darwin", "amd64", "codehamr-macos-amd64"},
+		{"darwin", "arm64", "codehamr-macos-arm64"},
+		{"windows", "amd64", "codehamr-windows-amd64.exe"},
+		{"windows", "arm64", "codehamr-windows-arm64.exe"},
+	}
+	for _, c := range cases {
+		got, ok := assetName(c.goos, c.goarch)
+		if !ok {
+			t.Errorf("%s/%s: assetName returned ok=false — every platform goreleaser publishes a binary for must be reachable, or releases are silently broken for that platform", c.goos, c.goarch)
+			continue
+		}
+		if got != c.want {
+			t.Errorf("%s/%s: got %q, want %q", c.goos, c.goarch, got, c.want)
+		}
+	}
+}
+
+// TestAssetNameRejectsUnreleasedPlatform: the inverse contract — anything
+// goreleaser does NOT build for must return ok=false so Check short-circuits
+// before touching the network. A 200-OK on the manifest plus an empty hash
+// for an unknown asset would otherwise lead Apply down a confusing path.
+func TestAssetNameRejectsUnreleasedPlatform(t *testing.T) {
+	cases := [][2]string{
+		{"plan9", "amd64"},
+		{"plan9", "riscv"},
+		{"freebsd", "amd64"},
+		{"openbsd", "arm64"},
+		{"linux", "386"},
+		{"linux", "riscv64"},
+		{"darwin", "386"},
+	}
+	for _, c := range cases {
+		if asset, ok := assetName(c[0], c[1]); ok {
+			t.Errorf("%s/%s: assetName returned ok=true with %q — goreleaser doesn't publish for this combo, Apply would 404", c[0], c[1], asset)
+		}
 	}
 }
 
@@ -281,6 +324,74 @@ func TestCheckReportsStale(t *testing.T) {
 	if !Check(context.Background(), exec) {
 		t.Fatal("Check should return true when local hash differs from published")
 	}
+}
+
+// TestApplyKeepsPreviousBinaryAsOld is the cross-platform-parity guard:
+// on every platform Apply must rename the running execPath aside to
+// execPath+".old" before moving the new download into place, never replace
+// it directly. Windows requires this — MoveFileEx with REPLACE_EXISTING
+// fails against a running .exe's sharing lock — and applying the same
+// rename-aside on linux/macos keeps the on-disk flow identical across
+// platforms (and lets a future debugger inspect what was just upgraded).
+// CleanupOld at startup deletes the stale .old on the next launch.
+func TestApplyKeepsPreviousBinaryAsOld(t *testing.T) {
+	asset := platformAsset(t)
+	newBody := []byte("new release v2\n")
+	oldBody := []byte("running binary v1\n")
+	r := newFakeRelease(t, asset, newBody, hashOf(newBody))
+	withReleaseURLs(t, r.srv.URL)
+
+	tmpDir := t.TempDir()
+	exec := filepath.Join(tmpDir, "codehamr")
+	if err := os.WriteFile(exec, oldBody, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Apply(context.Background(), exec); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	got, err := os.ReadFile(exec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(newBody) {
+		t.Fatalf("execPath should hold the new binary, got %q", got)
+	}
+	oldPath := exec + ".old"
+	gotOld, err := os.ReadFile(oldPath)
+	if err != nil {
+		t.Fatalf("Apply must preserve previous binary at %s, got %v", oldPath, err)
+	}
+	if string(gotOld) != string(oldBody) {
+		t.Fatalf("%s should hold the previous binary, got %q", oldPath, gotOld)
+	}
+}
+
+// TestCleanupOldRemovesStaleFile: the .old file from a previous Apply must
+// be removed at the next launch so it doesn't accumulate across updates.
+// On Windows the .old is locked until the previous codehamr process fully
+// exits, so cleanup at the start of main() — not at the end of Apply — is
+// the only point where the unlink is guaranteed to succeed.
+func TestCleanupOldRemovesStaleFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	exec := filepath.Join(tmpDir, "codehamr")
+	stale := exec + ".old"
+	if err := os.WriteFile(stale, []byte("previous"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	CleanupOld(exec)
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Fatalf("CleanupOld should remove %s, stat err: %v", stale, err)
+	}
+}
+
+// TestCleanupOldNoopWhenMissing: cleanup must be silent when there is no
+// .old file (the steady-state case after the first launch following an
+// update). No error, no log, no panic.
+func TestCleanupOldNoopWhenMissing(t *testing.T) {
+	tmpDir := t.TempDir()
+	exec := filepath.Join(tmpDir, "codehamr")
+	CleanupOld(exec) // must not panic, must not log
 }
 
 // TestApplyRespectsContextCancel: a cancelled ctx aborts the download and

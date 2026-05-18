@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -38,6 +37,16 @@ func main() {
 			printHelp()
 			return
 		}
+	}
+
+	// Wipe the previous session's superseded binary, if any. update.Apply
+	// renames the running exe to <path>.old before promoting the new
+	// download into place; on Windows the old file stays locked until the
+	// previous codehamr process exits, so unlink-at-Apply-time would race
+	// the lock. Doing it at the start of every launch always wins, on
+	// every platform, and keeps a stale file out of the install dir.
+	if exe, err := os.Executable(); err == nil {
+		update.CleanupOld(exe)
 	}
 
 	// Pre-launch auto-update: if the checksum of the running binary differs
@@ -177,11 +186,17 @@ func maybeSelfUpdate() {
 		}
 		return
 	}
-	// Re-exec in place. Environ carries CODEHAMR_NO_UPDATE_CHECK=1 on the
-	// replacement run so the already-updated child doesn't loop into a
-	// second check against its own freshly-written hash.
+	// Re-launch the freshly-installed binary. reExec is platform-split:
+	// unix execve replaces the process image in place (same PID, seamless
+	// to the parent shell); Windows can't execve so reexec_windows.go
+	// spawns the new exe as a child, waits for it, and forwards its exit
+	// code, achieving the same user-visible "one session, new binary"
+	// outcome. The replacement run carries CODEHAMR_NO_UPDATE_CHECK=1 so
+	// it doesn't loop into a second check against its own freshly-written
+	// hash. reExec only returns on failure (spawn error / missing binary);
+	// in that case we fall through to the old in-memory binary.
 	env := append(os.Environ(), "CODEHAMR_NO_UPDATE_CHECK=1")
-	if err := syscall.Exec(exe, os.Args, env); err != nil {
+	if err := reExec(exe, os.Args, env); err != nil {
 		fmt.Fprintf(os.Stderr, "⚠ re-exec failed: %v (continuing with previous version)\n", err)
 	}
 }
