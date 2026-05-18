@@ -87,7 +87,7 @@ Info for Ollama users: Ollama Desktop may silently cut context to 4k. Open setti
 
 ## HamrPass
 
-We love local LLMs and always will. codehamr is built fully open
+We love local LLMs and always will. Codehamr is built fully open
 source with an MIT license and always will be. Connect to your
 local Ollama models, or bring your own key with OpenRouter, OpenAI,
 whatever you like.
