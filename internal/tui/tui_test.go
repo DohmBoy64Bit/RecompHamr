@@ -2164,6 +2164,24 @@ func TestPopoverRenderHasNoMarker(t *testing.T) {
 	}
 }
 
+// TestPopoverSelectionStaysVisible: with more than popoverCap suggestions
+// (e.g. a user with >6 model profiles) the popover renders a window of rows;
+// when the selection moves past that window renderPopover must scroll so the
+// highlighted row is still shown. Otherwise the user can commit on Enter a
+// row that was never visible.
+func TestPopoverSelectionStaysVisible(t *testing.T) {
+	m := Model{width: 80, suggestOpen: true}
+	for i := 0; i < popoverCap+4; i++ {
+		m.suggest = append(m.suggest, argOption{value: fmt.Sprintf("profile%d", i)})
+	}
+	m.suggestIdx = len(m.suggest) - 1 // last row, well past the first window
+	rendered := stripANSI(m.renderPopover())
+	if !strings.Contains(rendered, m.suggest[m.suggestIdx].value) {
+		t.Fatalf("selected row %q not visible in popover:\n%s",
+			m.suggest[m.suggestIdx].value, rendered)
+	}
+}
+
 // TestSplashEmittedOnFirstSize: in inline mode the splash is printed once
 // into terminal scrollback on the first WindowSizeMsg, then it scrolls up
 // naturally as content arrives. We verify the lines reach the outbox (which

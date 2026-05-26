@@ -139,15 +139,26 @@ func (m Model) renderPopover() string {
 	if !m.suggestOpen {
 		return ""
 	}
-	rows := m.suggest[:m.popoverHeight()]
+	// Window the rows around the selection: with more suggestions than fit
+	// (popoverCap), a selection that scrolled past the first window must
+	// still be visible — otherwise the highlighted row is off-screen and the
+	// user commits a row they can't see. start slides just enough to keep
+	// suggestIdx inside the [start, start+h) band.
+	h := m.popoverHeight()
+	start := 0
+	if m.suggestIdx >= h {
+		start = m.suggestIdx - h + 1
+	}
+	rows := m.suggest[start : start+h]
 	var b strings.Builder
 	for i, c := range rows {
+		abs := start + i
 		vw := lipgloss.Width(c.value)
 		dw := lipgloss.Width(c.description)
 		gap := max(m.width-vw-dw, 1)
 		line := c.value + strings.Repeat(" ", gap) + c.description
 		switch {
-		case i == m.suggestIdx:
+		case abs == m.suggestIdx:
 			line = stylePopoverSelected.Render(line)
 		case c.current:
 			line = stylePopoverCurrent.Render(line)
