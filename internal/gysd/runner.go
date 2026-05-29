@@ -56,6 +56,17 @@ func RunCommand(parent context.Context, command string, timeout time.Duration) R
 		res.Output = res.Output + fmt.Sprintf("\n(timeout after %s)", timeout)
 		return res
 	}
+	if errors.Is(err, exec.ErrWaitDelay) {
+		// The shell exited 0; err is non-nil only because a backgrounded child
+		// (`cmd &`) held the stdout/stderr pipes open past WaitDelay — the very
+		// pattern WaitDelay (above) exists to support, not a verify failure.
+		// Return green (ExitCode stays the 0 zero-value) so RecordVerify doesn't
+		// mark a passing `build && ./server & curl /health`-style verify red —
+		// which would both bump RedStreak toward S3 and bar it from matching a
+		// `done` evidence quote. Mirrors tools.Bash; kept after the cancel and
+		// timeout checks so those signals win over a coincident WaitDelay.
+		return res
+	}
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		res.ExitCode = exitErr.ExitCode()

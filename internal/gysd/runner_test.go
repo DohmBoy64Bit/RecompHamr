@@ -92,6 +92,31 @@ func TestRunCommandKillsChildProcessGroup(t *testing.T) {
 	}
 }
 
+// TestRunCommandBackgroundedChildIsGreen: a verify that succeeds but
+// backgrounds a child holding the stdout/stderr pipes open past WaitDelay
+// (e.g. `build && ./server & curl /health`) trips exec.ErrWaitDelay — the
+// shell already exited 0, NOT an exit error. RunCommand must report that as
+// green (ExitCode 0, no "(exec error:" marker); otherwise RecordVerify marks
+// the passing run red, bumping RedStreak toward an S3 false yield and barring
+// it from satisfying a green `done` evidence match. Companion to the bash
+// tool's TestBashBackgroundedChildReturnsCleanOutput — same defect, the
+// verify path was missed.
+func TestRunCommandBackgroundedChildIsGreen(t *testing.T) {
+	r := RunCommand(context.Background(), "echo done && sleep 3 &", 10*time.Second)
+	if r.ExitCode != 0 {
+		t.Fatalf("ExitCode=%d, want 0 (backgrounded-child success mislabeled)", r.ExitCode)
+	}
+	if r.Canceled || r.TimedOut {
+		t.Fatalf("flags set unexpectedly: %+v", r)
+	}
+	if strings.Contains(r.Output, "(exec error:") {
+		t.Fatalf("backgrounded-child success carries spurious exec-error marker: %q", r.Output)
+	}
+	if !strings.Contains(r.Output, "done") {
+		t.Fatalf("Output missing backgrounded command output: %q", r.Output)
+	}
+}
+
 func TestRunCommandCombinesStdoutStderr(t *testing.T) {
 	r := RunCommand(context.Background(),
 		"echo OUT && echo ERR >&2", 5*time.Second)
