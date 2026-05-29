@@ -16,15 +16,19 @@ import (
 const (
 	historyFileName   = "history"
 	historyMaxEntries = 500
-	// historyMaxEntryBytes caps a single quoted line. Pasted attachments
-	// arrive as chips in the live UI but the on-disk history still stores
-	// their expanded text, so without this cap a multi-megabyte log paste
-	// would balloon the history file every submit and eventually exceed
-	// the 1 MiB scanner buffer in loadPromptHistory — at which point the
-	// entry would silently disappear on the next load. 256 KiB comfortably
-	// holds any sane prompt; longer pastes are simply not recalled, which
-	// is the right tradeoff for a dumb cat-friendly store.
+	// historyMaxEntryBytes is the sane-prompt size cap on the (unquoted)
+	// value. Pasted attachments arrive as chips in the live UI but the
+	// on-disk history still stores their expanded text, so without this cap
+	// a multi-megabyte log paste would balloon the history file every submit.
+	// 256 KiB comfortably holds any sane prompt; longer pastes are simply
+	// not recalled, which is the right tradeoff for a dumb cat-friendly store.
 	historyMaxEntryBytes = 256 * 1024
+	// historyScannerMax is the per-line token ceiling for the bufio scanners
+	// that read the file back (loadPromptHistory, countHistoryLines). A line
+	// at or above this length is dropped by bufio with ErrTooLong, which also
+	// halts the scan and loses every later entry — so appendPromptHistory
+	// must never write a quoted line this long (see the guard there).
+	historyScannerMax = 1024 * 1024
 )
 
 func historyPath(dir string) string { return filepath.Join(dir, historyFileName) }
@@ -44,7 +48,7 @@ func loadPromptHistory(dir string) []promptEntry {
 	// One prompt may carry a pasted log of tens of KB; raise the per-line
 	// cap well past Scanner's 64KB default so we don't silently drop the
 	// tail of a long entry on load.
-	sc.Buffer(make([]byte, 64*1024), 1024*1024)
+	sc.Buffer(make([]byte, 64*1024), historyScannerMax)
 	for sc.Scan() {
 		v, err := strconv.Unquote(sc.Text())
 		if err != nil {
@@ -75,7 +79,17 @@ func appendPromptHistory(dir, value string) error {
 	if len(value) > historyMaxEntryBytes {
 		return nil
 	}
-	line := strconv.Quote(value) + "\n"
+	// strconv.Quote expands control / invalid bytes to \xNN (4× each), so a
+	// value that clears the unquoted cap above can still quote to a line at or
+	// past historyScannerMax. Such a line is silently dropped on the next load
+	// AND halts the scan, losing every newer entry with it. Decline to store
+	// what the loader can't read back. (bufio needs the token strictly below
+	// the buffer max, hence >=.)
+	quoted := strconv.Quote(value)
+	if len(quoted) >= historyScannerMax {
+		return nil
+	}
+	line := quoted + "\n"
 	path := historyPath(dir)
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
@@ -120,7 +134,7 @@ func countHistoryLines(path string) (int, error) {
 	}
 	defer f.Close()
 	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 64*1024), 1024*1024)
+	sc.Buffer(make([]byte, 64*1024), historyScannerMax)
 	n := 0
 	for sc.Scan() {
 		n++

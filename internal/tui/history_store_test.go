@@ -150,6 +150,36 @@ func TestPromptHistoryConcurrentAppendsKeepBoth(t *testing.T) {
 	}
 }
 
+// TestPromptHistoryQuotedLineStaysLoadable is the regression for the
+// quote-expansion gap: appendPromptHistory gated on the *unquoted* length,
+// but strconv.Quote turns each control / invalid byte into \xNN (4× growth),
+// so a value sitting exactly at the byte cap but made of control bytes
+// produced an on-disk line larger than loadPromptHistory's scanner buffer.
+// bufio drops that line on load — and ErrTooLong halts the scan, so every
+// *newer* entry after it silently vanishes from recall too. The append guard
+// must decline to store any line the loader can't read back.
+func TestPromptHistoryQuotedLineStaysLoadable(t *testing.T) {
+	dir := t.TempDir()
+	// Clears the unquoted size gate (len == cap, not >), but quotes to ~4×
+	// the cap — past the scanner ceiling. Pre-fix this got written to disk.
+	pathological := strings.Repeat("\x01", historyMaxEntryBytes)
+	if err := appendPromptHistory(dir, pathological); err != nil {
+		t.Fatal(err)
+	}
+	// A normal prompt submitted afterwards must always survive recall — it
+	// must not be collateral damage of an unreadable line earlier in the file.
+	if err := appendPromptHistory(dir, "survivor"); err != nil {
+		t.Fatal(err)
+	}
+	got := loadPromptHistory(dir)
+	for _, e := range got {
+		if e.display == "survivor" {
+			return // invariant held: later entries stay loadable
+		}
+	}
+	t.Fatalf("a later entry was lost — an oversized quoted line halted the load scan; got %d entries", len(got))
+}
+
 // TestPromptHistoryRejectsHugeEntry: a multi-MiB paste must not get
 // stored verbatim — the prior load path used a 1 MiB scanner cap and
 // would silently drop oversized entries on next load anyway, so
