@@ -18,12 +18,14 @@ build:
 	        -o bin/$(BINARY)-$$label-$$arch$$ext $(PKG); \
 	done
 
+# A clean-tree build carries a real version string, so the freshness check would
+# "update" this local binary back to the last published release. Suppress it.
 run: build
 	clear
 	@os=$$(go env GOOS); arch=$$(go env GOARCH); \
 	 label=$$os; [ "$$os" = "darwin" ] && label=macos; \
 	 ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
-	 ./bin/$(BINARY)-$$label-$$arch$$ext
+	 CODEHAMR_NO_UPDATE_CHECK=1 ./bin/$(BINARY)-$$label-$$arch$$ext
 
 install:
 	clear
