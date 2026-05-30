@@ -75,16 +75,74 @@ func redactSlash(line string) string {
 	return "/hamrpass <redacted>"
 }
 
-// dbgWritef appends one timestamped record. No-op when logging is off.
+// dbgEnabled reports whether logging is on. Callers use it to skip building
+// expensive log payloads (e.g. accumulating a round's reasoning) when the log
+// is off — dbgWritef itself is already a no-op, but the work feeding it isn't.
+func dbgEnabled() bool {
+	dbgMu.Lock()
+	defer dbgMu.Unlock()
+	return dbgFile != nil
+}
+
+// dbgWritef appends one timestamped record. No-op when logging is off. The
+// timestamp carries the date too (not just the clock) so a shared log is
+// unambiguous across day boundaries and correlatable with other tooling.
 func dbgWritef(category, format string, args ...any) {
 	dbgMu.Lock()
 	defer dbgMu.Unlock()
 	if dbgFile == nil {
 		return
 	}
-	ts := time.Now().Format("15:04:05.000")
+	ts := time.Now().Format("2006-01-02 15:04:05.000")
 	body := fmt.Sprintf(format, args...)
 	fmt.Fprintf(dbgFile, "[%s] %s\n%s\n\n", ts, category, body)
+}
+
+// dbgWriteSession records the active backend and context budget once at startup.
+// Behaviour differs sharply by model (a dense Qwen3 and qwen3-coder fail in
+// different ways) and by context window, so a shared log must name exactly what
+// produced it. The system prompt itself isn't dumped — it's the embedded
+// PROMPT_SYS.md plus the working-dir anchor, both reconstructable from the repo;
+// only its size (which feeds the packing budget) is worth recording.
+func dbgWriteSession(version, profile, model, url string, ctxSize, sysTokens int, tools []string) {
+	dbgWritef("session",
+		"codehamr %s · profile=%s · model=%s @ %s\ncontext_size=%d tokens · system_prompt≈%d tokens · tools=[%s]",
+		version, profile, model, url, ctxSize, sysTokens, strings.Join(tools, ", "))
+}
+
+// dbgWriteRequest records, per LLM round, what newest-first packing actually
+// sent: how much of history survived the budget and how many tool outputs are
+// truncated. The message bodies are already captured as user/assistant/
+// tool_result records, so this logs only the packing decisions those per-message
+// records cannot show — what the model saw versus what was dropped. packed
+// includes the prepended system message; historyLen is the pre-pack history.
+func dbgWriteRequest(model string, ctxSize, budget, historyLen int, packed []chmctx.Message) {
+	if !dbgEnabled() {
+		return
+	}
+	// packed[0] is the prepended system message (buildMessages always prepends
+	// it). Count AND sum over history messages only — packed[1:] — so the token
+	// figure matches the message count and is directly comparable to budget,
+	// which is the *history* budget (ctx.Budget already subtracts the system and
+	// tool reservations). Summing the ~3k-token system prompt into a "packed=1
+	// msgs" line would read as if that one history message were 3k tokens.
+	tokens, truncated := 0, 0
+	for _, msg := range packed[1:] {
+		tokens += msg.Tokens()
+		if strings.Contains(msg.Content, "───── truncated:") {
+			truncated++
+		}
+	}
+	note := ""
+	if truncated > 0 {
+		note = fmt.Sprintf(" · %d tool output(s) truncated", truncated)
+	}
+	// kept = packed minus the system message; dropped covers both budget
+	// eviction and orphan-tool drops.
+	kept := len(packed) - 1
+	dbgWritef("request",
+		"model=%s · ctx=%d (history budget=%d) · history=%d msgs → packed=%d msgs (~%d tokens) · dropped=%d oldest%s",
+		model, ctxSize, budget, historyLen, kept, tokens, historyLen-kept, note)
 }
 
 // dbgWriteMessage records a chmctx.Message readably: content and tool calls

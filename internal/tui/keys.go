@@ -95,6 +95,7 @@ func (m Model) handleCtrlC() (tea.Model, tea.Cmd) {
 		// abortTurn flushes the partial block so streamed output stays
 		// visible, drains turn stats for a clean next banner, then unwinds
 		// the per-turn context.
+		dbgWritef("cancel", "user cancelled the turn (Ctrl+C)")
 		m.abortTurn(styleWarn.Render("✗ cancelled"))
 		m.quitArmedAt = time.Time{}
 		m.status = ""

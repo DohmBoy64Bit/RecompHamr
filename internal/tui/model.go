@@ -81,6 +81,13 @@ type Model struct {
 	// and tests read it to verify what was emitted.
 	scroll *strings.Builder
 
+	// reasoning accumulates the current round's chain-of-thought (EventReasoning)
+	// for the debug log only — it never enters history (see llm.EventReasoning).
+	// Pointer like streaming/scroll: Model is copied by value across bubbletea
+	// and strings.Builder must not be copied after first use. Only written when
+	// logging is on; reset every round in applyDone and on abort.
+	reasoning *strings.Builder
+
 	ta       promptInput
 	renderer *glamour.TermRenderer
 	spinner  spinner.Model
@@ -199,8 +206,18 @@ func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model 
 		// WindowSizeMsg, so we don't flash an 80×24 frame then resize.
 		streaming:       new(strings.Builder),
 		scroll:          new(strings.Builder),
+		reasoning:       new(strings.Builder),
 		histIdx:         -1,
 		liveContextSize: map[string]int{},
+	}
+	// Record the active backend + budget once, before any turn, so a shared log
+	// names exactly which model/endpoint/context window produced the behaviour.
+	// Gated on dbgEnabled so the profile derefs run only when logging is on —
+	// off (the default) means New behaves exactly as before.
+	if dbgEnabled() {
+		dbgWriteSession(version, cfg.Active, cfg.ActiveProfile().LLM, cfg.ActiveURL(),
+			m.activeContextSize(), chmctx.Tokens(m.system),
+			[]string{tools.BashName, tools.ReadFileName, tools.WriteFileName, tools.EditFileName})
 	}
 	// Seed prompt history from .codehamr/history so ↑ recalls prompts from
 	// earlier sessions. Loaded entries carry no chip metadata (the on-disk
@@ -560,10 +577,14 @@ func (m *Model) endTurn() {
 }
 
 func (m *Model) buildMessages() []chmctx.Message {
-	r := chmctx.Pack(m.history, chmctx.Budget(m.activeContextSize()))
+	ctxSize := m.activeContextSize()
+	budget := chmctx.Budget(ctxSize)
+	r := chmctx.Pack(m.history, budget)
 	out := make([]chmctx.Message, 0, len(r.Messages)+1)
 	out = append(out, chmctx.Message{Role: chmctx.RoleSystem, Content: m.system})
-	return append(out, r.Messages...)
+	out = append(out, r.Messages...)
+	dbgWriteRequest(m.cfg.ActiveProfile().LLM, ctxSize, budget, len(m.history), out)
+	return out
 }
 
 // buildTools exposes the four local tools every turn: bash, read_file,
@@ -608,7 +629,13 @@ func (m Model) handleStream(e llm.Event) (tea.Model, tea.Cmd) {
 		// Reasoning streams while phase stays "thinking": still deliberating,
 		// no user-facing content yet. Hidden from the transcript (not written
 		// to scroll); only the live token estimate ticks up in the status bar.
+		// When logging, accumulate it so the round's chain-of-thought lands in
+		// the debug log — the highest-signal record for understanding why the
+		// model chose a tool or went wrong.
 		m.streamingEstimate += len(e.Content) / 4
+		if dbgEnabled() {
+			m.reasoning.WriteString(e.Content)
+		}
 	case llm.EventToolCall:
 		m.applyToolCall(e)
 	case llm.EventDone:
@@ -659,10 +686,22 @@ func (m *Model) applyDone(e llm.Event) {
 	m.sessionTokens += delta
 	m.streamingEstimate = 0
 	m.connected = true
+	// Round-level reasoning first (it preceded the answer), then the assistant
+	// message, then the round metrics — so the log reads in causal order.
+	if r := m.reasoning.String(); r != "" {
+		dbgWritef("reasoning", "%s", r)
+	}
+	m.reasoning.Reset()
 	if e.Final != nil {
 		dbgWriteMessage("assistant", *e.Final)
 		m.history = append(m.history, *e.Final)
 	}
+	budgetNote := ""
+	if e.Budget.Set {
+		budgetNote = fmt.Sprintf(" · budget=%.1f%% pass", e.Budget.Remaining*100)
+	}
+	dbgWritef("round_done", "tokens=%d (counted=%d) · elapsed=%s · ctx_window=%d%s",
+		e.Tokens, delta, e.Elapsed.Round(time.Millisecond), e.ContextWindow, budgetNote)
 	m.flushStreaming()
 }
 
@@ -688,6 +727,7 @@ func (m *Model) applyError(e llm.Event) tea.Cmd {
 func (m *Model) abortTurn(banner string) {
 	m.flushStreaming()
 	m.streamingEstimate = 0
+	m.reasoning.Reset()
 	if banner != "" {
 		m.appendLine(banner)
 	}
@@ -704,6 +744,10 @@ func (m *Model) finalizeTurn() {
 	if rate := humanRate(m.turnTokens, m.turnElapsed); rate != "" {
 		banner += " · " + rate
 	}
+	// The end-reason (clean / leak / cancel / error) is logged at its own site;
+	// this records the turn's totals. Common to every wind-down (handleStreamClosed
+	// and abortTurn both call finalizeTurn), so it always fires for a real turn.
+	dbgWritef("turn_end", "%s · session_total=%s", banner, humanTokens(m.sessionTokens))
 	m.appendLine(styleStatus.Render(banner))
 	m.turnTokens = 0
 	m.turnElapsed = 0
@@ -728,6 +772,7 @@ func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
 	// the user — the fix is server-side, so re-prompting can't help.
 	if w := toolCallLeakWarning(m.history); w != "" {
 		m.appendLine(w)
+		dbgWritef("leak", "turn ended with tool-call text leaked into the reply (server-side parser misconfigured)")
 	}
 	m.finalizeTurn()
 	m.endTurn()
@@ -833,10 +878,14 @@ func (m *Model) recordToolOutcome(name, content string) {
 	}
 	if m.lastToolKey == m.failKey && m.failKey != "" {
 		m.failStreak++
-		return
+	} else {
+		m.failKey = m.lastToolKey
+		m.failStreak = 1
 	}
-	m.failKey = m.lastToolKey
-	m.failStreak = 1
+	// Log only failures: a success leaves the streak at 0 and is already visible
+	// as a tool_result. The climbing streak is the nudge machinery's state, the
+	// part the per-message records can't show.
+	dbgWritef("tool_outcome", "tool=%s FAILED · same-target streak=%d/%d · key=%s", name, m.failStreak, maxToolFailStreak, m.failKey)
 }
 
 // maybeFailureNudge appends one system-role note once the same target has
@@ -847,6 +896,7 @@ func (m *Model) maybeFailureNudge() {
 	if m.failStreak < maxToolFailStreak {
 		return
 	}
+	dbgWritef("nudge", "repeated-failure nudge injected after %d same-target failures (key=%s)", m.failStreak, m.failKey)
 	m.history = append(m.history, chmctx.Message{
 		Role: chmctx.RoleSystem,
 		Content: fmt.Sprintf(
@@ -871,6 +921,7 @@ func (m *Model) maybeRunawayNudge() {
 	if m.toolRounds != maxToolRounds {
 		return
 	}
+	dbgWritef("nudge", "runaway-iteration nudge injected at %d tool calls this turn", m.toolRounds)
 	m.history = append(m.history, chmctx.Message{
 		Role: chmctx.RoleSystem,
 		Content: fmt.Sprintf(

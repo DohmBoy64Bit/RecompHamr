@@ -657,6 +657,68 @@ func TestDebugLogFilePermsAreOwnerOnly(t *testing.T) {
 	}
 }
 
+// TestVerboseLogCapturesTurnRecords drives a realistic two-round turn (reasoning
+// → bash tool call → final answer) with logging on, and asserts the verbose
+// records that make a session reconstructable for later debugging actually land
+// in log.txt: the session header, the per-round request/packing summary, the
+// streamed reasoning, the tool result, and the round/turn metrics. Also pins the
+// dated timestamp — a bare clock can't be correlated across a day boundary. This
+// is the regression guard against a refactor silently gutting the debug log.
+func TestVerboseLogCapturesTurnRecords(t *testing.T) {
+	var round int
+	handler := func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		round++
+		if round == 1 {
+			fmt.Fprintf(w, "data: %s\n\n", `{"choices":[{"delta":{"reasoning":"let me check the file"}}]}`)
+			fmt.Fprintf(w, "data: %s\n\n", `{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"bash","arguments":"{\"cmd\":\"echo HAMMER\"}"}}]}}]}`)
+			fmt.Fprintf(w, "data: %s\n\n", `{"choices":[{"delta":{},"finish_reason":"tool_calls"}],"usage":{"completion_tokens":5}}`)
+			fmt.Fprint(w, "data: [DONE]\n\n")
+			return
+		}
+		fmt.Fprintf(w, "data: %s\n\n", `{"choices":[{"delta":{"content":"all done"}}]}`)
+		fmt.Fprintf(w, "data: %s\n\n", `{"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"completion_tokens":2}}`)
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}
+
+	dir := t.TempDir()
+	OpenDebugLog(dir)
+	t.Cleanup(CloseDebugLog)
+	// Logging is on before New runs (inside newTestModel), so the session header
+	// is captured too — it writes to the global dbgFile, not cfg.Dir.
+	m := newTestModel(t, handler)
+	mm, cmd := m.submit("inspect the repo", "inspect the repo", promptEntry{display: "inspect the repo"})
+	drain(mm, cmd)
+	CloseDebugLog()
+
+	raw, err := os.ReadFile(filepath.Join(dir, "log.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	logStr := string(raw)
+
+	for _, want := range []string{
+		"] session", "context_size=", // backend + budget header
+		"] user", "inspect the repo", // the prompt
+		"] request", "packed=", // per-round packing summary
+		"] reasoning", "let me check the file", // streamed chain-of-thought
+		"] tool_result",        // the bash result
+		"] assistant",          // final assistant message
+		"] round_done", "elapsed=", // per-round metrics
+		"] turn_end", // turn totals
+	} {
+		if !strings.Contains(logStr, want) {
+			t.Fatalf("verbose log missing %q\n--- log.txt ---\n%s", want, logStr)
+		}
+	}
+
+	// Dated timestamp: "[2006-01-02 15:04:05.000]", not the old bare clock.
+	first := logStr[:strings.IndexByte(logStr, '\n')]
+	if len(first) < 21 || first[0] != '[' || first[5] != '-' || first[8] != '-' || first[11] != ' ' {
+		t.Fatalf("log timestamp missing date component: %q", first)
+	}
+}
+
 // TestSlashModelSwitchDropsStickyFallbackState: llm.Client's noReasoningEffort
 // flag ("this server 400'd on tools+reasoning_effort, stop sending it") is
 // correct for one Client but wrong across a profile switch to a different
