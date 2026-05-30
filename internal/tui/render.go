@@ -201,7 +201,7 @@ func (m Model) splashLines() []string {
 			lines = append(lines, "  "+styleDim.Render(splashCode[i])+styleHamr.Render(splashHamr[i]))
 		}
 		lines = append(lines,
-			"", styleDim.Render("  it's hamr time!"),
+			"", styleDim.Render("  It's hamr time!"),
 			"", styleDim.Render(fmt.Sprintf("  codehamr %s · %s @ %s",
 				m.Version, m.cfg.ActiveProfile().LLM, m.cfg.Active)),
 			"",
