@@ -781,6 +781,16 @@ func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if len(m.pending) > 0 {
+		// The model issued a tool call — genuine progress. Re-arm the empty-reply
+		// latch so a LATER transient empty on this same (long) turn earns its own
+		// re-prompt instead of hitting the leak-and-die branch below. The latch
+		// exists to stop a server that deterministically swallows EVERY call, not
+		// to cap recoveries on a turn that keeps advancing — a flaky stream that
+		// drops the occasional call must not abandon a half-built file (the galaxy1
+		// failure: empty → nudge → recovered with a write → empty again → died).
+		// Two CONSECUTIVE empties still terminate: pending is 0 on that path, so
+		// this never re-arms there.
+		m.emptyNudged = false
 		return m.dispatchNextTool()
 	}
 	// The turn is ending with no tool calls. If the model said nothing and called

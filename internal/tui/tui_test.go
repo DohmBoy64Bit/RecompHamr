@@ -2870,6 +2870,29 @@ func TestEmptyReplyNudgeFiresOnceThenSurfaces(t *testing.T) {
 	}
 }
 
+// TestEmptyReplyNudgeReArmsAfterProgress pins the galaxy1 fix: once an empty
+// reply has nudged this turn, a round that issues a real tool call is genuine
+// progress and must re-arm the latch, so a LATER transient empty on the same
+// long turn earns its own re-prompt instead of hitting the leak-and-die branch.
+// A flaky stream that drops the occasional call must not abandon a half-built
+// file. Two CONSECUTIVE empties (no tool call between) still terminate — that
+// path has pending=0 and so never reaches the re-arm.
+func TestEmptyReplyNudgeReArmsAfterProgress(t *testing.T) {
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+	m.installTurnContext()
+	m.phase = phaseStreaming
+	m.emptyNudged = true // a prior empty already nudged this turn
+	m.pending = []chmctx.ToolCall{{ID: "c1", Name: "bash", Arguments: map[string]any{"cmd": "echo hi"}}}
+	m.history = []chmctx.Message{
+		{Role: chmctx.RoleUser, Content: "build it"},
+		{Role: chmctx.RoleAssistant, ToolCalls: []chmctx.ToolCall{{ID: "c1", Name: "bash"}}},
+	}
+	out, _ := m.handleStreamClosed()
+	if out.(Model).emptyNudged {
+		t.Fatal("a round that issued a tool call (progress) must re-arm the empty-reply latch, not leave it consumed for the rest of the turn")
+	}
+}
+
 // drainFinal submits a prompt and pumps the whole turn to completion, returning
 // the settled model. Centralises the submit+drain dance the empty-reply tests share.
 func drainFinal(t *testing.T, m Model, prompt string) Model {
