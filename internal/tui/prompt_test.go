@@ -413,3 +413,55 @@ func TestBackspaceImmediatelyAfterChipRemovesIt(t *testing.T) {
 		t.Fatalf("prompt should be empty after chip delete, got %q", p.DisplayValue())
 	}
 }
+
+// TestPasteIntoChipInteriorKeepsBothPastes: a paste while the cursor sits inside
+// an existing chip's label must not splice the new label into the old one.
+// insertChip snaps out of the chip first; without that, reconcile loses a
+// chip's content and the LLM payload is silently wrong.
+func TestPasteIntoChipInteriorKeepsBothPastes(t *testing.T) {
+	p := newChippablePrompt()
+	n := pasteChipMinLines + 4
+	a := strings.Repeat("AAAA\n", n-1) + "Aend"
+	b := strings.Repeat("BBBB\n", n-1) + "Bend"
+	p, _ = p.Update(pasteKey(a))
+	if len(p.spans) != 1 {
+		t.Fatalf("setup: expected 1 chip, got %d", len(p.spans))
+	}
+	p.setCursorRuneOffset(p.spans[0].start + 3) // strictly inside chip A's label
+	p, _ = p.Update(pasteKey(b))
+	if len(p.spans) != 2 {
+		t.Fatalf("expected 2 intact chips after interior paste, got %d", len(p.spans))
+	}
+	v := p.Value()
+	if !strings.Contains(v, "Aend") {
+		t.Fatalf("paste A content lost: %q", v)
+	}
+	if !strings.Contains(v, "Bend") {
+		t.Fatalf("paste B content lost/cross-mapped: %q", v)
+	}
+}
+
+// TestTypingIntoChipInteriorKeepsContent: typing a rune while the cursor sits
+// inside a chip label, when two chips share an identical label, must not split
+// the label and cross-map the survivor to the wrong paste. Update snaps out of
+// the chip before delegating the rune to the textarea.
+func TestTypingIntoChipInteriorKeepsContent(t *testing.T) {
+	p := newChippablePrompt()
+	n := pasteChipMinLines + 4
+	a := strings.Repeat("AAAA\n", n-1) + "Aend" // n lines
+	b := strings.Repeat("BBBB\n", n-1) + "Bend" // n lines -> identical label
+	p, _ = p.Update(pasteKey(a))
+	p, _ = p.Update(pasteKey(b))
+	if len(p.spans) != 2 {
+		t.Fatalf("setup: expected 2 chips, got %d", len(p.spans))
+	}
+	p.setCursorRuneOffset(p.spans[0].start + 3) // strictly inside the first label
+	p, _ = p.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("Z")})
+	v := p.Value()
+	if !strings.Contains(v, "Aend") {
+		t.Fatalf("paste A content lost/cross-mapped: %q", v)
+	}
+	if !strings.Contains(v, "Bend") {
+		t.Fatalf("paste B content lost/cross-mapped: %q", v)
+	}
+}

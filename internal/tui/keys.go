@@ -75,7 +75,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) forwardToTextarea(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.ta, cmd = m.ta.Update(msg)
-	m.refreshSuggest("")
+	m.refreshSuggest()
 	return m, cmd
 }
 
@@ -85,7 +85,7 @@ func (m Model) forwardToTextarea(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) setPromptText(s string) {
 	m.ta.SetValue(s)
 	m.ta.CursorEnd()
-	m.refreshSuggest("")
+	m.refreshSuggest()
 }
 
 // handleCtrlC implements Ctrl+C's three-level precedence: in-flight cancel >

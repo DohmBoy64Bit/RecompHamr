@@ -237,16 +237,29 @@ func writeYAML(path string, v any) error {
 # swap 'http://localhost:11434' with 'http://host.docker.internal:11434' below.
 
 `)
-	// 0o600: config.yaml carries the hamrpass key once /hamrpass activates a
-	// profile, and only the project owner should read it.
-	if err := os.WriteFile(path, append(header, b...), 0o600); err != nil {
+	// Write to a sibling temp then rename over config.yaml. Rename is atomic
+	// within the directory, so a crash, signal, or full disk mid-write can never
+	// leave a truncated config.yaml — which Bootstrap's strict decode would fatal
+	// on, bricking the next launch until the file is hand-deleted. Mirrors
+	// internal/update's promote-by-rename. os.CreateTemp makes the temp 0o600 and
+	// rename installs that fresh inode in place, so this also closes the
+	// upgrade-path leak the old in-place write needed a trailing Chmod for:
+	// config.yaml carries the hamrpass key, and only the project owner should
+	// read it.
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".config-*.yaml")
+	if err != nil {
 		return err
 	}
-	// os.WriteFile applies the mode only on create; an existing file keeps its
-	// old mode. A leftover 0o644 (from the world-readable prior default or a
-	// hand-edit) would persist as Save rewrites the pasted key in, so Chmod
-	// unconditionally to close the upgrade-path leak.
-	return os.Chmod(path, 0o600)
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath) // no-op after a successful rename; cleans up early returns
+	if _, err := tmp.Write(append(header, b...)); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, path)
 }
 
 // ActiveProfile returns the selected profile. Bootstrap guarantees c.Active

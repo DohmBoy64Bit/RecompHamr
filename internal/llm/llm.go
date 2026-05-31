@@ -310,18 +310,20 @@ func (c *Client) sendChat(parent context.Context, msgs []chmctx.Message, tools [
 // reasoning_effort for this Client's lifetime and retries once. Two wild
 // flavours, both caught by substring match: OpenAI gpt-5.5+
 // ("reasoning_effort … not supported") and Ollama non-thinking models
-// ("<model> does not support thinking"). Matching shared "not support" plus
-// either signal stays precise without parsing provider-specific JSON. Probe
-// never sets ReasoningEffort, so its 400 can't trip the flag.
+// ("<model> does not support thinking"). Each signal is the provider's own
+// phrase — "not support"+"reasoning_effort", or the literal "does not support
+// thinking" — so an unrelated 400 that merely contains the word "thinking"
+// can't trip the fallback and latch reasoning off for the Client's whole life.
+// Probe never sets ReasoningEffort, so its 400 can't trip the flag.
 func (c *Client) postChat(parent context.Context, body chatRequest) (*http.Response, cloud.BudgetStatus, error) {
 	if c.noReasoningEffort.Load() {
 		body.ReasoningEffort = ""
 	}
 	resp, budget, errBody, err := c.doPost(parent, body)
 	if err != nil && body.ReasoningEffort != "" &&
-		bytes.Contains(errBody, []byte("not support")) &&
-		(bytes.Contains(errBody, []byte("reasoning_effort")) ||
-			bytes.Contains(errBody, []byte("thinking"))) {
+		((bytes.Contains(errBody, []byte("not support")) &&
+			bytes.Contains(errBody, []byte("reasoning_effort"))) ||
+			bytes.Contains(errBody, []byte("does not support thinking"))) {
 		c.noReasoningEffort.Store(true)
 		body.ReasoningEffort = ""
 		resp, budget, _, err = c.doPost(parent, body)

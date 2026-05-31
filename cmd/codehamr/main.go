@@ -157,8 +157,13 @@ func maybeSelfUpdate() {
 	// PID) vs. Windows spawn-and-wait. CODEHAMR_NO_UPDATE_CHECK=1 stops the
 	// replacement run from re-checking its own freshly-written hash. On
 	// reExec failure we fall through to the old in-memory binary.
-	env := append(os.Environ(), "CODEHAMR_NO_UPDATE_CHECK=1")
-	if err := reExec(exe, os.Args, env); err != nil {
+	//
+	// os.Setenv overwrites in place so os.Environ() carries exactly one entry;
+	// append(os.Environ(), …) would leave a pre-existing user-set value first,
+	// and Unix execve resolves os.Getenv to the FIRST match — silently defeating
+	// the guard if someone exported CODEHAMR_NO_UPDATE_CHECK to a non-"1" value.
+	os.Setenv("CODEHAMR_NO_UPDATE_CHECK", "1")
+	if err := reExec(exe, os.Args, os.Environ()); err != nil {
 		fmt.Fprintf(os.Stderr, "⚠ re-exec failed: %v (continuing with previous version)\n", err)
 	}
 }

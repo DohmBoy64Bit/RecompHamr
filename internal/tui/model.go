@@ -864,8 +864,17 @@ func toolResultFailed(name, result string) bool {
 		return false
 	}
 	switch name {
-	case tools.WriteFileName, tools.EditFileName, tools.ReadFileName:
+	case tools.WriteFileName, tools.EditFileName:
+		// write/edit report success as plain text ("wrote N bytes", "edited …")
+		// and every error in parens, so a leading "(" is the failure signal.
 		return strings.HasPrefix(strings.TrimSpace(result), "(")
+	case tools.ReadFileName:
+		// read_file returns the file's RAW content on success, which can
+		// legitimately start with "(" (Lisp, S-expressions, a leading paren
+		// expr). Match only its two real failure outputs so a successful read
+		// isn't counted as a failure and made to feed the repeated-failure nudge.
+		t := strings.TrimSpace(result)
+		return strings.HasPrefix(t, "(read error:") || t == "(empty path)"
 	case tools.BashName:
 		return strings.Contains(result, "\n(exit: ") || strings.Contains(result, "(timeout after ")
 	}

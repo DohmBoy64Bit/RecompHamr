@@ -90,9 +90,9 @@ func (m *Model) preGrowTextarea() {
 
 // visualPromptLines counts the *visual* rows the textarea needs (a line that
 // wraps to three screen rows wants a three-row textarea), via wrapRows which
-// mirrors bubbles/textarea's wrap() so the size matches exactly with no
-// off-by-one. Reads DisplayValue so a chip counts as one line, not the
-// hundreds its expanded content would.
+// mirrors bubbles/textarea's wrap() (see there for the grapheme-cluster
+// caveat). Reads DisplayValue so a chip counts as one line, not the hundreds
+// its expanded content would.
 func (m *Model) visualPromptLines() int {
 	w := m.width - 4 // -2 for ta.SetWidth offset, -2 for "▌ " prompt
 	if w < 1 {
@@ -113,6 +113,11 @@ func (m *Model) visualPromptLines() int {
 // aware with a hard-wrap fallback for over-wide words, plus the trailing
 // cursor-anchor row when content exactly fills the width.
 // Adapted from charmbracelet/bubbles v0.20 textarea.
+//
+// Caveat: width is summed per-rune (runewidth) rather than per grapheme cluster
+// like bubbles' uniseg, so ASCII and CJK match exactly, but a multi-rune cluster
+// (a ZWJ-family emoji, a keycap) can over-count — harmlessly over-growing the
+// prompt by a row on emoji-heavy input. Not worth pulling in uniseg for that.
 func wrapRows(s string, width int) int {
 	if width <= 0 {
 		return 1

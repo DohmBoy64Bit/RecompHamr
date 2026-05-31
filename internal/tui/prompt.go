@@ -107,6 +107,12 @@ func (p promptInput) Update(msg tea.Msg) (promptInput, tea.Cmd) {
 		if handled, next := p.handleChipKey(kmsg); handled {
 			return next, nil
 		}
+		// A key the chip-aware handlers didn't claim (a typed rune, or a cursor
+		// move like Ctrl+B/Ctrl+F that the textarea owns) is about to reach the
+		// textarea. Snap out of any chip first so the keystroke can't land inside
+		// a label and split it: a split label desyncs reconcile, which — when two
+		// chips share a label — cross-maps the survivor to the wrong paste.
+		p.snapCursorOutOfChip()
 	}
 	var cmd tea.Cmd
 	p.ta, cmd = p.ta.Update(msg)
@@ -253,7 +259,11 @@ func (p *promptInput) insertChip(content string) {
 
 	label := chipLabel(lines)
 	labelLen := utf8.RuneCountInString(label)
-	insertAt := p.cursorRuneOffset()
+	// Snap out of any chip the cursor is parked inside before choosing the
+	// insertion point, so a paste can't splice a new label into the interior of
+	// an existing one — reconcile would then fail to re-find the broken label
+	// and silently drop a chip, sending the wrong (or no) paste to the LLM.
+	insertAt := p.snapCursorOutOfChip()
 
 	insertIdx := 0
 	for i, s := range p.spans {

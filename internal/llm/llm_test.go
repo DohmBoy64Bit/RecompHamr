@@ -667,6 +667,36 @@ func TestChatFallsBackWhenOllamaRejectsThinking(t *testing.T) {
 	}
 }
 
+// TestChatDoesNotFallBackOnUnrelatedThinking: a 400 that is NOT about reasoning
+// but happens to contain both "not support" and the word "thinking" must not
+// trip the reasoning_effort fallback — otherwise the bare-"thinking" match
+// burns a wasted retry and latches reasoning off for the Client's whole life on
+// an error that had nothing to do with reasoning. The retry would resend the
+// same (still-failing) request, so we'd see a second request and a sticky flag.
+func TestChatDoesNotFallBackOnUnrelatedThinking(t *testing.T) {
+	var bodies []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(b))
+		// Unrelated 400: the tool format is unsupported; "thinking" appears only
+		// incidentally in the human-readable hint, not as a reasoning rejection.
+		w.WriteHeader(400)
+		fmt.Fprintln(w, `{"error":{"message":"the requested tool format is not supported","provider_hint":"thinking about it differently won't help"}}`)
+	}))
+	defer srv.Close()
+
+	c := New(srv.URL, "some-model", "")
+	for _, e := range collect(c.Chat(context.Background(), nil, nil)) {
+		_ = e // the turn errors (the 400 is real) — that's expected
+	}
+	if len(bodies) != 1 {
+		t.Fatalf("unrelated 400 must NOT trigger a fallback retry; got %d requests", len(bodies))
+	}
+	if c.noReasoningEffort.Load() {
+		t.Fatal("reasoning must not latch off on a 400 unrelated to reasoning")
+	}
+}
+
 // TestNewHasNoHTTPTimeout pins that the streaming Client must NOT set
 // http.Client.Timeout: that field is end-to-end (it covers body reads) and would
 // abort a legitimately slow SSE stream with "context deadline exceeded … while

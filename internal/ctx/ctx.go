@@ -117,8 +117,11 @@ type PackResult struct {
 
 // Pack keeps whole messages newest-first until the budget is full, then
 // returns them chronologically. The newest message is always kept, even if it
-// alone exceeds the budget. A second pass (dropOrphanTools) drops tool
-// messages whose assistant.tool_calls ancestor got trimmed off the top.
+// alone exceeds the budget. Two clean-up passes then keep the wire well-formed:
+// dropDanglingToolCalls drops an assistant whose tool_calls weren't all
+// answered (the cancel-mid-tool case), and dropOrphanTools drops tool messages
+// whose assistant.tool_calls ancestor got trimmed off the top. Both directions
+// 400 every OpenAI-compatible backend, so both are stripped before the wire.
 func Pack(history []Message, budget int) PackResult {
 	kept := make([]Message, 0, len(history))
 	used := 0
@@ -132,6 +135,9 @@ func Pack(history []Message, budget int) PackResult {
 		used += cost
 	}
 	slices.Reverse(kept)
+	// Dangling assistant first: dropping it can orphan its partial tool results,
+	// which the following dropOrphanTools pass then cleans up.
+	kept = dropDanglingToolCalls(kept)
 	kept = dropOrphanTools(kept)
 	// dropOrphanTools can empty the kept set when the newest message is a tool
 	// result whose owning assistant fell just past the budget cut: the always-
@@ -219,6 +225,42 @@ func dropOrphanTools(kept []Message) []Message {
 		}
 		if m.Role == RoleTool && (m.ToolCallID == "" || !seen[m.ToolCallID]) {
 			continue
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+// dropDanglingToolCalls removes any assistant message whose tool_calls include
+// an id with no answering tool message in the kept slice — the mirror of
+// dropOrphanTools. An assistant.tool_calls followed by fewer tool results than
+// calls issued 400s every OpenAI-compatible backend with "missing tool
+// response". This shape is produced whenever a turn is aborted mid-tool: the
+// TUI appends the assistant.tool_calls as soon as the round closes, but a Ctrl+C
+// / stream-error / idle-stall then drops the pending calls so their tool results
+// never arrive (see tui.endTurn). On the user's next request that dangling
+// assistant would otherwise reach the wire and wedge the conversation until
+// /clear. Empty ids count as unanswered — an unidentifiable call can't be paired.
+func dropDanglingToolCalls(kept []Message) []Message {
+	answered := map[string]bool{}
+	for _, m := range kept {
+		if m.Role == RoleTool && m.ToolCallID != "" {
+			answered[m.ToolCallID] = true
+		}
+	}
+	out := kept[:0]
+	for _, m := range kept {
+		if m.Role == RoleAssistant && len(m.ToolCalls) > 0 {
+			dangling := false
+			for _, tc := range m.ToolCalls {
+				if !answered[tc.ID] {
+					dangling = true
+					break
+				}
+			}
+			if dangling {
+				continue
+			}
 		}
 		out = append(out, m)
 	}

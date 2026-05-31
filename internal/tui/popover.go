@@ -30,10 +30,8 @@ func (m Model) popoverMoveSelection(delta int) (tea.Model, tea.Cmd) {
 }
 
 // refreshSuggest recomputes the popover from the textarea: command level before
-// the first space, argument level after it. A non-empty preferred forces the
-// selection onto that value when it survives the refresh — keeps the cursor on
-// the row a keep-open Enter just confirmed.
-func (m *Model) refreshSuggest(preferred string) {
+// the first space, argument level after it.
+func (m *Model) refreshSuggest() {
 	text := m.ta.Value()
 	if strings.Contains(text, "\n") || !strings.HasPrefix(text, "/") {
 		m.closePopover()
@@ -48,7 +46,7 @@ func (m *Model) refreshSuggest(preferred string) {
 				ms = append(ms, argOption{value: c.name, description: c.description})
 			}
 		}
-		m.setPopover(ms, false, "", "")
+		m.setPopover(ms, false, "")
 		return
 	}
 
@@ -70,12 +68,12 @@ func (m *Model) refreshSuggest(preferred string) {
 			ms = append(ms, o)
 		}
 	}
-	m.setPopover(ms, true, cmdName, preferred)
+	m.setPopover(ms, true, cmdName)
 }
 
-// setPopover swaps in a new suggestion set. Selection priority: preferred row,
-// else the current row (e.g. active profile), else the first.
-func (m *Model) setPopover(ms []argOption, argLevel bool, cmdName, preferred string) {
+// setPopover swaps in a new suggestion set. Selection priority: the current row
+// (e.g. active profile), else the first.
+func (m *Model) setPopover(ms []argOption, argLevel bool, cmdName string) {
 	if len(ms) == 0 {
 		m.closePopover()
 		return
@@ -84,19 +82,12 @@ func (m *Model) setPopover(ms []argOption, argLevel bool, cmdName, preferred str
 	m.suggestArgLevel = argLevel
 	m.activeCmd = cmdName
 	m.suggestOpen = true
-	m.suggestIdx = selectInitialIdx(ms, preferred)
+	m.suggestIdx = selectInitialIdx(ms)
 }
 
-// selectInitialIdx picks the starting row: preferred, else the current row,
-// else the first.
-func selectInitialIdx(ms []argOption, preferred string) int {
-	if preferred != "" {
-		for i, o := range ms {
-			if o.value == preferred {
-				return i
-			}
-		}
-	}
+// selectInitialIdx picks the starting row: the current row (e.g. active
+// profile), else the first.
+func selectInitialIdx(ms []argOption) int {
 	for i, o := range ms {
 		if o.current {
 			return i

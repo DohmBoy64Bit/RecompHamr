@@ -234,6 +234,71 @@ func TestPackKeepsNewestParallelToolGroupOverBudget(t *testing.T) {
 	}
 }
 
+// TestPackDropsDanglingAssistantToolCalls: a turn cancelled mid-tool leaves an
+// assistant.tool_calls in history with no answering tool message (the TUI
+// appended it on round close, then endTurn dropped the pending call on Ctrl+C).
+// On the next request Pack must strip that dangling assistant — otherwise the
+// wire carries an unanswered tool_calls and every OpenAI-compat backend 400s.
+func TestPackDropsDanglingAssistantToolCalls(t *testing.T) {
+	history := []Message{
+		{Role: RoleUser, Content: "run a long thing"},
+		{Role: RoleAssistant, ToolCalls: []ToolCall{{ID: "c1", Name: "bash"}}},
+		// no tool(c1) — the user Ctrl+C'd before it finished
+		{Role: RoleUser, Content: "actually, do this instead"},
+	}
+	r := Pack(history, 100000)
+	for _, m := range r.Messages {
+		if m.Role == RoleAssistant && len(m.ToolCalls) > 0 {
+			t.Fatalf("dangling assistant.tool_calls survived pack: %+v", r.Messages)
+		}
+	}
+	// Both user messages must remain — only the unpaired assistant is dropped.
+	if len(r.Messages) != 2 {
+		t.Fatalf("want 2 user messages kept, got %d: %+v", len(r.Messages), r.Messages)
+	}
+}
+
+// TestPackDropsDanglingPartialParallelGroup: cancelling a parallel round after
+// only some results return leaves assistant(c1,c2)+tool(c1). The assistant has
+// an unanswered call (c2), so it must be dropped, and dropOrphanTools must then
+// clean up the now-orphaned tool(c1).
+func TestPackDropsDanglingPartialParallelGroup(t *testing.T) {
+	history := []Message{
+		{Role: RoleUser, Content: "do two things"},
+		{Role: RoleAssistant, ToolCalls: []ToolCall{
+			{ID: "c1", Name: "bash"}, {ID: "c2", Name: "bash"},
+		}},
+		{Role: RoleTool, ToolCallID: "c1", Content: "out1"}, // c2 never answered
+		{Role: RoleUser, Content: "next"},
+	}
+	r := Pack(history, 100000)
+	for _, m := range r.Messages {
+		if m.Role == RoleAssistant && len(m.ToolCalls) > 0 {
+			t.Fatalf("partial parallel assistant survived: %+v", r.Messages)
+		}
+		if m.Role == RoleTool {
+			t.Fatalf("orphaned tool(c1) survived after its assistant was dropped: %+v", r.Messages)
+		}
+	}
+}
+
+// TestPackKeepsFullyAnsweredToolCalls: don't over-reach — an assistant whose
+// every tool_call is answered (including parallel) must survive intact.
+func TestPackKeepsFullyAnsweredToolCalls(t *testing.T) {
+	history := []Message{
+		{Role: RoleAssistant, ToolCalls: []ToolCall{
+			{ID: "c1", Name: "bash"}, {ID: "c2", Name: "bash"},
+		}},
+		{Role: RoleTool, ToolCallID: "c1", Content: "out1"},
+		{Role: RoleTool, ToolCallID: "c2", Content: "out2"},
+		{Role: RoleAssistant, Content: "done"},
+	}
+	r := Pack(history, 100000)
+	if len(r.Messages) != 4 {
+		t.Fatalf("fully-answered group must survive, got %d: %+v", len(r.Messages), r.Messages)
+	}
+}
+
 func TestBudget(t *testing.T) {
 	// Reference the constants directly so a future FixedSystem/FixedTools tweak
 	// doesn't trip a magic-number mismatch absent a real regression.

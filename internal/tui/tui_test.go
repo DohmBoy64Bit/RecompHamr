@@ -702,8 +702,8 @@ func TestVerboseLogCapturesTurnRecords(t *testing.T) {
 		"] user", "inspect the repo", // the prompt
 		"] request", "packed=", // per-round packing summary
 		"] reasoning", "let me check the file", // streamed chain-of-thought
-		"] tool_result",        // the bash result
-		"] assistant",          // final assistant message
+		"] tool_result",            // the bash result
+		"] assistant",              // final assistant message
 		"] round_done", "elapsed=", // per-round metrics
 		"] turn_end", // turn totals
 	} {
@@ -1566,9 +1566,11 @@ func TestToolTargetKey(t *testing.T) {
 }
 
 // TestToolResultFailed pins the failure classifier the nudge keys on: a
-// "(cancelled)" result (user Ctrl+C) is never a failure; file tools fail iff the
-// trimmed result opens with "(" (their error convention); bash fails iff it
-// carries "\n(exit: " or "(timeout after "; a clean result is not a failure.
+// "(cancelled)" result (user Ctrl+C) is never a failure; write/edit fail iff the
+// trimmed result opens with "(" (their error convention); read_file returns raw
+// content on success — which can start with "(" — so it fails only on its two
+// real error outputs; bash fails iff it carries "\n(exit: " or "(timeout after ";
+// a clean result is not a failure.
 func TestToolResultFailed(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -1586,7 +1588,10 @@ func TestToolResultFailed(t *testing.T) {
 		{"edit_file not-found fails", tools.EditFileName, "(not found: old_string)", true},
 		{"edit_file success", tools.EditFileName, "edited /tmp/x", false},
 		{"read_file error fails", tools.ReadFileName, "(read error: no such file)", true},
+		{"read_file empty-path fails", tools.ReadFileName, "(empty path)", true},
 		{"read_file success", tools.ReadFileName, "package main\n", false},
+		{"read_file Lisp content is not a failure", tools.ReadFileName, "(ns foo)\n(defn bar [] 1)\n", false},
+		{"read_file leading-paren prose is not a failure", tools.ReadFileName, "(this file starts with a paren)", false},
 	}
 	for _, c := range cases {
 		if got := toolResultFailed(c.tool, c.result); got != c.want {

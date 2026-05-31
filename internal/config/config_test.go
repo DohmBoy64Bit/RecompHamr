@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -341,6 +342,43 @@ func TestConfigFilePermissionsAreOwnerOnly(t *testing.T) {
 	}
 	if got := parentSt.Mode().Perm(); got&0o077 != 0 {
 		t.Fatalf(".codehamr/ dir perms = %v — must not grant any other-user bits", got)
+	}
+}
+
+// TestSaveIsAtomicAndLeavesNoTemp: writeYAML writes a sibling temp then renames
+// it over config.yaml so a torn write can't brick the next launch. Pin that the
+// rename leaves no leftover .config-*.yaml temp and the result still decodes —
+// a regression here would mean the atomic-write path leaks temps or wrote junk.
+func TestSaveIsAtomicAndLeavesNoTemp(t *testing.T) {
+	dir := t.TempDir()
+	cfg, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cdir := filepath.Join(dir, DirName)
+	// Save a few times — each must rename cleanly with no temp accumulation.
+	for i := range 3 {
+		cfg.Models["hamrpass"].Key = fmt.Sprintf("hp-key-%d-0000000000", i)
+		if err := cfg.Save(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	entries, err := os.ReadDir(cdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".config-") {
+			t.Fatalf("Save left a temp file behind: %s", e.Name())
+		}
+	}
+	// The committed file must still be a valid, re-decodable config.
+	reloaded, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatalf("config.yaml not decodable after atomic Save: %v", err)
+	}
+	if reloaded.Models["hamrpass"].Key != "hp-key-2-0000000000" {
+		t.Fatalf("last Save not durable: key = %q", reloaded.Models["hamrpass"].Key)
 	}
 }
 
