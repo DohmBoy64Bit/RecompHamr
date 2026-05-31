@@ -4,7 +4,24 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/codehamr/codehamr/internal/config"
 )
+
+// TestEmbeddedPromptFitsFixedSystem guards the invariant the packer relies on:
+// FixedSystem must reserve enough budget for the embedded system prompt PLUS the
+// "\n\nWorking directory: <path>" anchor buildSystem appends. If a prompt edit
+// pushes the embedded text past this, the reservation under-counts and packing
+// silently over-fills the real context — a bug with no other test to catch it.
+// anchorAllowance covers a generously long working-directory path (~384 chars).
+func TestEmbeddedPromptFitsFixedSystem(t *testing.T) {
+	const anchorAllowance = 96 // tokens; "\n\nWorking directory: " + a deep container path
+	used := Tokens(config.DefaultSystemPrompt) + anchorAllowance
+	if used > FixedSystem {
+		t.Fatalf("embedded prompt (%d tok) + anchor allowance (%d) = %d exceeds FixedSystem=%d; trim the prompt or bump FixedSystem",
+			Tokens(config.DefaultSystemPrompt), anchorAllowance, used, FixedSystem)
+	}
+}
 
 func TestTokensHeuristic(t *testing.T) {
 	cases := map[string]int{
