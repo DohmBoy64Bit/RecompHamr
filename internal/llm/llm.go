@@ -142,11 +142,15 @@ const (
 // treating the stream as dead. It is an inter-frame (idle) timeout, not an
 // end-to-end one: a slow-but-alive stream keeps arriving frames — content,
 // reasoning, even blank/keepalive lines — each resetting the watchdog, so only a
-// connection gone silent after 200 OK trips it. 120s clears a local 30B's
-// worst-case prompt prefill before the first token while still ending the
-// "server holds the socket open and sends nothing" hang that Ctrl+C was the only
-// other escape from.
-const streamIdleTimeout = 120 * time.Second
+// connection gone silent after 200 OK trips it. The silent window that matters is
+// the pre-first-token gap: a local model emits nothing while it prefills the
+// prompt (or cold-reloads after a keep_alive eviction), and a 27B on modest
+// hardware can stay silent well past two minutes there — a 120s value killed such
+// live streams mid-prefill. 600s clears that worst case; erring long is cheap
+// because a genuinely dead socket is still escapable instantly with Ctrl+C
+// (request-context cancel unblocks the read), whereas killing a live stream loses
+// the turn.
+const streamIdleTimeout = 600 * time.Second
 
 type Client struct {
 	BaseURL string
