@@ -342,16 +342,77 @@ func TestPackKeepsFullyAnsweredToolCalls(t *testing.T) {
 	}
 }
 
+// TestPackAnchorsUserTaskOverBudget: a long single turn — one small task message,
+// then many large assistant rounds that fill the budget — would let the
+// newest-first walk evict the sole user task, leaving a userless window that
+// 400s every OpenAI-compat backend ("no user query found in messages"). Pack
+// must re-anchor the original task over budget so the wire always carries it.
+func TestPackAnchorsUserTaskOverBudget(t *testing.T) {
+	big := strings.Repeat("x", 4*3000) // ~3000-token assistant chunk
+	history := []Message{
+		{Role: RoleUser, Content: "BUILD THE GALAXY"},
+		{Role: RoleAssistant, Content: big},
+		{Role: RoleAssistant, Content: big},
+		{Role: RoleAssistant, Content: big},
+	}
+	r := Pack(history, 5000) // holds ~1 assistant chunk; the task gets evicted
+	var sawTask bool
+	for _, m := range r.Messages {
+		if m.Role == RoleUser && m.Content == "BUILD THE GALAXY" {
+			sawTask = true
+		}
+	}
+	if !sawTask {
+		t.Fatalf("original user task was evicted, leaving a userless window: %+v", r.Messages)
+	}
+	// Chronological order: the anchored task must lead the window.
+	if r.Messages[0].Role != RoleUser {
+		t.Fatalf("anchored task not first: %+v", r.Messages)
+	}
+}
+
+// TestPackNoStaleAnchorWhenRecentUserSurvives: in a normal multi-turn chat a
+// recent user message already survives the walk, so Pack must NOT also drag the
+// stale first message back in — anchoring is a userless-window fallback, not an
+// always-pin. Guards the anchor against over-reach.
+func TestPackNoStaleAnchorWhenRecentUserSurvives(t *testing.T) {
+	bigStale := strings.Repeat("y", 4*2000) // ~2000-token first task, evicted by the walk
+	history := []Message{
+		{Role: RoleUser, Content: "STALE FIRST TASK" + bigStale},
+		{Role: RoleAssistant, Content: strings.Repeat("z", 4*500)},
+		{Role: RoleUser, Content: "fresh recent task"},
+		{Role: RoleAssistant, Content: "ok"},
+	}
+	// Budget holds the recent user + its surrounding small messages but not the
+	// large stale first task — which the walk evicts and the anchor must NOT
+	// drag back, because a recent user message already survives.
+	r := Pack(history, 1000)
+	for _, m := range r.Messages {
+		if m.Content == "STALE FIRST TASK" {
+			t.Fatalf("stale first task was anchored despite a recent user surviving: %+v", r.Messages)
+		}
+	}
+	var sawRecent bool
+	for _, m := range r.Messages {
+		if m.Role == RoleUser && m.Content == "fresh recent task" {
+			sawRecent = true
+		}
+	}
+	if !sawRecent {
+		t.Fatalf("recent user message missing: %+v", r.Messages)
+	}
+}
+
 func TestBudget(t *testing.T) {
-	// Reference the constants directly so a future FixedSystem/FixedTools tweak
-	// doesn't trip a magic-number mismatch absent a real regression.
+	// Reference the constants directly so a future FixedSystem/FixedTools/headroom
+	// tweak doesn't trip a magic-number mismatch absent a real regression.
 	// 65k: ctxSize/8 = 8192, just above the 8k floor.
-	if got := Budget(65536); got != 65536-FixedSystem-FixedTools-8192 {
-		t.Fatalf("budget wrong at 65k: %d", got)
+	if raw := 65536 - FixedSystem - FixedTools - 8192; Budget(65536) != raw-raw/budgetHeadroomDivisor {
+		t.Fatalf("budget wrong at 65k: %d", Budget(65536))
 	}
 	// 262k: ctxSize/8 = 32768, matches Qwen3 thinking-mode default.
-	if got := Budget(262144); got != 262144-FixedSystem-FixedTools-32768 {
-		t.Fatalf("budget wrong at 262k: %d", got)
+	if raw := 262144 - FixedSystem - FixedTools - 32768; Budget(262144) != raw-raw/budgetHeadroomDivisor {
+		t.Fatalf("budget wrong at 262k: %d", Budget(262144))
 	}
 	if Budget(1000) != 0 {
 		t.Fatal("budget must floor at 0")

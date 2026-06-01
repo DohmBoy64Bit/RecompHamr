@@ -235,6 +235,11 @@ func writeYAML(path string, v any) error {
 #
 # Running codehamr in a devcontainer / WSL2 with Ollama on the host:
 # swap 'http://localhost:11434' with 'http://host.docker.internal:11434' below.
+#
+# context_size is what codehamr packs to — set it to your server's ACTUAL window,
+# not the model's theoretical max. For Ollama that's OLLAMA_CONTEXT_LENGTH (or a
+# Modelfile 'PARAMETER num_ctx'); too high and the server silently drops the
+# oldest messages. More VRAM lets you raise both together.
 
 `)
 	// Write to a sibling temp then rename over config.yaml. Rename is atomic

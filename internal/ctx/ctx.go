@@ -58,6 +58,14 @@ const (
 	FixedTools  = 1500
 )
 
+// budgetHeadroomDivisor cuts the history budget by 1/this (10%) below the
+// declared window. The char/4 Tokens heuristic UNDERcounts code- and JSON-heavy
+// histories (the real tokenizer emits more per char), so packing to the literal
+// ceiling risks the true token count spilling past the window — on Ollama a
+// silent front-truncation that drops the system prompt and the anchored task, on
+// llama.cpp a hard 400. The margin keeps an honest context_size safely in-window.
+const budgetHeadroomDivisor = 10
+
 // ResponseReserve is the slice Budget keeps free for the model's response.
 // Scales as ctxSize/8 so reasoning models get room (262k→32k, 1M→125k),
 // floored at 8k so small-ctx profiles don't collapse history to nothing.
@@ -122,6 +130,9 @@ type PackResult struct {
 // answered (the cancel-mid-tool case), and dropOrphanTools drops tool messages
 // whose assistant.tool_calls ancestor got trimmed off the top. Both directions
 // 400 every OpenAI-compatible backend, so both are stripped before the wire.
+// A final anchorUserMessage pass guarantees the window is never userless — the
+// third shape that 400s every backend, and the one a long single turn reaches
+// when the budget walk evicts the sole user task.
 func Pack(history []Message, budget int) PackResult {
 	kept := make([]Message, 0, len(history))
 	used := 0
@@ -158,10 +169,36 @@ func Pack(history []Message, budget int) PackResult {
 		kept = dropDanglingToolCalls(kept)
 		kept = dropOrphanTools(kept)
 	}
+	kept = anchorUserMessage(kept, history)
 	return PackResult{
 		Messages: kept,
 		Kept:     len(kept),
 	}
+}
+
+// anchorUserMessage guarantees the packed window carries a user-role message
+// whenever history has one. The newest-first walk drops oldest-first, so a long
+// single turn — one task message, then dozens of assistant+tool rounds that fill
+// the budget — evicts the sole user task and hands the backend a userless window,
+// which 400s every OpenAI-compatible server ("no user query found in messages").
+// When no user survived, recover the FIRST user message (the original task — the
+// agent's anchor against drift), prepended chronologically over budget: the same
+// deliberately-over-budget guarantee newestToolGroup and the always-keep-newest
+// path already make. A lone user message carries no tool-call pairing, so this is
+// safe after the dangling/orphan passes. No-op when a recent user already
+// survived (normal multi-turn) or history has no user message at all.
+func anchorUserMessage(kept, history []Message) []Message {
+	for _, m := range kept {
+		if m.Role == RoleUser {
+			return kept
+		}
+	}
+	for i := range history {
+		if history[i].Role == RoleUser {
+			return append([]Message{history[i]}, kept...)
+		}
+	}
+	return kept
 }
 
 // newestToolGroup returns the assistant that issued the newest tool result
@@ -275,11 +312,13 @@ func dropDanglingToolCalls(kept []Message) []Message {
 	return out
 }
 
-// Budget subtracts the fixed reservations from the total context size.
+// Budget subtracts the fixed reservations from the total context size, then
+// leaves a headroom margin (see budgetHeadroomDivisor) so a char/4 undercount
+// can't push the real prompt past the declared window.
 func Budget(ctxSize int) int {
 	b := ctxSize - FixedSystem - FixedTools - ResponseReserve(ctxSize)
 	if b < 0 {
 		return 0
 	}
-	return b
+	return b - b/budgetHeadroomDivisor
 }
