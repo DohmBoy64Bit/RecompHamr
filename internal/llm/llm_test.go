@@ -154,6 +154,47 @@ func TestChatToolCallFragmentedArgs(t *testing.T) {
 	}
 }
 
+// TestChatToolArgsStreamLive: each tool-call arguments fragment is forwarded as
+// an EventToolArgs as it arrives — so the UI can tick its live token estimate
+// while a file streams into write_file, not just once at stream end. Fragments
+// concatenate to the full arguments and all precede the resolved EventToolCall.
+func TestChatToolArgsStreamLive(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		sseOK(w, []string{
+			`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"write_file"}}]}}]}`,
+			`{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"path\":\"a"}}]}}]}`,
+			`{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":".txt\",\"content\":\"hi"}}]}}]}`,
+			`{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"}"}}]}}]}`,
+			`{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}`,
+		})
+	}))
+	defer srv.Close()
+	c := New(srv.URL, "m", "")
+	var args strings.Builder
+	sawCall := false
+	argsAllBeforeCall := true
+	for _, e := range collect(c.Chat(context.Background(), nil, nil)) {
+		switch e.Kind {
+		case EventToolArgs:
+			args.WriteString(e.Content)
+			if sawCall {
+				argsAllBeforeCall = false
+			}
+		case EventToolCall:
+			sawCall = true
+		}
+	}
+	if got := args.String(); got != `{"path":"a.txt","content":"hi"}` {
+		t.Fatalf("EventToolArgs fragments should concatenate to the full args, got %q", got)
+	}
+	if !sawCall {
+		t.Fatalf("expected a resolved EventToolCall after the fragments")
+	}
+	if !argsAllBeforeCall {
+		t.Fatalf("every EventToolArgs must precede the resolved EventToolCall")
+	}
+}
+
 // TestChatToolCallMultipleByIndex: two tool calls interleaved across chunks.
 // Each fragment must route to its slot by `index`, not by slice position.
 func TestChatToolCallMultipleByIndex(t *testing.T) {

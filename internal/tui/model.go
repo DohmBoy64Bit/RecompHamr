@@ -54,6 +54,30 @@ func (p phase) label() string {
 	return ""
 }
 
+// turnOutcome is how a finished turn ended, frozen into the status bar until the
+// next submit. outcomeNone is the zero value (no turn has finished yet, or the
+// frozen summary was cleared at the start of a new turn).
+type turnOutcome int
+
+const (
+	outcomeNone turnOutcome = iota
+	outcomeDone
+	outcomeStopped
+)
+
+// marker is the status-bar glyph for the frozen finish: ✓ for a clean finish,
+// ✗ for an abort (cancel, error, or a stalled/leaked end). "" suppresses the
+// frozen segment for outcomeNone.
+func (o turnOutcome) marker() string {
+	switch o {
+	case outcomeDone:
+		return "✓"
+	case outcomeStopped:
+		return "✗"
+	}
+	return ""
+}
+
 type Model struct {
 	Version    string
 	ProjectDir string
@@ -102,8 +126,19 @@ type Model struct {
 	// (reset only by /clear, so the status bar carries the running session
 	// total).
 	turnTokens    int
-	turnElapsed   time.Duration
 	sessionTokens int
+	// turnStart stamps the wall-clock start of the current turn, set in beginTurn
+	// (the user-submit path only — tool re-entry bypasses it), so it spans every
+	// tool round rather than resetting per round. The status bar ticks
+	// liveElapsed(time.Since(turnStart)) while a turn runs.
+	turnStart time.Time
+	// last* hold the finished turn's frozen footer summary, shown at idle until
+	// the next submit: outcome marker, wall-clock duration, and the token count
+	// the avg tok/s divides by. lastTokens ÷ lastElapsed IS the displayed rate,
+	// so it stays self-verifying against the shown duration.
+	lastElapsed time.Duration
+	lastTokens  int
+	lastOutcome turnOutcome
 	// streamingEstimate is a live char/4 estimate of tokens for the current
 	// round (reasoning + content). The server reports the authoritative count
 	// only in the final usage block, so without this the footer would freeze
@@ -573,6 +608,8 @@ func (m *Model) installTurnContext() {
 // funnels through here so one m.cancel() cancels the whole cascade.
 func (m *Model) beginTurn() tea.Cmd {
 	m.installTurnContext()
+	m.turnStart = time.Now()
+	m.lastOutcome = outcomeNone // the new run replaces the prior frozen summary
 	m.phase = phaseThinking
 	return m.startChat()
 }
@@ -666,6 +703,17 @@ func (m Model) handleStream(e llm.Event) (tea.Model, tea.Cmd) {
 		if dbgEnabled() {
 			m.reasoning.WriteString(e.Content)
 		}
+	case llm.EventToolArgs:
+		// Tool-call arguments stream as the model writes a file (write_file /
+		// edit_file) or a bash command. Count them live like content so the
+		// counter doesn't freeze through a long file write, and flip to
+		// "generating" — the model is producing output, not thinking. The
+		// resolved call still arrives whole as EventToolCall; this only feeds
+		// the estimate, nothing reaches history here.
+		if m.phase == phaseThinking {
+			m.phase = phaseStreaming
+		}
+		m.streamingEstimate += len(e.Content) / 4
 	case llm.EventToolCall:
 		m.applyToolCall(e)
 	case llm.EventDone:
@@ -712,7 +760,6 @@ func (m *Model) applyDone(e llm.Event) {
 		delta = m.streamingEstimate
 	}
 	m.turnTokens += delta
-	m.turnElapsed += e.Elapsed
 	m.sessionTokens += delta
 	m.streamingEstimate = 0
 	m.connected = true
@@ -756,30 +803,49 @@ func (m *Model) applyError(e llm.Event) tea.Cmd {
 // applyDone for the happy path.
 func (m *Model) abortTurn(banner string) {
 	m.flushStreaming()
-	m.streamingEstimate = 0
 	m.reasoning.Reset()
 	if banner != "" {
 		m.appendLine(banner)
 	}
-	m.finalizeTurn()
+	// finalizeTurn folds the in-flight estimate into the counters and zeroes it,
+	// so the avg counts what was generated up to the interrupt — don't drop it here.
+	m.finalizeTurn(outcomeStopped)
 	m.endTurn() // drops pending tool calls along with the rest of the turn state
 }
 
-func (m *Model) finalizeTurn() {
-	if m.turnTokens == 0 && m.turnElapsed == 0 {
-		return
+// finalizeTurn freezes the finished turn's wall-clock summary into the status
+// bar — shown at idle until the next submit — and logs the totals. outcome is
+// the finish glyph: ✓ clean, ✗ abort/stall. The bar's avg tok/s divides
+// lastTokens by lastElapsed (wall-clock), so it stays self-verifying against
+// the duration shown right beside it. There is no scrollback banner: the footer
+// owns the run summary, and the precise wall time lands in the turn_end log.
+// Common to every wind-down (handleStreamClosed and abortTurn both call it).
+func (m *Model) finalizeTurn(outcome turnOutcome) {
+	if m.turnStart.IsZero() {
+		return // defensive: finalizeTurn only runs inside a turn beginTurn started
 	}
-	banner := fmt.Sprintf("%s · %s", humanTokens(m.turnTokens), humanDuration(m.turnElapsed))
-	if rate := humanRate(m.turnTokens, m.turnElapsed); rate != "" {
-		banner += " · " + rate
+	// Commit the in-flight round's live estimate before measuring. On a clean
+	// finish it's already 0 (applyDone folded the round into turnTokens at
+	// EventDone). But a Ctrl+C or error mid-stream interrupts before EventDone,
+	// so the cancelled round's tokens — often the whole generation — sit only in
+	// streamingEstimate; without this they'd vanish from the avg and the session
+	// total would drop backward. char/4 is the best count for a round that never
+	// reported usage.
+	m.turnTokens += m.streamingEstimate
+	m.sessionTokens += m.streamingEstimate
+	m.streamingEstimate = 0
+	wall := time.Since(m.turnStart)
+	m.lastElapsed = wall
+	m.lastTokens = m.turnTokens
+	m.lastOutcome = outcome
+	avg := humanRate(m.turnTokens, wall)
+	if avg != "" {
+		avg = " · " + avg + " avg"
 	}
-	// The end-reason (clean / leak / cancel / error) is logged at its own site;
-	// this records the turn's totals. Common to every wind-down (handleStreamClosed
-	// and abortTurn both call finalizeTurn), so it always fires for a real turn.
-	dbgWritef("turn_end", "%s · session_total=%s", banner, humanTokens(m.sessionTokens))
-	m.appendLine(styleStatus.Render(banner))
+	dbgWritef("turn_end", "%s · %s wall%s · session_total=%s",
+		humanTokens(m.turnTokens), wall.Round(time.Millisecond), avg, humanTokens(m.sessionTokens))
+	m.turnStart = time.Time{}
 	m.turnTokens = 0
-	m.turnElapsed = 0
 }
 
 // handleStreamClosed drives what happens after one round's stream finishes:
@@ -814,6 +880,7 @@ func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
 	// deterministically swallows the call can't loop. If it persists, surface it
 	// rather than dying silently — the prior behaviour left a half-done artifact
 	// with no banner at all.
+	outcome := outcomeDone // a clean, non-empty finish; stall/leak below downgrade it
 	if newestAssistantEmpty(m.history) {
 		if !m.emptyNudged {
 			m.emptyNudged = true
@@ -827,11 +894,13 @@ func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
 		}
 		m.appendLine(styleError.Render("⚠ the model ended its turn with no reply and no tool call — it stopped mid-task, or your model server dropped the call (a thinking model's reasoning parser can swallow it: add vLLM `--reasoning-parser qwen3`, or turn thinking off for tool turns)."))
 		dbgWritef("leak", "turn ended with an empty assistant message after a re-prompt (model stalled or the call was swallowed server-side)")
+		outcome = outcomeStopped
 	} else if w := toolCallLeakWarning(m.history); w != "" {
 		// The model meant to call a tool but its server's parser leaked the raw
 		// call into the reply text instead. The fix is server-side.
 		m.appendLine(w)
 		dbgWritef("leak", "turn ended with tool-call text leaked into the reply (server-side parser misconfigured)")
+		outcome = outcomeStopped
 	} else if m.maybeVerifyNudge() {
 		// A substantial turn is finishing with a clean, non-empty summary. Re-ground
 		// it once to the original request and let the model verify — or honestly mark
@@ -841,7 +910,7 @@ func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
 		m.phase = phaseThinking
 		return m, m.startChat()
 	}
-	m.finalizeTurn()
+	m.finalizeTurn(outcome)
 	m.endTurn()
 	return m, nil
 }

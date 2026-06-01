@@ -9,32 +9,30 @@ import (
 	"github.com/codehamr/codehamr/internal/config"
 )
 
-// humanTokens renders a token count compactly: `900 tok`, `1.2k tok`,
-// `1.5M tok`. Trailing `.0` is trimmed so round multiples read as `1k`.
+// humanTokens renders a token count compactly: `900 tok`, `1.2k tok`, `1.5M
+// tok`. The k/M ranges always keep one decimal (`2.0k`, not `2k`) so the live
+// counter holds a constant width as it ticks past round thousands — it reads
+// `1.9k → 2.0k → 2.1k`, not a jumpy `1.9k → 2k → 2.1k`.
 func humanTokens(n int) string {
 	switch {
 	case n < 1000:
 		return fmt.Sprintf("%d tok", n)
 	case n < 1_000_000:
-		return compactFloat(float64(n)/1000) + "k tok"
+		return fmt.Sprintf("%.1fk tok", float64(n)/1000)
 	default:
-		return compactFloat(float64(n)/1_000_000) + "M tok"
+		return fmt.Sprintf("%.1fM tok", float64(n)/1_000_000)
 	}
 }
 
-func compactFloat(f float64) string {
-	return strings.TrimSuffix(strconv.FormatFloat(f, 'f', 1, 64), ".0")
-}
-
-// humanDuration renders an elapsed duration compactly: `0.8s`, `6m 51s`,
-// `1h 14m`. Sub-minute keeps one decimal; past a minute it's dropped as
-// noise. Round values read as `1m` / `1h`, not `1m 0s` / `1h 0m`.
-func humanDuration(d time.Duration) string {
-	secs := d.Seconds()
-	if secs < 60 {
-		return fmt.Sprintf("%.1fs", secs)
+// liveElapsed renders a running wall-clock duration for the status bar: whole
+// seconds under a minute (no sub-second decimal spinning at the spinner's
+// refresh rate), then `6m 51s` / `1h 14m`. Round values read as `1m` / `1h`,
+// not `1m 0s` / `1h 0m`. Used live (time.Since(turnStart)) and frozen at finish.
+func liveElapsed(d time.Duration) string {
+	s := int(d.Seconds())
+	if s < 60 {
+		return fmt.Sprintf("%ds", s)
 	}
-	s := int(secs)
 	if s < 3600 {
 		m, rem := s/60, s%60
 		if rem == 0 {

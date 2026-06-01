@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/charmbracelet/x/ansi"
@@ -239,6 +240,15 @@ func (m Model) renderStatusBar() string {
 	}
 	if label := m.phase.label(); label != "" {
 		segs = appendStatus(segs, m.spinner.View()+" "+label)
+		segs = appendStatus(segs, liveElapsed(time.Since(m.turnStart)))
+	} else if mark := m.lastOutcome.marker(); mark != "" {
+		// Frozen run summary at idle, until the next submit: outcome glyph,
+		// wall-clock duration, and the avg rate that divides into it.
+		seg := mark + " " + liveElapsed(m.lastElapsed)
+		if avg := humanRate(m.lastTokens, m.lastElapsed); avg != "" {
+			seg += " · " + avg + " avg"
+		}
+		segs = appendStatus(segs, seg)
 	}
 	if m.status != "" {
 		segs = appendStatus(segs, m.status)

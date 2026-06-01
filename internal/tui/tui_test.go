@@ -969,11 +969,32 @@ func TestToolCallRoundTripExecutesBash(t *testing.T) {
 	if final.phase.active() {
 		t.Fatalf("turn ending with no tool calls must return to idle, phase=%v", final.phase)
 	}
-	// Per-turn summary must sum tokens across both LLM rounds, not overwrite.
-	// Round 1 reports usage.completion_tokens=5, round 2 reports 1. Sum = 6.
-	if !strings.Contains(stripANSI(final.scroll.String()), "6 tok") {
-		t.Fatalf("per-turn summary should sum to 6 tok across rounds: %s",
-			stripANSI(final.scroll.String()))
+	// The frozen run summary must sum tokens across both LLM rounds, not
+	// overwrite. Round 1 reports usage.completion_tokens=5, round 2 reports 1.
+	// finalizeTurn freezes turnTokens into lastTokens (the avg-rate divisor). Sum = 6.
+	if final.lastTokens != 6 {
+		t.Fatalf("per-turn tokens should sum across rounds (5+1), got %d", final.lastTokens)
+	}
+	// A clean finish (no tool calls) freezes the ✓ outcome for the idle footer.
+	if final.lastOutcome != outcomeDone {
+		t.Fatalf("clean finish should freeze outcomeDone, got %v", final.lastOutcome)
+	}
+}
+
+// TestToolArgsStreamBumpsEstimateAndPhase: a tool-call argument fragment (a file
+// streaming into write_file) ticks the live token estimate AND flips the phase
+// to "generating", so the counter doesn't freeze through a long file write — the
+// bug where only chat content and reasoning were counted, not tool arguments.
+func TestToolArgsStreamBumpsEstimateAndPhase(t *testing.T) {
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+	m.phase = phaseThinking // a tool-only round starts here, before any content
+	out, _ := m.handleStream(llm.Event{Kind: llm.EventToolArgs, Content: strings.Repeat("x", 40)})
+	m = out.(Model)
+	if m.phase != phaseStreaming {
+		t.Fatalf("EventToolArgs should flip thinking→generating, phase=%v", m.phase)
+	}
+	if m.streamingEstimate != 10 { // 40 chars / 4
+		t.Fatalf("EventToolArgs should bump the estimate by len/4, got %d", m.streamingEstimate)
 	}
 }
 
@@ -1405,8 +1426,9 @@ func TestHumanIntFormat(t *testing.T) {
 }
 
 // TestHumanTokensFormat: the session counter renders compactly — plain int under
-// 1000, then `k` with an optional decimal, then `M`. Trailing `.0` is trimmed so
-// round multiples read as `1k` / `10M`, not `1.0k` / `10.0M`.
+// 1000, then `k`/`M` with a constant single decimal. The decimal is always kept
+// (`2.0k`, not `2k`) so the live counter doesn't jump width as it ticks past a
+// round thousand.
 func TestHumanTokensFormat(t *testing.T) {
 	cases := []struct {
 		n    int
@@ -1416,13 +1438,15 @@ func TestHumanTokensFormat(t *testing.T) {
 		{1, "1 tok"},
 		{900, "900 tok"},
 		{999, "999 tok"},
-		{1000, "1k tok"},
+		{1000, "1.0k tok"},
 		{1200, "1.2k tok"},
-		{9999, "10k tok"},
-		{10_000, "10k tok"},
-		{42_000, "42k tok"},
-		{999_999, "1000k tok"},
-		{1_000_000, "1M tok"},
+		{1900, "1.9k tok"}, // the pair the user flagged: must stay constant width
+		{2000, "2.0k tok"}, // not "2k tok"
+		{9999, "10.0k tok"},
+		{10_000, "10.0k tok"},
+		{42_000, "42.0k tok"},
+		{999_999, "1000.0k tok"},
+		{1_000_000, "1.0M tok"},
 		{1_500_000, "1.5M tok"},
 		{12_345_678, "12.3M tok"},
 	}
@@ -1437,15 +1461,18 @@ func TestHumanTokensFormat(t *testing.T) {
 // seconds below a minute (quick turns stay informative), flips to integer
 // `Xm Ys` up to an hour, then `Xh Ym`. Zero-tail segments are dropped so
 // round values read as `1m` / `1h` instead of `1m 0s` / `1h 0m`.
-func TestHumanDurationFormat(t *testing.T) {
+// TestLiveElapsed: the running wall-clock readout — whole seconds under a
+// minute (no spinning sub-second decimal at the spinner's refresh rate), then
+// `6m 51s` / `1h 14m`, with the trailing unit dropped when zero.
+func TestLiveElapsed(t *testing.T) {
 	cases := []struct {
 		d    time.Duration
 		want string
 	}{
-		{0, "0.0s"},
-		{800 * time.Millisecond, "0.8s"},
-		{12_300 * time.Millisecond, "12.3s"},
-		{59_900 * time.Millisecond, "59.9s"},
+		{0, "0s"},
+		{800 * time.Millisecond, "0s"},
+		{12_300 * time.Millisecond, "12s"},
+		{59_900 * time.Millisecond, "59s"},
 		{60 * time.Second, "1m"},
 		{90 * time.Second, "1m 30s"},
 		{411_100 * time.Millisecond, "6m 51s"},
@@ -1456,8 +1483,8 @@ func TestHumanDurationFormat(t *testing.T) {
 		{7500 * time.Second, "2h 5m"},
 	}
 	for _, c := range cases {
-		if got := humanDuration(c.d); got != c.want {
-			t.Errorf("humanDuration(%v) = %q, want %q", c.d, got, c.want)
+		if got := liveElapsed(c.d); got != c.want {
+			t.Errorf("liveElapsed(%v) = %q, want %q", c.d, got, c.want)
 		}
 	}
 }
@@ -1514,18 +1541,47 @@ func TestSessionTokensAccumulateAcrossTurns(t *testing.T) {
 }
 
 // TestSessionTokensSurviveFinalizeTurn: finalizeTurn clears turnTokens but
-// must NOT touch sessionTokens.
+// must NOT touch sessionTokens. turnStart must be set or finalizeTurn no-ops.
 func TestSessionTokensSurviveFinalizeTurn(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.turnTokens = 50
-	m.turnElapsed = 1 * time.Second
+	m.turnStart = time.Now()
 	m.sessionTokens = 123
-	m.finalizeTurn()
+	m.finalizeTurn(outcomeDone)
 	if m.turnTokens != 0 {
 		t.Fatalf("turnTokens should be reset by finalizeTurn, got %d", m.turnTokens)
 	}
 	if m.sessionTokens != 123 {
 		t.Fatalf("sessionTokens must not be touched by finalizeTurn, got %d", m.sessionTokens)
+	}
+	if m.lastOutcome != outcomeDone {
+		t.Fatalf("finalizeTurn should freeze the outcome, got %v", m.lastOutcome)
+	}
+}
+
+// TestFinalizeFoldsInFlightEstimate: a turn aborted mid-stream (Ctrl+C, error)
+// has no EventDone to fold the current round's tokens into turnTokens — they sit
+// in streamingEstimate. finalizeTurn must commit that estimate so the frozen avg
+// counts what was generated up to the interrupt and the session total doesn't
+// drop backward. (On a clean finish the estimate is already 0, so this is a no-op.)
+func TestFinalizeFoldsInFlightEstimate(t *testing.T) {
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+	m.turnStart = time.Now()
+	m.turnTokens = 40        // one completed round
+	m.streamingEstimate = 60 // an in-flight round cancelled before EventDone
+	m.sessionTokens = 200
+	m.finalizeTurn(outcomeStopped)
+	if m.lastTokens != 100 {
+		t.Fatalf("frozen tokens should fold the in-flight estimate (40+60), got %d", m.lastTokens)
+	}
+	if m.sessionTokens != 260 {
+		t.Fatalf("session total should absorb the in-flight estimate (200+60), got %d", m.sessionTokens)
+	}
+	if m.streamingEstimate != 0 {
+		t.Fatalf("finalizeTurn should consume the estimate, got %d", m.streamingEstimate)
+	}
+	if m.lastOutcome != outcomeStopped {
+		t.Fatalf("abort should freeze outcomeStopped, got %v", m.lastOutcome)
 	}
 }
 
@@ -2069,6 +2125,37 @@ func TestStatusBarShowsSessionTokens(t *testing.T) {
 	bar := m.renderStatusBar()
 	if !strings.Contains(bar, "1.2k tok") {
 		t.Fatalf("status bar should show compact session counter: %q", bar)
+	}
+}
+
+// TestStatusBarLiveTimerAndFrozenSummary: during an active turn the bar shows
+// the phase label plus a ticking wall-clock; at idle after a clean finish it
+// shows the frozen ✓, the wall-clock duration, and the avg rate that divides
+// into it (5000 tok ÷ 100s = 50 tok/s).
+func TestStatusBarLiveTimerAndFrozenSummary(t *testing.T) {
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+
+	m.phase = phaseStreaming
+	m.turnStart = time.Now().Add(-90 * time.Second)
+	bar := stripANSI(m.renderStatusBar())
+	if !strings.Contains(bar, "generating") {
+		t.Fatalf("active bar should show the phase label: %q", bar)
+	}
+	if !strings.Contains(bar, "1m 30s") {
+		t.Fatalf("active bar should show the live wall-clock: %q", bar)
+	}
+
+	m.phase = phaseIdle
+	m.turnStart = time.Time{}
+	m.lastOutcome = outcomeDone
+	m.lastElapsed = 100 * time.Second
+	m.lastTokens = 5000
+	bar = stripANSI(m.renderStatusBar())
+	if !strings.Contains(bar, "✓ 1m 40s") {
+		t.Fatalf("idle bar should show frozen outcome + duration: %q", bar)
+	}
+	if !strings.Contains(bar, "50 tok/s avg") {
+		t.Fatalf("idle bar should show the avg rate: %q", bar)
 	}
 }
 

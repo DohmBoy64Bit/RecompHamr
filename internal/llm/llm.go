@@ -136,6 +136,13 @@ const (
 	// EventReasoning carries incremental reasoning text, kept out of history
 	// — exists only so the UI can tick its live token estimate while thinking.
 	EventReasoning
+	// EventToolArgs carries an incremental tool-call arguments fragment (in
+	// Content), the bytes a write_file/edit_file/bash call streams as it's
+	// generated. Like EventReasoning it never touches history — the resolved
+	// call still arrives whole as EventToolCall at stream end — and exists only
+	// so the UI's live token estimate keeps ticking while the model writes a
+	// file, instead of freezing until EventDone.
+	EventToolArgs
 )
 
 // streamIdleTimeout bounds how long readSSE waits for the NEXT SSE frame before
@@ -505,6 +512,14 @@ func dispatchDelta(parent context.Context, d streamDelta, budget cloud.BudgetSta
 			slot.name = tc.Function.Name
 		}
 		slot.args.WriteString(tc.Function.Arguments)
+		// Forward the fragment so the UI's live token estimate ticks while the
+		// model streams file content into a tool call — the resolved call still
+		// arrives whole as EventToolCall at stream end, so this is UI-only.
+		if tc.Function.Arguments != "" {
+			if !sendEvent(parent, out, Event{Kind: EventToolArgs, Content: tc.Function.Arguments, Budget: budget}) {
+				return false
+			}
+		}
 	}
 	return true
 }
