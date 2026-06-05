@@ -3,6 +3,8 @@
 A minimal coding agent for the terminal. Built for local LLMs, also
 runs on OpenAI-compatible endpoints.
 
+![codehamr demo](codehamr.gif)
+
 ## Simplicity
 
 A coding agent built for local LLMs makes different decisions than one
