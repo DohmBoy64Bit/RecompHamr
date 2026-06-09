@@ -363,7 +363,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(msg)
 	nm := next.(Model)
 	if len(nm.outbox) > 0 {
-		printCmd := tea.Println(strings.Join(nm.outbox, "\n"))
+		printCmd := tea.Println(wrapForScrollback(strings.Join(nm.outbox, "\n"), nm.width))
 		nm.outbox = nil
 		cmd = tea.Batch(printCmd, cmd)
 	}
@@ -537,13 +537,13 @@ func (m Model) handleResizeSettle(msg resizeSettleMsg) (tea.Model, tea.Cmd) {
 	// so no previous-width row can soft-wrap into stair-steps.
 	cmds := []tea.Cmd{tea.ClearScreen, eraseScrollback}
 	if splash := strings.Join(m.splashLines(), "\n"); splash != "" {
-		cmds = append(cmds, tea.Println(splash))
+		cmds = append(cmds, tea.Println(wrapForScrollback(splash, m.width)))
 	}
 	if scroll := strings.TrimRight(m.scroll.String(), "\n"); scroll != "" {
-		cmds = append(cmds, tea.Println(scroll))
+		cmds = append(cmds, tea.Println(wrapForScrollback(scroll, m.width)))
 	}
 	if len(m.outbox) > 0 {
-		cmds = append(cmds, tea.Println(strings.Join(m.outbox, "\n")))
+		cmds = append(cmds, tea.Println(wrapForScrollback(strings.Join(m.outbox, "\n"), m.width)))
 		m.outbox = nil
 	}
 	return m, tea.Sequence(cmds...)

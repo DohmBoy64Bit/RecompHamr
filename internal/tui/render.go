@@ -37,6 +37,25 @@ func (m *Model) appendLine(s string) {
 	m.outbox = append(m.outbox, s)
 }
 
+// wrapForScrollback hard-wraps every line of s to the terminal width before it
+// goes to tea.Println. bubbletea's standard renderer dumps queued Println lines
+// verbatim - unlike its View paint path it never truncates them - so a line
+// wider than the terminal is soft-wrapped by the terminal into extra physical
+// rows the renderer never counted. Its cursor math then drifts and the prior
+// frame's wrapped textarea rows survive un-erased: the duplicated prompt
+// fragment seen when submitting a long prompt. Mirrors the ansi.Wrap the live
+// streaming view already applies. width <= 0 (no WindowSizeMsg yet) is a no-op.
+func wrapForScrollback(s string, width int) string {
+	if width <= 0 {
+		return s
+	}
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lines[i] = ansi.Wrap(line, width, "")
+	}
+	return strings.Join(lines, "\n")
+}
+
 // flushStreaming ends the content phase: render the streaming buffer through
 // glamour, queue it for tea.Println, reset. No-op on an empty buffer. Glamour
 // errors fall back to raw so partial docs (unclosed code fence on cancel) survive.
