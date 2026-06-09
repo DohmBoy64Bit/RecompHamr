@@ -40,6 +40,8 @@ Then run `codehamr` in your project.
 
 > **Warning:** AI systems like codehamr run model-generated shell commands with full filesystem access. Best run inside safe sandboxes like devcontainers or isolated VMs.
 
+> **Windows + devcontainer:** When you run the VS Code devcontainer on Windows, enable Docker Desktop's WSL integration for your distro (Settings, Resources, WSL integration, toggle on the Debian distro). Without it the container cannot reach the Docker engine through WSL2.
+
 ## Config
 
 On first run codehamr seeds `.codehamr/config.yaml` with a `local`
