@@ -785,6 +785,16 @@ func (m *Model) applyDone(e llm.Event) {
 	// undercount on real histories. Log-only; nothing reads it back.
 	dbgWritef("round_done", "tokens=%d (counted=%d) · prompt_tokens=%d · elapsed=%s · ctx_window=%d%s",
 		e.Tokens, delta, e.PromptTokens, e.Elapsed.Round(time.Millisecond), e.ContextWindow, budgetNote)
+	// Tripwire for the packer's blind spot: char/4 undercounts code-heavy
+	// history (measured ~1.6x on a real run), so the true prompt can reach the
+	// server's window while Pack still believes it has headroom. Ollama then
+	// front-truncates silently (200 OK, system prompt lost). A server count at
+	// or past 95% of the window is that band; log it so a forensic pass sees
+	// the overflow instead of inferring it. Log-only; the headroom constant
+	// stays put until a run actually trips this.
+	if ctxSize := m.activeContextSize(); e.PromptTokens > 0 && e.PromptTokens >= ctxSize-ctxSize/20 {
+		dbgWritef("ctx_pressure", "prompt_tokens=%d at >=95%% of ctx=%d; real prompt has outgrown the packer's estimate, next request risks silent server-side truncation", e.PromptTokens, ctxSize)
+	}
 	m.flushStreaming()
 }
 
@@ -1171,7 +1181,7 @@ func (m *Model) maybeVerifyNudge() bool {
 	dbgWritef("nudge", "finish re-grounding nudge injected at %d tool calls this turn", m.toolRounds)
 	m.history = append(m.history, chmctx.Message{
 		Role:    chmctx.RoleSystem,
-		Content: nudgeOrigin + "Before you finish: re-read the original request and walk its acceptance criteria one at a time. For each, name the check you actually ran and what it showed. Anything runnable you built or changed is proven only by running it - build or type-check it, run the test, execute the script, or for a page or UI load it in a headless browser and drive the primary interaction (click Start, press the keys, submit the form) and confirm the state changed - then fix what breaks and re-run. If a check genuinely can't run here, mark it `unverified: <what> - <why>` and lead your summary with it, not with a confident \"works\"; never dress up a static check (a brace count, a grep, an HTTP 200) as proof, and never report a check you didn't run. Then reply with your one-line summary.",
+		Content: nudgeOrigin + "Before you finish: re-read the original request and walk its acceptance criteria one at a time. For each, name the check you actually ran and what it showed. Anything runnable you built or changed is proven only by running it - build or type-check it, run the test, execute the script, or for a page or UI load it in a headless browser and drive the primary interaction (click Start, press the keys, submit the form) and confirm the state changed - then fix what breaks and re-run. If a check seems to need a runtime or browser this environment lacks, prove the lack with one read-only probe (`command -v node`, `command -v chromium chromium-browser google-chrome`, `ls ~/.cache/ms-playwright`) instead of assuming; never install anything just to verify, and if the probe comes up empty, stop hunting. Only then mark the check `unverified: <what> - <why>` and lead your summary with it, not with a confident \"works\"; never dress up a static check (a brace count, a grep, an HTTP 200) as proof, and never report a check you didn't run. Then reply with your one-line summary.",
 	})
 	return true
 }

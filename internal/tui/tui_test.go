@@ -753,6 +753,36 @@ func TestVerboseLogCapturesTurnRecords(t *testing.T) {
 	}
 }
 
+// TestCtxPressureTripwire: the round_done companion warning fires only when the
+// server-counted prompt reaches 95% of the active window. The char/4 packer
+// undercounts code-heavy history (~1.6x measured on a real run), so the server
+// count is the only signal that the real prompt is about to spill past the
+// window into silent server-side truncation.
+func TestCtxPressureTripwire(t *testing.T) {
+	dir := t.TempDir()
+	OpenDebugLog(dir)
+	t.Cleanup(CloseDebugLog)
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+	m.liveContextSize[m.cfg.Active] = 10000
+
+	m.applyDone(llm.Event{PromptTokens: 9499}) // below threshold: silent
+	m.applyDone(llm.Event{})                   // server reported nothing: silent
+	m.applyDone(llm.Event{PromptTokens: 9500}) // 95%: fire
+	CloseDebugLog()
+
+	raw, err := os.ReadFile(filepath.Join(dir, "log.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	logStr := string(raw)
+	if got := strings.Count(logStr, "] ctx_pressure"); got != 1 {
+		t.Fatalf("tripwire must fire exactly once (at >=95%% of the window), got %d\n%s", got, logStr)
+	}
+	if !strings.Contains(logStr, "prompt_tokens=9500 at >=95% of ctx=10000") {
+		t.Fatalf("tripwire record must name the offending count and window:\n%s", logStr)
+	}
+}
+
 // TestSlashModelSwitchDropsStickyFallbackState: llm.Client's noReasoningEffort
 // flag ("this server 400'd on tools+reasoning_effort, stop sending it") is
 // correct for one Client but wrong across a profile switch to a different
@@ -1969,6 +1999,12 @@ func TestVerifyNudgeFiresOnceAtMinRounds(t *testing.T) {
 	last := m.history[len(m.history)-1]
 	if !strings.Contains(last.Content, "unverified") || !strings.Contains(last.Content, "acceptance criteria") {
 		t.Fatalf("re-grounding note must push honest verification against the original request: %q", last.Content)
+	}
+	// A missing runtime must be proven with a read-only probe, never assumed
+	// (the mc run asserted "no browser here" without ever checking) and never
+	// chased with an install (the doomed apt-get loop).
+	if !strings.Contains(last.Content, "command -v") || !strings.Contains(last.Content, "never install") {
+		t.Fatalf("re-grounding note must demand a read-only runtime probe with a no-install fence: %q", last.Content)
 	}
 
 	// Latched: a later drain in the same turn must not re-fire.
