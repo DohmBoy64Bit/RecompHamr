@@ -94,6 +94,25 @@ func TestEditFileOldNotUnique(t *testing.T) {
 	}
 }
 
+// TestEditFileOverlappingOldString: strings.Count sees only one
+// non-overlapping "==" in "a === b", but it matches at two positions with
+// different results; the exactly-once guarantee must reject it.
+func TestEditFileOverlappingOldString(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "f.txt")
+	if err := os.WriteFile(path, []byte("a === b"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := EditFile(path, "==", "XX")
+	if !strings.Contains(s, "(ambiguous") {
+		t.Fatalf("self-overlapping old_string must be ambiguous, got %q", s)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != "a === b" {
+		t.Fatalf("file modified on ambiguity: %q", got)
+	}
+}
+
 func TestEditFileNoOp(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "f.txt")

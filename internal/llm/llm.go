@@ -184,7 +184,12 @@ func idleTimeoutFromEnv() time.Duration {
 		return d
 	}
 	if n, err := strconv.Atoi(v); err == nil && n > 0 {
-		return time.Duration(n) * time.Second
+		// Overflow check: a huge bare-seconds value (e.g. nanoseconds pasted
+		// where seconds were meant) can wrap the multiply to a small positive
+		// duration, silently killing every live-but-slow stream mid-prefill.
+		if d := time.Duration(n) * time.Second; d/time.Second == time.Duration(n) {
+			return d
+		}
 	}
 	return streamIdleTimeout
 }

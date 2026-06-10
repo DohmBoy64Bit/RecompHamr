@@ -108,6 +108,22 @@ func TestCtrlDNonEmptyNoOp(t *testing.T) {
 	}
 }
 
+// TestCtrlDMidTurnDoesNotQuit: the textarea is empty during a running turn
+// (submit resets it), so without the phase gate a reflexive Ctrl+D would quit
+// instantly, skipping turnCtx cancel and orphaning a running tool's process
+// group. Ctrl+C is the mid-turn escape; Ctrl+D must be inert until idle.
+func TestCtrlDMidTurnDoesNotQuit(t *testing.T) {
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+	m.phase = phaseThinking
+	if m.ta.Value() != "" {
+		t.Fatal("precondition: textarea empty")
+	}
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
+	if cmd != nil {
+		t.Fatal("Ctrl+D mid-turn must not quit")
+	}
+}
+
 // TestPlaceholderMentionsTab: placeholder names both "/" and "Tab" as entry
 // points into the popover, so new users discover either way.
 func TestPlaceholderMentionsTab(t *testing.T) {
@@ -850,6 +866,40 @@ models:
 	names := suggestNames(mm)
 	if !slices.Contains(names, "remote") {
 		t.Fatalf("external 'remote' profile missing from arg popover on first /models entry, got %v", names)
+	}
+}
+
+// TestArgPopoverSkipsConfigReloadMidTurn: typing is allowed mid-turn, but the
+// cmd→arg popover transition must not reload config then: a reload can
+// rebuildClient and swap the live llm.Client (and zero the budget) under the
+// in-flight turn. The stale list is fine; submit is phase-gated and runSlash
+// reloads once the turn is over.
+func TestArgPopoverSkipsConfigReloadMidTurn(t *testing.T) {
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+	yaml := []byte(`active: local
+models:
+  local:
+    llm: local-model
+    url: ` + m.cfg.Models["local"].URL + `
+    key: ""
+    context_size: 256000
+  remote:
+    llm: cloud-model
+    url: http://remote:9000
+    key: sk-r
+    context_size: 128000
+`)
+	if err := os.WriteFile(filepath.Join(m.cfg.Dir, "config.yaml"), yaml, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m.phase = phaseThinking
+	mm := typeInto(m, "/models ")
+	names := suggestNames(mm)
+	if slices.Contains(names, "remote") {
+		t.Fatalf("mid-turn popover transition must not reload config, got %v", names)
+	}
+	if !slices.Contains(names, "local") {
+		t.Fatalf("popover should still list the in-memory profiles, got %v", names)
 	}
 }
 
@@ -1662,6 +1712,12 @@ func TestToolResultFailed(t *testing.T) {
 		{"read_file success", tools.ReadFileName, "package main\n", false},
 		{"read_file Lisp content is not a failure", tools.ReadFileName, "(ns foo)\n(defn bar [] 1)\n", false},
 		{"read_file leading-paren prose is not a failure", tools.ReadFileName, "(this file starts with a paren)", false},
+		// Router-level failures bypass the per-tool shapes and must still feed
+		// the streak: truncated args re-emitted forever was exactly the loop
+		// the failure nudge was built for.
+		{"invalid-JSON args fail for bash", tools.BashName, "(tool arguments were not valid JSON: unexpected end of JSON input, most likely the arguments were truncated)", true},
+		{"invalid-JSON args fail for read_file", tools.ReadFileName, "(tool arguments were not valid JSON: x)", true},
+		{"unknown tool fails", "made_up_tool", "(unknown tool: made_up_tool)", true},
 	}
 	for _, c := range cases {
 		if got := toolResultFailed(c.tool, c.result); got != c.want {

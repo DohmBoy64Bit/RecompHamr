@@ -804,6 +804,11 @@ func TestIdleTimeoutFromEnv(t *testing.T) {
 		{val: "garbage", set: true, want: streamIdleTimeout},
 		{val: "0", set: true, want: streamIdleTimeout},
 		{val: "-5m", set: true, want: streamIdleTimeout},
+		// Bare seconds large enough to wrap the ×time.Second multiply to a
+		// small POSITIVE duration must fall back, not silently kill every
+		// live-but-slow stream mid-prefill.
+		{val: "18446744074", set: true, want: streamIdleTimeout},
+		{val: "9000000000", set: true, want: 9_000_000_000 * time.Second},
 	}
 	for _, tc := range cases {
 		if tc.set {

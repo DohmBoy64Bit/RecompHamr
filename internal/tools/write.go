@@ -13,7 +13,7 @@ func WriteFile(path, content string) string {
 	if path == "" {
 		return "(empty path)"
 	}
-	if dir := filepath.Dir(path); dir != "" && dir != "." {
+	if dir := filepath.Dir(path); dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return fmt.Sprintf("(mkdir error: %v)", err)
 		}

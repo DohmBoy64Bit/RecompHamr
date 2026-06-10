@@ -171,6 +171,13 @@ func Apply(ctx context.Context, execPath string) error {
 	if _, err := io.Copy(io.MultiWriter(tmp, h), resp.Body); err != nil {
 		return err
 	}
+	// Sync before the rename: rename is metadata-only, so without the flush a
+	// power loss right after Apply can journal the rename while the data never
+	// hit disk, leaving a truncated binary at execPath that CleanupOld can
+	// never reach (recoverable only by hand from .old).
+	if err := tmp.Sync(); err != nil {
+		return err
+	}
 	if err := tmp.Close(); err != nil {
 		return err
 	}

@@ -1038,17 +1038,25 @@ func toolResultFailed(name, result string) bool {
 	if strings.Contains(result, "(cancelled)") {
 		return false
 	}
+	// Router-level failures arrive under any tool name and bypass the per-tool
+	// shapes below: truncated/invalid JSON args (the failure that makes a model
+	// re-emit the same too-large write for minutes) and a hallucinated tool
+	// name. Both must count as failures or the repeated-failure nudge never
+	// fires on exactly the loops it was built for.
+	t := strings.TrimSpace(result)
+	if strings.HasPrefix(t, "(tool arguments were not valid JSON") || strings.HasPrefix(t, "(unknown tool:") {
+		return true
+	}
 	switch name {
 	case tools.WriteFileName, tools.EditFileName:
 		// write/edit report success as plain text ("wrote N bytes", "edited …")
 		// and every error in parens, so a leading "(" is the failure signal.
-		return strings.HasPrefix(strings.TrimSpace(result), "(")
+		return strings.HasPrefix(t, "(")
 	case tools.ReadFileName:
 		// read_file returns the file's RAW content on success, which can
 		// legitimately start with "(" (Lisp, S-expressions, a leading paren
 		// expr). Match only its two real failure outputs so a successful read
 		// isn't counted as a failure and made to feed the repeated-failure nudge.
-		t := strings.TrimSpace(result)
 		return strings.HasPrefix(t, "(read error:") || t == "(empty path)"
 	case tools.BashName:
 		return strings.Contains(result, "\n(exit: ") || strings.Contains(result, "(timeout after ")

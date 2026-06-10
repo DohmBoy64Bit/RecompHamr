@@ -345,6 +345,30 @@ func TestConfigFilePermissionsAreOwnerOnly(t *testing.T) {
 	}
 }
 
+// TestBootstrapTightensLooseDirPerms: a .codehamr/ created loose (older
+// release, or by hand at 0o755) must be tightened on the next Bootstrap, the
+// directory counterpart of Save's fresh-temp-inode fix for config.yaml.
+func TestBootstrapTightensLooseDirPerms(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, DirName)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o755); err != nil { // bypass umask
+		t.Fatal(err)
+	}
+	if _, _, err := Bootstrap(root); err != nil {
+		t.Fatal(err)
+	}
+	st, err := os.Stat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Mode().Perm(); got != 0o700 {
+		t.Fatalf("pre-existing loose .codehamr/ = %v after Bootstrap, want 0o700", got)
+	}
+}
+
 // TestSaveIsAtomicAndLeavesNoTemp: writeYAML writes a sibling temp then renames
 // it over config.yaml so a torn write can't brick the next launch. Pin that the
 // rename leaves no leftover .config-*.yaml temp and the result still decodes.

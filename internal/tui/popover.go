@@ -57,8 +57,11 @@ func (m *Model) refreshSuggest() {
 	}
 	// Reload cfg on the cmd→arg transition (or a different arg-level command) so
 	// lists like /models <name> reflect external edits before submit. Errors are
-	// silent: runSlash surfaces them on submit, not on every keystroke.
-	if !m.suggestArgLevel || m.activeCmd != cmdName {
+	// silent: runSlash surfaces them on submit, not on every keystroke. Never
+	// mid-turn: a reload can rebuildClient and swap the live client (and zero
+	// the budget) under the in-flight turn; submit is phase-gated anyway, so
+	// runSlash's own reload covers correctness once the turn is over.
+	if !m.phase.active() && (!m.suggestArgLevel || m.activeCmd != cmdName) {
 		_ = m.reloadConfigFromDisk()
 	}
 	argPrefix := strings.TrimLeft(rest, " ")

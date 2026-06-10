@@ -29,8 +29,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.ClearScreen
 	case tea.KeyCtrlD:
 		// Ctrl+D on empty input = EOF = quit; no-op on non-empty so a
-		// reflexive press never destroys a draft.
-		if m.ta.Value() == "" {
+		// reflexive press never destroys a draft, and no-op mid-turn (the
+		// textarea is empty then, since submit resets it) so a reflexive press
+		// can't quit without cancelling turnCtx and orphan a running tool's
+		// process group. Ctrl+C is the mid-turn escape.
+		if m.ta.Value() == "" && !m.phase.active() {
 			return m, tea.Quit
 		}
 		return m, nil

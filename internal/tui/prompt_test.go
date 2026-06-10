@@ -181,6 +181,56 @@ func TestTwoChipsTrackedIndependently(t *testing.T) {
 	}
 }
 
+// TestDamagedLabelAmongIdenticalChipsDropsWholeGroup: two pastes with the same
+// line count render identical labels. A word-delete at the boundary (Ctrl+W,
+// which handleChipKey doesn't claim and snapCursorOutOfChip can't prevent)
+// damages one label; in-order re-binding would then map the surviving label to
+// the FIRST span's paste, silently sending the wrong content on submit. The
+// spans are indistinguishable, so reconcile drops the whole label group.
+func TestDamagedLabelAmongIdenticalChipsDropsWholeGroup(t *testing.T) {
+	mkLines := func(prefix string, n int) string {
+		parts := make([]string, n)
+		for i := range parts {
+			parts[i] = fmt.Sprintf("%s %d", prefix, i+1)
+		}
+		return strings.Join(parts, "\n")
+	}
+	p := newChippablePrompt()
+	p, _ = p.Update(pasteKey(mkLines("alpha", 8)))
+	p, _ = p.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" mid ")})
+	p, _ = p.Update(pasteKey(mkLines("beta", 8)))
+	if len(p.spans) != 2 {
+		t.Fatalf("precondition: expected 2 chips, got %d", len(p.spans))
+	}
+	// Word-delete backward from the first chip's end eats into its label.
+	p.setCursorRuneOffset(p.spans[0].end)
+	p, _ = p.Update(tea.KeyMsg{Type: tea.KeyCtrlW})
+	if len(p.spans) != 0 {
+		t.Fatalf("indistinguishable identical-label chips must drop as a group, got %d spans", len(p.spans))
+	}
+	if v := p.Value(); strings.Contains(v, "alpha 1") || strings.Contains(v, "beta 1") {
+		t.Fatalf("no paste content may expand after the group drop: %q", v)
+	}
+}
+
+// TestDamagedLabelUniqueChipDropsOnlyItself: the group-drop above must not
+// over-trigger; a damaged label with no twin drops alone and the other chip
+// keeps its mapping.
+func TestDamagedLabelUniqueChipDropsOnlyItself(t *testing.T) {
+	p := newChippablePrompt()
+	p, _ = p.Update(pasteKey(makePaste(8)))
+	p, _ = p.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" mid ")})
+	p, _ = p.Update(pasteKey(makePaste(15)))
+	p.setCursorRuneOffset(p.spans[0].end)
+	p, _ = p.Update(tea.KeyMsg{Type: tea.KeyCtrlW})
+	if len(p.spans) != 1 {
+		t.Fatalf("only the damaged chip should drop, got %d spans", len(p.spans))
+	}
+	if c := p.store[p.spans[0].id]; c.lines != 15 {
+		t.Fatalf("survivor should be the 15-line chip, got %d", c.lines)
+	}
+}
+
 // TestValueExpandsAllChips: Value() interleaves surrounding text with full
 // paste contents in order.
 func TestValueExpandsAllChips(t *testing.T) {

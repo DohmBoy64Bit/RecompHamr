@@ -126,6 +126,13 @@ func Bootstrap(projectRoot string) (*Config, bool, error) {
 		if !info.IsDir() {
 			return nil, false, fmt.Errorf("%s: exists but is not a directory", dir)
 		}
+		// Tighten a pre-existing loose dir (created by an older release or by
+		// hand): same upgrade-path rationale as Save's fresh-temp-inode trick
+		// for config.yaml, applied to the directory the threat comment below
+		// is about. Best-effort; a failure here shouldn't block launch.
+		if info.Mode().Perm() != 0o700 {
+			_ = os.Chmod(dir, 0o700)
+		}
 	case errors.Is(err, os.ErrNotExist):
 		// 0o700: config.yaml may carry the hamrpass key (a long-lived bearer
 		// token). A world-listable dir lets other local users spot it and probe
@@ -258,6 +265,13 @@ func writeYAML(path string, v any) error {
 	tmpPath := tmp.Name()
 	defer os.Remove(tmpPath) // no-op after a successful rename; cleans up early returns
 	if _, err := tmp.Write(append(header, b...)); err != nil {
+		tmp.Close()
+		return err
+	}
+	// Sync before the rename: rename is metadata-only, so a power loss right
+	// after Save could otherwise journal the rename ahead of the data and
+	// leave the truncated config.yaml the crash-safety above promises away.
+	if err := tmp.Sync(); err != nil {
 		tmp.Close()
 		return err
 	}

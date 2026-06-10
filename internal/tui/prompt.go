@@ -305,9 +305,21 @@ func (p *promptInput) deleteSpan(chip chipSpan) {
 // span's end) and updates offsets. A span whose label has vanished (e.g.
 // partially deleted by a non-chip-aware edit) is dropped along with its store
 // entry, so the chip becomes plain text from then on.
+//
+// When several chips share a label (same line count) and an edit damaged one
+// of them, in-order re-binding would silently map a survivor to the wrong
+// paste (the cross-map named in Update's snap rationale; word-deletes can
+// reach into a label from outside, which the cursor snap can't prevent). The
+// spans are indistinguishable then, so drop the whole label group instead.
 func (p *promptInput) reconcile() {
 	value := p.ta.Value()
 	valueRunes := []rune(value)
+	spansPerLabel := map[string]int{}
+	for _, span := range p.spans {
+		if content, ok := p.store[span.id]; ok {
+			spansPerLabel[chipLabel(content.lines)]++
+		}
+	}
 	kept := make([]chipSpan, 0, len(p.spans))
 	searchFrom := 0
 	for _, span := range p.spans {
@@ -317,6 +329,10 @@ func (p *promptInput) reconcile() {
 		}
 		label := chipLabel(content.lines)
 		labelRunes := []rune(label)
+		if spansPerLabel[label] > runeCount(valueRunes, labelRunes) {
+			delete(p.store, span.id)
+			continue
+		}
 		idx := runeIndex(valueRunes[searchFrom:], labelRunes)
 		if idx < 0 {
 			delete(p.store, span.id)
@@ -328,6 +344,24 @@ func (p *promptInput) reconcile() {
 		searchFrom = end
 	}
 	p.spans = kept
+}
+
+// runeCount is the counting counterpart of runeIndex: non-overlapping
+// occurrences of needle in haystack. Exact for chip labels, which cannot
+// self-overlap (they start with the unique "[" of the label format).
+func runeCount(haystack, needle []rune) int {
+	if len(needle) == 0 {
+		return 0
+	}
+	count, from := 0, 0
+	for {
+		idx := runeIndex(haystack[from:], needle)
+		if idx < 0 {
+			return count
+		}
+		count++
+		from += idx + len(needle)
+	}
 }
 
 // runeIndex is a rune-level strings.Index: first occurrence of needle in

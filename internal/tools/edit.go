@@ -42,6 +42,13 @@ func EditFile(path, oldString, newString string) string {
 	if n > 1 {
 		return fmt.Sprintf("(ambiguous: old_string appears %d times - provide more context to make it unique)", n)
 	}
+	// strings.Count only counts non-overlapping occurrences, so a self-
+	// overlapping old_string ("==" in "a === b") passes n == 1 yet matches at
+	// two positions with different results. Catch the overlapping second match
+	// so the exactly-once guarantee holds.
+	if idx := strings.Index(content, oldString); strings.Contains(content[idx+1:], oldString) {
+		return "(ambiguous: old_string overlaps itself - provide more context to make it unique)"
+	}
 	updated := strings.Replace(content, oldString, newString, 1)
 	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
 		return fmt.Sprintf("(write error: %v)", err)
