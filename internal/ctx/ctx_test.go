@@ -5,7 +5,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/codehamr/codehamr/internal/config"
+	"github.com/DohmBoy64Bit/recomphamr/internal/config"
 )
 
 // TestEmbeddedPromptFitsFixedSystem guards the invariant the packer relies on:
@@ -415,7 +415,7 @@ func TestPackDemotesSystemNudgeToUser(t *testing.T) {
 	history := []Message{
 		{Role: RoleUser, Content: "build it"},
 		{Role: RoleAssistant, Content: "working"},
-		{Role: RoleSystem, Content: "[Automated codehamr check - not a message from your user.] runaway self-check"},
+		{Role: RoleSystem, Content: "[Automated recomphamr check - not a message from your user.] runaway self-check"},
 	}
 	r := Pack(history, 100000)
 	for _, m := range r.Messages {
@@ -440,7 +440,7 @@ func TestPackAnchorsTaskEvenWithSystemNudge(t *testing.T) {
 		{Role: RoleUser, Content: "BUILD THE GALAXY"},
 		{Role: RoleAssistant, Content: big},
 		{Role: RoleAssistant, Content: big},
-		{Role: RoleSystem, Content: "[Automated codehamr check] runaway self-check"},
+		{Role: RoleSystem, Content: "[Automated recomphamr check] runaway self-check"},
 	}
 	r := Pack(history, 5000)
 	var sawTask bool
@@ -493,3 +493,6 @@ func TestResponseReserveScales(t *testing.T) {
 		}
 	}
 }
+
+
+

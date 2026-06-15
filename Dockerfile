@@ -16,3 +16,4 @@ RUN go install github.com/goreleaser/goreleaser/v2@v2.15.3 \
 ENV PATH="/root/.local/bin:${PATH}"
 
 WORKDIR /workspaces/codehamr
+

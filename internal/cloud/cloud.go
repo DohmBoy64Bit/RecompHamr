@@ -1,4 +1,4 @@
-// Package cloud parses the budget and auth signals from the codehamr.com proxy.
+// Package cloud parses the budget and auth signals from the recomphamr.com proxy.
 // Client-side plumbing only; the server owns all accounting.
 //
 // Wire contract: one budget-fraction header (0.0..1.0), one context-window
@@ -126,3 +126,6 @@ func ContextWindowFromHeaders(h http.Header) int {
 	}
 	return n
 }
+
+
+

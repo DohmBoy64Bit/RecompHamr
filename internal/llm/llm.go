@@ -4,7 +4,7 @@
 //
 // One code path serves every backend:
 //   - local Ollama, via the OpenAI-compatible `/v1` shim Ollama itself ships
-//   - the codehamr.com hosted endpoint, hamrpass-keyed (proxy over OpenRouter)
+//   - the recomphamr.com hosted endpoint, hamrpass-keyed (proxy over OpenRouter)
 //   - any other endpoint already speaking OpenAI's wire format
 //
 // Deliberately unsupported, to keep the client uniform:
@@ -29,8 +29,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/codehamr/codehamr/internal/cloud"
-	chmctx "github.com/codehamr/codehamr/internal/ctx"
+	"github.com/DohmBoy64Bit/recomphamr/internal/cloud"
+	chmctx "github.com/DohmBoy64Bit/recomphamr/internal/ctx"
 )
 
 type Tool struct {
@@ -172,17 +172,17 @@ const (
 // Ctrl+C (request-context cancel unblocks the read), whereas killing a live
 // stream loses the turn. This idle timeout is NOT the loop/stuck guard: a
 // looping model emits frames and resets the watchdog every time, so it slips
-// straight past; runaway/failure nudges and Ctrl+C own that. CODEHAMR_IDLE_TIMEOUT
+// straight past; runaway/failure nudges and Ctrl+C own that. RECOMPHAMR_IDLE_TIMEOUT
 // overrides the default (Go duration like "90m", or a bare number = seconds).
 const streamIdleTimeout = time.Hour
 
-// idleTimeoutFromEnv resolves CODEHAMR_IDLE_TIMEOUT to a duration, falling back
+// idleTimeoutFromEnv resolves RECOMPHAMR_IDLE_TIMEOUT to a duration, falling back
 // to streamIdleTimeout when unset or unparseable. Accepts a Go duration string
 // ("45m", "1h30m") or a bare number read as seconds. Lives here, not in main's
 // applyEnvOverrides, because it's purely an llm concern and both Client call
 // sites (startup + /models switch) go through New.
 func idleTimeoutFromEnv() time.Duration {
-	v := strings.TrimSpace(os.Getenv("CODEHAMR_IDLE_TIMEOUT"))
+	v := strings.TrimSpace(os.Getenv("RECOMPHAMR_IDLE_TIMEOUT"))
 	if v == "" {
 		return streamIdleTimeout
 	}
@@ -620,3 +620,6 @@ func firstLine(s string) string {
 	}
 	return strings.TrimSpace(s)
 }
+
+
+

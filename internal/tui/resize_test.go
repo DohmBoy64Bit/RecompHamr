@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/codehamr/codehamr/internal/config"
-	"github.com/codehamr/codehamr/internal/llm"
+	"github.com/DohmBoy64Bit/recomphamr/internal/config"
+	"github.com/DohmBoy64Bit/recomphamr/internal/llm"
 )
 
 // TestResizeKeepsPromptInsideTerminal: across a resize sequence View must
@@ -267,3 +267,6 @@ func countPrintlnLeaves(cmd tea.Cmd) int {
 		return msg != nil && reflect.TypeOf(msg) == printlnMsgType
 	})
 }
+
+
+

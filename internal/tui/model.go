@@ -14,11 +14,12 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/codehamr/codehamr/internal/cloud"
-	"github.com/codehamr/codehamr/internal/config"
-	chmctx "github.com/codehamr/codehamr/internal/ctx"
-	"github.com/codehamr/codehamr/internal/llm"
-	"github.com/codehamr/codehamr/internal/tools"
+	"github.com/DohmBoy64Bit/recomphamr/internal/cloud"
+	"github.com/DohmBoy64Bit/recomphamr/internal/config"
+	chmctx "github.com/DohmBoy64Bit/recomphamr/internal/ctx"
+	"github.com/DohmBoy64Bit/recomphamr/internal/llm"
+	"github.com/DohmBoy64Bit/recomphamr/internal/skills"
+	"github.com/DohmBoy64Bit/recomphamr/internal/tools"
 )
 
 const (
@@ -243,6 +244,10 @@ type Model struct {
 	// on-disk ContextSize is intentionally empty); for user-managed profiles
 	// it's empty and packing falls back to Profile.ContextSize. Never persisted.
 	liveContextSize map[string]int
+
+	// activeSkills holds the names of currently loaded RE skills,
+	// injected into the system prompt by buildSystem.
+	activeSkills []string
 }
 
 func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model {
@@ -262,7 +267,7 @@ func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model 
 		ProjectDir: projectDir,
 		cfg:        cfg,
 		cli:        cli,
-		system:     buildSystem(projectDir),
+		system:     buildSystem(projectDir, nil),
 		ta:         ta,
 		renderer:   r,
 		spinner:    sp,
@@ -284,7 +289,7 @@ func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model 
 			m.activeContextSize(), chmctx.Tokens(m.system),
 			[]string{tools.BashName, tools.ReadFileName, tools.WriteFileName, tools.EditFileName})
 	}
-	// Seed prompt history from .codehamr/history so ↑ recalls prompts from
+	// Seed prompt history from .rehamr/history so ↑ recalls prompts from
 	// earlier sessions. Loaded entries carry no chip metadata (the on-disk
 	// format stores expanded text only), so a recalled multi-line paste
 	// appears uncollapsed, the right tradeoff for a cat-friendly history file.
@@ -555,10 +560,10 @@ func (m Model) handleResizeSettle(msg resizeSettleMsg) (tea.Model, tea.Cmd) {
 // pasted log every turn; entry is the history snapshot replayed by ↑/↓,
 // including chip state.
 func (m Model) submit(sendText, echoText string, entry promptEntry) (tea.Model, tea.Cmd) {
-	// Redact secret-bearing slash commands (/hamrpass <key>) before they reach
+	// Redact secret-bearing slash commands (/rehampass <key>) before they reach
 	// any sink that persists or replays them: the scrollback echo (kept in
 	// m.scroll, re-emitted verbatim on every resize), the ↑/↓ recall ring, and
-	// the on-disk .codehamr/history file. Without this, submit leaks the bearer
+	// the on-disk .rehamr/history file. Without this, submit leaks the bearer
 	// token into a second on-disk copy and into UI recall, undermining the
 	// 0o600 + symlink defences on the key in config.yaml. Raw sendText still
 	// flows to runSlash so activation works. No-op for non-secret input.
@@ -574,7 +579,7 @@ func (m Model) submit(sendText, echoText string, entry promptEntry) (tea.Model, 
 	m.histIdx = -1
 	// Persist the (redacted) prompt so ↑ finds it after a restart. Errors are
 	// swallowed: a transient failure isn't worth derailing submit, and a
-	// permanent one (read-only .codehamr/) would just be noise on every prompt.
+	// permanent one (read-only .rehamr/) would just be noise on every prompt.
 	_ = appendPromptHistory(m.cfg.Dir, safeText)
 
 	if strings.HasPrefix(sendText, "/") {
@@ -1013,7 +1018,7 @@ func (m Model) dispatchNextTool() (tea.Model, tea.Cmd) {
 // Deliberately says nothing about whether to stop or keep going (each nudge body
 // owns that), so it can't induce the premature-completion failure the runaway /
 // verify wording fights.
-const nudgeOrigin = "[Automated codehamr check - not a message from your user.] "
+const nudgeOrigin = "[Automated recomphamr check - not a message from your user.] "
 
 // maxToolFailStreak is how many consecutive same-target failures trigger the
 // nudge. Generous on purpose: a model iterating on a hard edit gets several
@@ -1192,9 +1197,25 @@ func (m Model) cursorOnFirstLine() bool { return m.ta.Line() == 0 }
 func (m Model) cursorOnLastLine() bool  { return m.ta.Line() == m.ta.LineCount()-1 }
 
 // buildSystem appends the working-directory anchor to the embedded system
-// prompt so "hier" / "here" resolves to a concrete path.
-func buildSystem(projectDir string) string {
-	return config.DefaultSystemPrompt + "\n\nWorking directory: " + projectDir
+// prompt so "hier" / "here" resolves to a concrete path. If activeSkills is
+// non-empty, the skill bodies are appended after the anchor.
+func buildSystem(projectDir string, activeSkills []string) string {
+	s := config.DefaultSystemPrompt + "\n\nWorking directory: " + projectDir
+	if len(activeSkills) > 0 {
+		s += "\n\n## Active RE Skills\n"
+		for _, name := range activeSkills {
+			body, err := skills.Get(name)
+			if err == nil {
+				s += "\n### " + name + "\n" + body + "\n"
+			}
+		}
+	}
+	return s
+}
+
+// rebuildSystem refreshes m.system from the current activeSkills.
+func (m Model) rebuildSystem() string {
+	return buildSystem(m.ProjectDir, m.activeSkills)
 }
 
 // pingBackend issues a short GET to baseURL/v1/models via cloud.Reachable. Any
@@ -1208,3 +1229,6 @@ func pingBackend(baseURL string) tea.Cmd {
 		return pingMsg{ok: cloud.Reachable(ctx, baseURL) == nil, baseURL: baseURL}
 	}
 }
+
+
+

@@ -26,7 +26,7 @@ archives:
     name_template: "codehamr-{{ if eq .Os \"darwin\" }}macos{{ else }}{{ .Os }}{{ end }}-{{ .Arch }}"
 
 checksum:
-  name_template: "codehamr_checksums.txt"
+  name_template: "recomphamr_checksums.txt"
   algorithm: sha256
 
 changelog:
@@ -36,3 +36,4 @@ changelog:
   filters:
     exclude:
       - '^Merge '
+

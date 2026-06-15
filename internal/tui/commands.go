@@ -6,10 +6,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/codehamr/codehamr/internal/cloud"
-	chmctx "github.com/codehamr/codehamr/internal/ctx"
-	"github.com/codehamr/codehamr/internal/llm"
-	"github.com/codehamr/codehamr/internal/tools"
+	"github.com/DohmBoy64Bit/recomphamr/internal/cloud"
+	chmctx "github.com/DohmBoy64Bit/recomphamr/internal/ctx"
+	"github.com/DohmBoy64Bit/recomphamr/internal/llm"
+	"github.com/DohmBoy64Bit/recomphamr/internal/tools"
 )
 
 // streamEventMsg and streamClosedMsg tag their originating channel so the model
@@ -68,9 +68,9 @@ func (m Model) errorMessage(e llm.Event) string {
 	}
 	switch {
 	case errors.Is(e.Err, cloud.ErrBudgetExhausted):
-		return "⚠ hamrpass depleted · top up at codehamr.com"
+		return "⚠ hamrpass depleted · top up at recomphamr.com"
 	case errors.Is(e.Err, cloud.ErrUnauthorized):
-		return "⚠ key rejected · check models." + m.cfg.Active + ".key in .codehamr/config.yaml"
+		return "⚠ key rejected · check models." + m.cfg.Active + ".key in .rehamr/config.yaml"
 	case isUnreachable(e.Err):
 		return "⚠ unreachable: " + m.cfg.ActiveURL() + " · /models to switch profile"
 	default:
@@ -82,3 +82,6 @@ func isUnreachable(err error) bool {
 	_, ok := errors.AsType[cloud.ErrUnreachable](err)
 	return ok
 }
+
+
+

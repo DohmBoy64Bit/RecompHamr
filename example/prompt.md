@@ -22,3 +22,4 @@ Build a single self-contained `galaxy.html` that opens in a modern browser and r
 It opens with no console errors, the intro shows a ringed planet, flying reveals an endless and varied universe, and shooting things produces convincing explosions with synthesized audio.
 
 Deliver the complete `galaxy.html` and nothing else: no commentary, no markdown fences.
+

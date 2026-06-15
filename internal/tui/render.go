@@ -10,15 +10,15 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-// splashCode and splashHamr form the two-tone "CODEHAMR" wordmark printed
+// splashRecomp and splashHamr form the two-tone "RECOMPHAMR" wordmark printed
 // once at startup, pushed into scrollback via tea.Println; it scrolls up
 // naturally as content arrives, so View() needs no hide-on-first-content branch.
-var splashCode = []string{
-	" ██████  ██████  ██████   ███████ ",
-	"██      ██    ██ ██   ██  ██      ",
-	"██      ██    ██ ██   ██  █████   ",
-	"██      ██    ██ ██   ██  ██      ",
-	" ██████  ██████  ██████   ███████ ",
+var splashRecomp = []string{
+	"██████  ███████  ██████   ██████  ███    ███ ██████  ",
+	"██   ██ ██      ██      ██    ██ ████  ████ ██   ██ ",
+	"██████  █████   ██      ██    ██ ██ ████ ██ ██████  ",
+	"██   ██ ██      ██      ██    ██ ██  ██  ██ ██      ",
+	"██   ██ ███████  ██████  ██████  ██      ██ ██      ",
 }
 
 var splashHamr = []string{
@@ -219,18 +219,18 @@ func (m Model) View() string {
 // splashLines builds the identity block for tea.Println. Below wordmarkWidth
 // the ASCII art soft-wraps into garbage, so collapse to plain text.
 func (m Model) splashLines() []string {
-	const wordmarkWidth = 70 // cells needed for CODE+HAMR side-by-side
+	const wordmarkWidth = 70 // cells needed for RECOMP+HAMR side-by-side
 	if m.width >= wordmarkWidth {
 		lines := []string{""}
-		for i := range splashCode {
-			lines = append(lines, "  "+styleDim.Render(splashCode[i])+styleHamr.Render(splashHamr[i]))
+		for i := range splashRecomp {
+			lines = append(lines, "  "+styleDim.Render(splashRecomp[i])+styleHamr.Render(splashHamr[i]))
 		}
 		lines = append(lines,
-			"", styleDim.Render("  It's hamr time!"),
-			"", styleDim.Render(fmt.Sprintf("  codehamr %s · %s @ %s",
+			"", styleDim.Render("  RE · decomp · recomp · evidence-backed reconstruction"),
+			"", styleDim.Render(fmt.Sprintf("  recomphamr %s · %s @ %s",
 				m.Version, m.cfg.ActiveProfile().LLM, m.cfg.Active)),
 			"",
-			styleDim.Render("  AI systems can make mistakes. Codehamr executes their commands with full shell and filesystem access."),
+			styleDim.Render("  AI systems can make mistakes. RecompHAMR executes their commands with full shell and filesystem access."),
 			styleDim.Render("  Run inside a devcontainer or VM where it cannot cause damage outside the sandbox."),
 			"",
 		)
@@ -238,11 +238,11 @@ func (m Model) splashLines() []string {
 	}
 	return []string{
 		"",
-		styleHamr.Render("  codehamr"),
+		styleHamr.Render("  recomphamr"),
 		styleDim.Render(fmt.Sprintf("  %s · %s @ %s",
 			m.Version, m.cfg.ActiveProfile().LLM, m.cfg.Active)),
 		"",
-		styleDim.Render("  Sandboxed AI shell - run in a devcontainer or VM."),
+		styleDim.Render("  RE · decomp · recomp - run in a devcontainer or VM."),
 		"",
 	}
 }
@@ -280,3 +280,6 @@ func (m Model) renderStatusBar() string {
 func appendStatus(segs []string, s string) []string {
 	return append(segs, styleStatus.Render(s))
 }
+
+
+

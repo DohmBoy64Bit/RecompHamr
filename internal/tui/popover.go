@@ -155,3 +155,6 @@ func (m Model) renderPopover() string {
 	}
 	return b.String()
 }
+
+
+

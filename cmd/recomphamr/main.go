@@ -1,4 +1,4 @@
-// Command codehamr is the lightweight, fast coding agent for the terminal.
+// Command recomphamr is the lightweight, fast coding agent for the terminal.
 package main
 
 import (
@@ -12,10 +12,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/codehamr/codehamr/internal/config"
-	"github.com/codehamr/codehamr/internal/llm"
-	"github.com/codehamr/codehamr/internal/tui"
-	"github.com/codehamr/codehamr/internal/update"
+	"github.com/DohmBoy64Bit/recomphamr/internal/config"
+	"github.com/DohmBoy64Bit/recomphamr/internal/llm"
+	"github.com/DohmBoy64Bit/recomphamr/internal/tui"
+	"github.com/DohmBoy64Bit/recomphamr/internal/update"
 )
 
 // updateBudget caps the pre-launch auto-update (checksum fetch + download +
@@ -30,7 +30,7 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "-v", "--version", "version":
-			fmt.Println("codehamr", version)
+			fmt.Println("recomphamr", version)
 			return
 		case "-h", "--help", "help":
 			printHelp()
@@ -56,11 +56,11 @@ func main() {
 	// draws, so there's nothing to announce.
 	cfg, _, err := config.Bootstrap(cwd)
 	if err != nil {
-		log.Fatalf("codehamr: %v", err)
+		log.Fatalf("recomphamr: %v", err)
 	}
 	applyEnvOverrides(cfg)
 
-	// Opt-in debug log (`logging: true`): truncates .codehamr/log.txt and
+	// Opt-in debug log (`logging: true`): truncates .rehamr/log.txt and
 	// records every chat exchange. See tui.OpenDebugLog / dbgWrite.
 	if cfg.Logging {
 		tui.OpenDebugLog(cfg.Dir)
@@ -89,17 +89,17 @@ func main() {
 	// xterm.js hosts (VS Code) leak those bytes as runes into the textarea
 	// on every window switch, inflating prompt height with invisible chars.
 	if _, err := tea.NewProgram(m, tea.WithReportFocus()).Run(); err != nil {
-		log.Fatalf("codehamr: %v", err)
+		log.Fatalf("recomphamr: %v", err)
 	}
 }
 
 func printHelp() {
 	fmt.Println(strings.TrimSpace(`
-codehamr, a lightweight, fast coding agent for the terminal.
+recomphamr, a lightweight coding agent for RE · decomp · recomp · evidence-backed reconstruction.
 
 Usage:
-  codehamr             start interactive TUI
-  codehamr --version   print version
+  recomphamr             start interactive TUI
+  recomphamr --version   print version
 
 Slash commands (inside TUI):`))
 	tui.PrintHelp(os.Stdout)
@@ -110,11 +110,11 @@ Keys (inside TUI):
   ctrl+d   quit (on empty input)
 
 Config:
-  .codehamr/config.yaml   per-project settings
+  .rehamr/config.yaml   per-project settings
 
 Env:
-  CODEHAMR_URL            override the active profile's url at runtime
-  CODEHAMR_IDLE_TIMEOUT   stream idle timeout, e.g. 90m or 1h (default 1h)`))
+  RECOMPHAMR_URL            override the active profile's url at runtime
+  RECOMPHAMR_IDLE_TIMEOUT   stream idle timeout, e.g. 90m or 1h (default 1h)`))
 }
 
 // isLocalBuild reports whether the binary came from a working tree rather
@@ -146,7 +146,7 @@ func maybeSelfUpdate() {
 	if !update.Check(ctx, exe) {
 		return
 	}
-	fmt.Fprintln(os.Stderr, "◉ applying codehamr update...")
+	fmt.Fprintln(os.Stderr, "◉ applying recomphamr update...")
 	if err := update.Apply(ctx, exe); err != nil {
 		fmt.Fprintf(os.Stderr, "⚠ update failed: %v\n", err)
 		if os.IsPermission(err) {
@@ -155,15 +155,15 @@ func maybeSelfUpdate() {
 		return
 	}
 	// Re-launch the new binary. reExec is platform-split: unix execve (same
-	// PID) vs. Windows spawn-and-wait. CODEHAMR_NO_UPDATE_CHECK=1 stops the
+	// PID) vs. Windows spawn-and-wait. RECOMPHAMR_NO_UPDATE_CHECK=1 stops the
 	// replacement run from re-checking its own freshly-written hash. On
 	// reExec failure we fall through to the old in-memory binary.
 	//
 	// os.Setenv overwrites in place so os.Environ() carries exactly one entry;
 	// append(os.Environ(), …) would leave a pre-existing user-set value first,
 	// and Unix execve resolves os.Getenv to the FIRST match, silently defeating
-	// the guard if someone exported CODEHAMR_NO_UPDATE_CHECK to a non-"1" value.
-	os.Setenv("CODEHAMR_NO_UPDATE_CHECK", "1")
+	// the guard if someone exported RECOMPHAMR_NO_UPDATE_CHECK to a non-"1" value.
+	os.Setenv("RECOMPHAMR_NO_UPDATE_CHECK", "1")
 	if err := reExec(exe, os.Args, os.Environ()); err != nil {
 		fmt.Fprintf(os.Stderr, "⚠ re-exec failed: %v (continuing with previous version)\n", err)
 	}
@@ -174,16 +174,20 @@ func maybeSelfUpdate() {
 func mustCwd() string {
 	cwd, err := os.Getwd()
 	if err != nil {
-		log.Fatalf("codehamr: %v", err)
+		log.Fatalf("recomphamr: %v", err)
 	}
 	return cwd
 }
 
-// applyEnvOverrides folds runtime env vars into cfg. CODEHAMR_URL overrides
+// applyEnvOverrides folds runtime env vars into cfg. RECOMPHAMR_URL overrides
 // the active profile's URL (devcontainers / CI), held on a non-serialised
 // field so it never round-trips into config.yaml on Save.
 func applyEnvOverrides(cfg *config.Config) {
-	if envURL := os.Getenv("CODEHAMR_URL"); envURL != "" {
+	if envURL := os.Getenv("RECOMPHAMR_URL"); envURL != "" {
 		cfg.URLOverride = envURL
 	}
 }
+
+
+
+

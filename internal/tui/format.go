@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codehamr/codehamr/internal/config"
+	"github.com/DohmBoy64Bit/recomphamr/internal/config"
 )
 
 // humanTokens renders a token count compactly: `900 tok`, `1.2k tok`, `1.5M
@@ -92,3 +92,6 @@ func humanInt(n int) string {
 	}
 	return b.String()
 }
+
+
+

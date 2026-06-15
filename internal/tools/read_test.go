@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	chmctx "github.com/codehamr/codehamr/internal/ctx"
+	chmctx "github.com/DohmBoy64Bit/recomphamr/internal/ctx"
 )
 
 func TestReadFileHappy(t *testing.T) {
@@ -112,3 +112,6 @@ func TestInlineStatusReadFile(t *testing.T) {
 		t.Fatalf("bad inline status: %q", s)
 	}
 }
+
+
+

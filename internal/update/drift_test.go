@@ -98,8 +98,8 @@ func TestAssetNameMatchesGoreleaserMatrix(t *testing.T) {
 	}
 }
 
-// TestPublishedManifestMatchesAssetName is opt-in: point CODEHAMR_CHECK_MANIFEST
-// at a goreleaser checksums file (CI sets it to dist/codehamr_checksums.txt after
+// TestPublishedManifestMatchesAssetName is opt-in: point RECOMPHAMR_CHECK_MANIFEST
+// at a goreleaser checksums file (CI sets it to dist/recomphamr_checksums.txt after
 // a release build) and it asserts the published asset names are EXACTLY the set
 // assetName produces. This is the only check that exercises real goreleaser
 // output, so it catches a name_template edit, an archive-format switch
@@ -107,9 +107,9 @@ func TestAssetNameMatchesGoreleaserMatrix(t *testing.T) {
 // of which the hermetic test above can see. Skips when the env var is unset, so
 // the default `go test ./...` never needs goreleaser or the network.
 func TestPublishedManifestMatchesAssetName(t *testing.T) {
-	path := os.Getenv("CODEHAMR_CHECK_MANIFEST")
+	path := os.Getenv("RECOMPHAMR_CHECK_MANIFEST")
 	if path == "" {
-		t.Skip("set CODEHAMR_CHECK_MANIFEST=<checksums.txt> to compare published asset names against assetName")
+		t.Skip("set RECOMPHAMR_CHECK_MANIFEST=<checksums.txt> to compare published asset names against assetName")
 	}
 	f, err := os.Open(path)
 	if err != nil {
@@ -148,3 +148,6 @@ func TestPublishedManifestMatchesAssetName(t *testing.T) {
 		}
 	}
 }
+
+
+

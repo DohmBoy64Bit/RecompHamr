@@ -1,4 +1,4 @@
-// Package config owns the .codehamr/ directory: config.yaml plus the
+// Package config owns the .rehamr/ directory: config.yaml plus the
 // embedded default system prompt. The prompt lives only in the binary,
 // never on disk, so it's untamperable and every release ships it consistent.
 package config
@@ -19,7 +19,7 @@ import (
 //go:embed PROMPT_SYS.md
 var DefaultSystemPrompt string
 
-const DirName = ".codehamr"
+const DirName = ".rehamr"
 
 // defaultContextSize is the local profile's packing budget and the floor
 // Bootstrap coerces a bogus/missing context_size to. It must match what a stock
@@ -36,9 +36,7 @@ const defaultContextSize = 32768
 // Bootstrap won't seed it, coercion won't default it, and the TUI reads the
 // live value per response. Local Ollama has no header channel, so config.yaml
 // stays canonical there.
-var cloudProfileNames = map[string]struct{}{
-	"hamrpass": {},
-}
+var cloudProfileNames = map[string]struct{}{}
 
 // IsCloudProfile reports whether a profile's context_size is server-managed.
 func IsCloudProfile(name string) bool {
@@ -46,23 +44,33 @@ func IsCloudProfile(name string) bool {
 	return ok
 }
 
-// managedProfiles are seeded on first run: a local Ollama target and the
-// hosted hamrpass endpoint (empty key, since /hamrpass pastes it, re-creating
-// the entry from this seed if the user deleted it). After first run config.yaml
-// is the user's: deletions and renames stick, Bootstrap never re-adds anything.
-// hamrpass keeps ContextSize=0 so omitempty drops it from disk: users can't
-// tune what the server already manages.
+// managedProfiles are seeded on first run: AMD-priority local model profiles.
+// After first run config.yaml is the user's: deletions and renames stick,
+// Bootstrap never re-adds anything.
 var managedProfiles = map[string]Profile{
-	"local": {
+	"lmstudio-amd": {
+		LLM:         "qwen/qwen3.6-35b-a3b",
+		URL:         "http://localhost:1234",
+		Key:         "",
+		ContextSize: defaultContextSize,
+	},
+	"lmstudio-fast": {
+		LLM:         "openai/gpt-oss-20b",
+		URL:         "http://localhost:1234",
+		Key:         "",
+		ContextSize: defaultContextSize,
+	},
+	"ollama-amd": {
 		LLM:         "qwen3.6:27b",
 		URL:         "http://localhost:11434",
 		Key:         "",
 		ContextSize: defaultContextSize,
 	},
-	"hamrpass": {
-		LLM: "hamrpass",
-		URL: "https://codehamr.com",
-		Key: "",
+	"llama-vulkan": {
+		LLM:         "qwen3.6-35b-a3b",
+		URL:         "http://localhost:8080",
+		Key:         "",
+		ContextSize: defaultContextSize,
 	},
 }
 
@@ -76,7 +84,7 @@ type Profile struct {
 	ContextSize int    `yaml:"context_size,omitempty"`
 }
 
-// Config is the on-disk schema at .codehamr/config.yaml. Strict decoding:
+// Config is the on-disk schema at .rehamr/config.yaml. Strict decoding:
 // unknown top-level keys fail Bootstrap so typos and stale schemas surface
 // immediately rather than being silently ignored.
 type Config struct {
@@ -89,7 +97,7 @@ type Config struct {
 	// runtime-only (not serialized)
 	Dir string `yaml:"-"`
 	// URLOverride, if set, wins over ActiveProfile().URL everywhere we dial
-	// out. Kept off the Profile map so the runtime CODEHAMR_URL override never
+	// out. Kept off the Profile map so the runtime RECOMPHAMR_URL override never
 	// round-trips into Save().
 	URLOverride string `yaml:"-"`
 }
@@ -101,17 +109,17 @@ func Default() *Config {
 		models[name] = &cp
 	}
 	return &Config{
-		Active: "local",
+		Active: "lmstudio-amd",
 		Models: models,
 	}
 }
 
-// Bootstrap returns the config for the current project, creating .codehamr/
+// Bootstrap returns the config for the current project, creating .rehamr/
 // and config.yaml on first use. config.yaml is never overwritten; the prompt
 // is embedded, never written to disk.
 //
 // The directory check uses Lstat (not Stat) and refuses a pre-existing
-// .codehamr that isn't a real directory: a symlink there would let a co-tenant
+// .rehamr that isn't a real directory: a symlink there would let a co-tenant
 // redirect config.yaml to an attacker path, planting a models.<name>.url that
 // proxies the hamrpass key on the next dial-out.
 func Bootstrap(projectRoot string) (*Config, bool, error) {
@@ -197,7 +205,7 @@ func Bootstrap(projectRoot string) (*Config, bool, error) {
 	if _, ok := cfg.Models[cfg.Active]; !ok {
 		names := cfg.ModelNames()
 		if len(names) == 0 {
-			return nil, false, errors.New("config.yaml: no profiles configured; add one under `models:` or delete .codehamr/config.yaml to reseed defaults")
+			return nil, false, errors.New("config.yaml: no profiles configured; add one under `models:` or delete .rehamr/config.yaml to reseed defaults")
 		}
 		cfg.Active = names[0]
 	}
@@ -206,17 +214,26 @@ func Bootstrap(projectRoot string) (*Config, bool, error) {
 }
 
 // EnsureHamrpass returns the hamrpass profile, re-creating it from the seed if
-// the user deleted it. Lets /hamrpass activate by pasting a key without a
+// the user deleted it. Lets /rehampass activate by pasting a key without a
 // restart detour.
+// hamrpassSeed is the canonical hamrpass profile, stored separately from
+// managedProfiles so it stays out of first-bootstrap seeding but is still
+// available for lazy creation via /rehampass.
+var hamrpassSeed = Profile{
+	LLM: "hamrpass",
+	URL: "https://recomphamr.com",
+	Key: "",
+}
+
 func (c *Config) EnsureHamrpass() *Profile {
 	if hp, ok := c.Models["hamrpass"]; ok {
 		return hp
 	}
-	tmpl := managedProfiles["hamrpass"]
 	if c.Models == nil {
 		c.Models = map[string]*Profile{}
 	}
-	c.Models["hamrpass"] = &tmpl
+	cp := hamrpassSeed // copy the value, not the pointer
+	c.Models["hamrpass"] = &cp
 	return c.Models["hamrpass"]
 }
 
@@ -238,12 +255,12 @@ func writeYAML(path string, v any) error {
 	// footgun: in a devcontainer/WSL2 with Ollama on the host, `localhost`
 	// doesn't reach the host and yields a baffling "connection refused". Native
 	// users aren't affected, hence sandbox-vs-host framing over an OS-specific one.
-	header := []byte(`# codehamr configuration
+	header := []byte(`# recomphamr configuration
 #
-# Running codehamr in a devcontainer / WSL2 with Ollama on the host:
+# Running recomphamr in a devcontainer / WSL2 with Ollama on the host:
 # swap 'http://localhost:11434' with 'http://host.docker.internal:11434' below.
 #
-# context_size is what codehamr packs to - set it to your server's ACTUAL window,
+# context_size is what recomphamr packs to - set it to your server's ACTUAL window,
 # not the model's theoretical max. For Ollama that's OLLAMA_CONTEXT_LENGTH (or a
 # Modelfile 'PARAMETER num_ctx'); too high and the server silently drops the
 # oldest messages. More VRAM lets you raise both together.
@@ -289,7 +306,7 @@ func (c *Config) ActiveProfile() *Profile {
 
 // ActiveURL is the endpoint every dial-out uses: the runtime override if set,
 // else the active profile's URL. Use this over ActiveProfile().URL so
-// CODEHAMR_URL doesn't leak back into Save.
+// RECOMPHAMR_URL doesn't leak back into Save.
 func (c *Config) ActiveURL() string {
 	if c.URLOverride != "" {
 		return c.URLOverride
@@ -319,3 +336,6 @@ func (c *Config) SetActive(name string) error {
 	}
 	return nil
 }
+
+
+

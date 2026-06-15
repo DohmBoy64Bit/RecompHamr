@@ -44,3 +44,6 @@ func TestWrapForScrollbackNoWidthIsNoop(t *testing.T) {
 		t.Fatalf("zero width should pass through unchanged, got %q", got)
 	}
 }
+
+
+

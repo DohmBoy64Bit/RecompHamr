@@ -237,3 +237,6 @@ func (m Model) handleEnter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.closePopover()
 	return m.submit(sendText, echoText, entry)
 }
+
+
+

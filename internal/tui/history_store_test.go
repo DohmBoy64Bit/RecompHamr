@@ -195,3 +195,6 @@ func TestPromptHistoryRejectsHugeEntry(t *testing.T) {
 		t.Fatalf("at-cap entry should round-trip, got %d entries", len(got))
 	}
 }
+
+
+

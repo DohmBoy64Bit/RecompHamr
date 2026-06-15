@@ -66,3 +66,6 @@ func TestTypingOverflowKeepsCursorVisible(t *testing.T) {
 			mm.maxTextareaHeight(), mm.ta.Height(), mm.visualPromptLines(), mm.width, view)
 	}
 }
+
+
+

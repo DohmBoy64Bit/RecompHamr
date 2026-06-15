@@ -3,7 +3,7 @@
 A minimal coding agent for the terminal. Built for local LLMs, also
 runs on OpenAI-compatible endpoints.
 
-![codehamr demo](codehamr.gif)
+![codehamr demo](recomphamr.gif)
 
 ## Simplicity
 
@@ -27,16 +27,16 @@ progress.
 Linux, macOS:
 
 ```bash
-curl -fsSL https://codehamr.com/install.sh | bash
+curl -fsSL https://recomphamr.com/install.sh | bash
 ```
 
 Windows:
 
 ```cmd
-curl -fsSL https://codehamr.com/install.cmd -o install.cmd && install.cmd
+curl -fsSL https://recomphamr.com/install.cmd -o install.cmd && install.cmd
 ```
 
-Then run `codehamr` in your project.
+Then run `recomphamr` in your project.
 
 > **Warning:** AI systems like codehamr run model-generated shell commands with full filesystem access. Best run inside safe sandboxes like devcontainers or isolated VMs.
 
@@ -44,7 +44,7 @@ Then run `codehamr` in your project.
 
 ## Config
 
-On first run codehamr seeds `.codehamr/config.yaml` with a `local`
+On first run codehamr seeds `.rehamr/config.yaml` with a `local`
 (Ollama, vLLM, LM-Studio) profile and a `hamrpass` profile. The system prompt is embedded
 in the binary, not on disk. Project specific rules go straight into the
 chat: tell the agent what matters, the conversation carries it.
@@ -72,7 +72,7 @@ models:
         context_size: 128000
     hamrpass:
         llm: hamrpass
-        url: https://codehamr.com
+        url: https://recomphamr.com
         key: hp_...
 ```
 
@@ -82,7 +82,7 @@ models:
 
 Local LLMs finally caught up, and we love it. For the best experience we recommend a **~30B-class** model on **32 GB+ unified RAM / VRAM**, fully local and a real alternative to expensive cloud subscriptions.
 
-Info for Ollama users: Ollama's `/v1` endpoint reports no context-window header, so codehamr packs blind to `context_size` in your config. If that exceeds what your server honors, Ollama silently front-truncates the prompt, and codehamr loses its system prompt and earlier tool results mid-task with no error. Ollama Desktop may cap context at 4k: open settings, lift the **Context length** slider to **64k+** (RAM / VRAM permitting), and raise `context_size` in `.codehamr/config.yaml` to match. The seeded default is a safe 32k.
+Info for Ollama users: Ollama's `/v1` endpoint reports no context-window header, so codehamr packs blind to `context_size` in your config. If that exceeds what your server honors, Ollama silently front-truncates the prompt, and codehamr loses its system prompt and earlier tool results mid-task with no error. Ollama Desktop may cap context at 4k: open settings, lift the **Context length** slider to **64k+** (RAM / VRAM permitting), and raise `context_size` in `.rehamr/config.yaml` to match. The seeded default is a safe 32k.
 
 Sampling matters too: for coding, a ~30B-class model typically wants `temperature 0.6`, `top_p 0.95`, `top_k 20`, and **never greedy decoding** (temp 0), which sends it into endless repetition loops. If it still loops, add a small `presence_penalty` and check your server actually applies it (current Ollama silently ignores penalty params). These are server-side knobs, set them at your endpoint.
 
@@ -114,8 +114,9 @@ latest open-weight model and tuning every parameter. We do that work and
 ship it as one endpoint with sensible defaults, so you can just hamr code
 and get your shit done.
 
-There's a waitlist at [codehamr.com](https://codehamr.com). HamrPass only gets built if real demand shows up there. Otherwise it doesn't. Local-first stays the focus.
+There's a waitlist at [recomphamr.com](https://recomphamr.com). HamrPass only gets built if real demand shows up there. Otherwise it doesn't. Local-first stays the focus.
 
 ## License
 
 [MIT](LICENSE). Do whatever you want with it. Star it if it earned one.
+

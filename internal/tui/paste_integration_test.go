@@ -25,3 +25,6 @@ func TestModelBracketedPasteCreatesChip(t *testing.T) {
 		t.Fatalf("display value should start with chip label, got %q", om.ta.DisplayValue())
 	}
 }
+
+
+

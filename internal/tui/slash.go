@@ -9,9 +9,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/codehamr/codehamr/internal/cloud"
-	"github.com/codehamr/codehamr/internal/config"
-	"github.com/codehamr/codehamr/internal/llm"
+	"github.com/DohmBoy64Bit/recomphamr/internal/cloud"
+	"github.com/DohmBoy64Bit/recomphamr/internal/config"
+	"github.com/DohmBoy64Bit/recomphamr/internal/doctor"
+	"github.com/DohmBoy64Bit/recomphamr/internal/llm"
+	"github.com/DohmBoy64Bit/recomphamr/internal/project"
+	"github.com/DohmBoy64Bit/recomphamr/internal/skills"
 )
 
 // argOption is one popover entry, used at command-level (one row per command)
@@ -34,14 +37,14 @@ type command struct {
 // commands lists every slash command, in popover/--help order. Keep it short.
 var commands = []command{
 	{
-		name:        "/hamrpass",
+		name:        "/rehampass",
 		description: "set or show hamrpass key",
 		handler:     (Model).cmdHamrpass,
-		// Live key-entry hint: selecting /hamrpass auto-inserts the trailing
+		// Live key-entry hint: selecting /rehampass auto-inserts the trailing
 		// space (handleEnter/handleTab do this whenever args != nil), then the
 		// arg popover renders one synthetic row that validates the key live.
 		// The row's value mirrors the input so HasPrefix always keeps it, and
-		// Enter submits "/hamrpass <key>".
+		// Enter submits "/rehampass <key>".
 		args: hamrpassArgHint,
 	},
 	{
@@ -65,6 +68,54 @@ var commands = []command{
 			}
 			return out
 		},
+	},
+	{
+		name:        "/skills",
+		description: "list built-in RE skills",
+		handler:     (Model).cmdSkills,
+	},
+	{
+		name:        "/skill",
+		description: "load a skill by name (Tab for list)",
+		handler:     (Model).cmdSkill,
+		args: func(m Model) []argOption {
+			names := skills.Names()
+			out := make([]argOption, 0, len(names))
+			for _, n := range names {
+				active := false
+				for _, a := range m.activeSkills {
+					if strings.EqualFold(a, n) {
+						active = true
+						break
+					}
+				}
+				out = append(out, argOption{
+					value:   n,
+					current: active,
+				})
+			}
+			return out
+		},
+	},
+	{
+		name:        "/init-re",
+		description: "create .rehamr/ evidence workspace",
+		handler:     (Model).cmdInitRE,
+	},
+	{
+		name:        "/status-re",
+		description: "summarize RE project state",
+		handler:     (Model).cmdStatusRE,
+	},
+	{
+		name:        "/doctor",
+		description: "run environment diagnostics",
+		handler:     (Model).cmdDoctor,
+	},
+	{
+		name:        "/help",
+		description: "show this help",
+		handler:     (Model).cmdHelp,
 	},
 }
 
@@ -96,7 +147,7 @@ func (m Model) runSlash(text string) (tea.Model, tea.Cmd) {
 
 // reloadConfigFromDisk re-runs config.Bootstrap and replaces m.cfg so hand-edits
 // to config.yaml between slash commands take effect immediately. URLOverride
-// (from CODEHAMR_URL) is carried across the swap so the env var keeps applying.
+// (from RECOMPHAMR_URL) is carried across the swap so the env var keeps applying.
 //
 // Returns the Bootstrap error verbatim; callers decide whether to surface it
 // (runSlash warns on submit; the popover-refresh path ignores it so a broken
@@ -169,7 +220,7 @@ func (m *Model) printModelList() {
 // its reachability cmd. Keyed profiles (cloud) probe: the success line is
 // delayed until the response arrives so it can carry the live ctx window from
 // X-Context-Window. Keyless profiles (local Ollama) ping and print
-// synchronously. Shared by /models and /hamrpass.
+// synchronously. Shared by /models and /rehampass.
 func (m *Model) confirmActive(profile string) tea.Cmd {
 	p := m.cfg.ActiveProfile()
 	if p.Key != "" {
@@ -202,7 +253,7 @@ func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
 	m.streamingEstimate = 0
 	// Reset the repeated-failure streak so the next turn starts clean.
 	m.failKey, m.failStreak = "", 0
-	// Wipe prompt recall too: in-memory ring and on-disk .codehamr/history,
+	// Wipe prompt recall too: in-memory ring and on-disk .rehamr/history,
 	// or leftover history would contradict the "fresh start" promise.
 	m.promptHistory = nil
 	m.histIdx = -1
@@ -225,7 +276,7 @@ func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
 const hamrpassMinKeyLen = 16
 
 // hamrpassValidate is the single source of truth for whether a key is
-// acceptable and what the UI says about it. Shared by the inline /hamrpass
+// acceptable and what the UI says about it. Shared by the inline /rehampass
 // handler and the arg popover hint. ok=false with an empty trimmed key is the
 // "show status block" signal.
 //
@@ -252,7 +303,7 @@ func hamrpassValidate(raw string) (key, hint string, ok bool) {
 	return key, "Enter to activate", true
 }
 
-// hamrpassArgHint is the args callback for /hamrpass: one synthetic row whose
+// hamrpassArgHint is the args callback for /rehampass: one synthetic row whose
 // value mirrors the typed argument and whose description carries the live
 // validation hint. Mirroring keeps the row alive: refreshSuggest filters via
 // HasPrefix(value, prefix), and HasPrefix(x, x) is always true.
@@ -270,7 +321,7 @@ func hamrpassArgHint(m Model) []argOption {
 	return []argOption{{value: rest, description: mark + hint}}
 }
 
-// cmdHamrpass: `/hamrpass` shows status + how-to, `/hamrpass <key>` validates,
+// cmdHamrpass: `/rehampass` shows status + how-to, `/rehampass <key>` validates,
 // saves the key on the managed hamrpass profile, switches active, and pings the
 // backend. Validation lives in hamrpassValidate so the popover hint and the
 // inline error stay in lockstep.
@@ -298,11 +349,11 @@ func (m *Model) printHamrpassStatus() {
 	if ok && strings.TrimSpace(hp.Key) != "" {
 		status = "set"
 	}
-	url, llmName := "https://codehamr.com", "hamrpass"
+	url, llmName := "https://recomphamr.com", "hamrpass"
 	if ok {
 		url, llmName = hp.URL, hp.LLM
 	}
-	m.appendLine(styleHamr.Render("hamrpass") + styleDim.Render(" · prepaid pass for the hosted codehamr endpoint"))
+	m.appendLine(styleHamr.Render("hamrpass") + styleDim.Render(" · prepaid pass for the hosted recomphamr endpoint"))
 	m.appendLine(styleDim.Render(fmt.Sprintf("  status   : %s", status)))
 	m.appendLine(styleDim.Render(fmt.Sprintf("  endpoint : %s", url)))
 	m.appendLine(styleDim.Render(fmt.Sprintf("  llm      : %s", llmName)))
@@ -310,11 +361,11 @@ func (m *Model) printHamrpassStatus() {
 	m.appendLine("A hamrpass is a prepaid pot of budget for our hosted, agent")
 	m.appendLine("tuned model. No subscription, no expiry, no rate limits. The")
 	m.appendLine("pass simply runs out when the budget is spent. Top up at")
-	m.appendLine("https://codehamr.com.")
+	m.appendLine("https://recomphamr.com.")
 	m.appendLine("")
 	m.appendLine(styleDim.Render("To activate:"))
-	m.appendLine(styleDim.Render("  /hamrpass <your key>            paste here, switches active profile"))
-	m.appendLine(styleDim.Render("  or edit .codehamr/config.yaml   set models.hamrpass.key directly"))
+	m.appendLine(styleDim.Render("  /rehampass <your key>            paste here, switches active profile"))
+	m.appendLine(styleDim.Render("  or edit .rehamr/config.yaml   set models.hamrpass.key directly"))
 	m.appendLine("")
 	m.appendLine(styleDim.Render("Once set, the remaining pass percentage appears in the status bar."))
 }
@@ -333,3 +384,96 @@ func (m *Model) activateHamrpass(key string) tea.Cmd {
 	m.rebuildClient()
 	return m.confirmActive("hamrpass")
 }
+
+// ---------------------------------------------------------------------------
+// RE slash command handlers
+// ---------------------------------------------------------------------------
+
+func (m Model) cmdSkills(_ []string) (tea.Model, tea.Cmd) {
+	m.appendLine("Built-in RE skills:")
+	m.appendLine(skills.ListMarkdown(m.activeSkills))
+	m.appendLine("")
+	m.appendLine(styleDim.Render("Load one with /skill <name>. Platform-specific packs intentionally omitted."))
+	return m, nil
+}
+
+func (m Model) cmdSkill(args []string) (tea.Model, tea.Cmd) {
+	if len(args) == 0 {
+		m.appendLine(styleError.Render("usage: /skill <name>"))
+		return m, nil
+	}
+	name, err := skills.Resolve(args[0])
+	if err != nil {
+		m.appendLine(styleError.Render("unknown skill: " + args[0]))
+		return m, nil
+	}
+	for _, s := range m.activeSkills {
+		if strings.EqualFold(s, name) {
+			m.appendLine(fmt.Sprintf("skill %s is already active", name))
+			return m, nil
+		}
+	}
+	m.activeSkills = append(m.activeSkills, name)
+	m.system = m.rebuildSystem()
+	m.appendLine(styleOK.Render("loaded skill: " + name))
+	return m, nil
+}
+
+func (m Model) cmdInitRE(_ []string) (tea.Model, tea.Cmd) {
+	err := project.InitRE(m.ProjectDir)
+	if err != nil {
+		m.appendLine(styleError.Render("init-re error: " + err.Error()))
+		return m, nil
+	}
+	m.appendLine(styleOK.Render(".rehamr/ evidence workspace initialized"))
+	m.appendLine(styleDim.Render("  Use /status-re to check project state"))
+	return m, nil
+}
+
+func (m Model) cmdStatusRE(_ []string) (tea.Model, tea.Cmd) {
+	rehamrDir := filepath.Join(m.ProjectDir, config.DirName)
+	status, err := project.StatusRE(rehamrDir)
+	if err != nil {
+		m.appendLine(styleError.Render("status-re: " + err.Error()))
+		return m, nil
+	}
+	m.appendLine(status)
+	return m, nil
+}
+
+func (m Model) cmdDoctor(_ []string) (tea.Model, tea.Cmd) {
+	m.appendLine("Running diagnostics...")
+	result := doctor.Run(m.ProjectDir, *m.cfg, "")
+	m.appendLine(result)
+	return m, nil
+}
+
+func (m Model) cmdHelp(_ []string) (tea.Model, tea.Cmd) {
+	// Avoid import cycle: list commands statically instead of iterating commands slice.
+	m.appendLine("Commands:")
+	type helpCmd struct{ name, desc string }
+	for _, c := range []helpCmd{
+		{"/rehampass", "set or show hamrpass key"},
+		{"/clear", "reset the conversation"},
+		{"/models", "list · <name> set"},
+		{"/skills", "list built-in RE skills"},
+		{"/skill", "load a skill by name"},
+		{"/init-re", "create .rehamr/ evidence workspace"},
+		{"/status-re", "summarize RE project state"},
+		{"/doctor", "run environment diagnostics"},
+		{"/help", "show this help"},
+	} {
+		m.appendLine(fmt.Sprintf("  %-14s %s", c.name, c.desc))
+	}
+	m.appendLine("")
+	m.appendLine("Keys:")
+	m.appendLine("  ctrl+l   clear the screen (keeps conversation)")
+	m.appendLine("  ctrl+c   cancel running op · press again to quit")
+	m.appendLine("  ctrl+d   quit (on empty input)")
+	m.appendLine("  tab      autocomplete slash commands and arguments")
+	m.appendLine("  up/down  walk prompt history")
+	return m, nil
+}
+
+
+

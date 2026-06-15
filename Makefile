@@ -1,4 +1,4 @@
-BINARY  := codehamr
+BINARY  := recomphamr
 PKG     := ./cmd/codehamr
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -25,7 +25,7 @@ run: build
 	@os=$$(go env GOOS); arch=$$(go env GOARCH); \
 	 label=$$os; [ "$$os" = "darwin" ] && label=macos; \
 	 ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
-	 CODEHAMR_NO_UPDATE_CHECK=1 ./bin/$(BINARY)-$$label-$$arch$$ext
+	 RECOMPHAMR_NO_UPDATE_CHECK=1 ./bin/$(BINARY)-$$label-$$arch$$ext
 
 install:
 	clear

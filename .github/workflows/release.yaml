@@ -54,5 +54,5 @@ jobs:
           done
           # Absolute path: `go test` runs with CWD set to the package dir, so a
           # relative dist/ path would not resolve.
-          CODEHAMR_CHECK_MANIFEST="$PWD/dist/codehamr_checksums.txt" \
+          RECOMPHAMR_CHECK_MANIFEST="$PWD/dist/recomphamr_checksums.txt" \
             go test -run TestPublishedManifestMatchesAssetName -count=1 ./internal/update/

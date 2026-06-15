@@ -1,6 +1,6 @@
 // Package update performs a passive freshness check against the latest GitHub
 // release: it sha256-hashes the running executable and compares it to the row
-// for the current os/arch in goreleaser's published codehamr_checksums.txt.
+// for the current os/arch in goreleaser's published recomphamr_checksums.txt.
 // Mismatch = the local binary is stale.
 //
 // Called once before the TUI starts (see maybeSelfUpdate): Check decides
@@ -11,7 +11,7 @@
 // Any failure, whether a network hiccup, offline, missing asset, or parse
 // glitch, returns "no update" rather than an error: a startup banner that
 // shouts on flaky internet is worse than one that stays quiet.
-// CODEHAMR_NO_UPDATE_CHECK=1 is the escape hatch for air-gapped setups, CI,
+// RECOMPHAMR_NO_UPDATE_CHECK=1 is the escape hatch for air-gapped setups, CI,
 // and the post-update re-exec (which
 // sets it so the child doesn't loop into a second check).
 package update
@@ -35,11 +35,11 @@ import (
 // Direct CDN download, no GitHub API call, so no rate limit even for users
 // who start many sessions. var not const so tests can point it at an httptest
 // server; production never reassigns it.
-var checksumsURL = "https://github.com/codehamr/codehamr/releases/latest/download/codehamr_checksums.txt"
+var checksumsURL = "https://github.com/DohmBoy64Bit/recomphamr/releases/latest/download/recomphamr_checksums.txt"
 
 // releaseBase is the "latest" redirect for individual binary assets; combined
 // with an assetName to form the download URL in Apply.
-var releaseBase = "https://github.com/codehamr/codehamr/releases/latest/download/"
+var releaseBase = "https://github.com/DohmBoy64Bit/recomphamr/releases/latest/download/"
 
 // fetchTimeout bounds the checksums.txt GET so a silent network can't extend
 // startup.
@@ -54,7 +54,7 @@ var promoteRename = os.Rename
 // asset's recorded hash. ctx propagates a startup Ctrl+C into the HTTP request.
 // Returns false on any failure; see package doc.
 func Check(ctx context.Context, execPath string) bool {
-	if os.Getenv("CODEHAMR_NO_UPDATE_CHECK") == "1" {
+	if os.Getenv("RECOMPHAMR_NO_UPDATE_CHECK") == "1" {
 		return false
 	}
 	asset, ok := assetName(runtime.GOOS, runtime.GOARCH)
@@ -96,7 +96,7 @@ func assetName(goos, goarch string) (string, bool) {
 	if goarch != "amd64" && goarch != "arm64" {
 		return "", false
 	}
-	return fmt.Sprintf("codehamr-%s-%s%s", goos, goarch, ext), true
+	return fmt.Sprintf("recomphamr-%s-%s%s", goos, goarch, ext), true
 }
 
 // hashFile streams a file through sha256.
@@ -114,7 +114,7 @@ func hashFile(path string) (string, error) {
 }
 
 // Apply downloads the current platform's binary, verifies its sha256 against the
-// published codehamr_checksums.txt, and atomically replaces execPath. The caller
+// published recomphamr_checksums.txt, and atomically replaces execPath. The caller
 // is expected to syscall.Exec afterwards so the process becomes the new binary
 // with no user-visible restart.
 //
@@ -142,7 +142,7 @@ func Apply(ctx context.Context, execPath string) error {
 	if expected == "" {
 		return fmt.Errorf("checksum lookup: no entry for %s in published manifest", asset)
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(execPath), ".codehamr-update-*")
+	tmp, err := os.CreateTemp(filepath.Dir(execPath), ".rehamr-update-*")
 	if err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func CleanupOld(execPath string) {
 	_ = os.Remove(execPath + ".old")
 }
 
-// fetchHash downloads codehamr_checksums.txt and returns the hash for asset.
+// fetchHash downloads recomphamr_checksums.txt and returns the hash for asset.
 // The manifest is one line per asset, "<hex-sha256>  <filename>"; we match the
 // last field so a future prefix tweak still works.
 //
@@ -262,3 +262,6 @@ func fetchHash(ctx context.Context, asset string) (string, error) {
 	}
 	return "", nil
 }
+
+
+

@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	chmctx "github.com/codehamr/codehamr/internal/ctx"
+	chmctx "github.com/DohmBoy64Bit/recomphamr/internal/ctx"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 // it reports once on stderr and disables logging: the log must never block
 // the TUI from starting.
 //
-// 0o600 because the log captures every prompt: /hamrpass <key> and bash args
+// 0o600 because the log captures every prompt: /rehampass <key> and bash args
 // can carry secrets even past the slash redaction below. Owner-only is the
 // only honest answer.
 func OpenDebugLog(dir string) {
@@ -40,7 +40,7 @@ func OpenDebugLog(dir string) {
 	dbgMu.Lock()
 	dbgFile = f
 	dbgMu.Unlock()
-	dbgWritef("session", "codehamr started · project=%s", dir)
+	dbgWritef("session", "recomphamr started · project=%s", dir)
 }
 
 // CloseDebugLog flushes and closes the log. Idempotent.
@@ -53,11 +53,11 @@ func CloseDebugLog() {
 	}
 }
 
-// redactSlash strips the /hamrpass <key> bearer token before it lands in any
+// redactSlash strips the /rehampass <key> bearer token before it lands in any
 // log. A central hook covers any future secret-bearing command from one place.
 //
 // The split mirrors runSlash's strings.Fields: both must agree on command vs.
-// args, else a multi-line `/hamrpass\n<key>` (Alt+Enter inserts a literal
+// args, else a multi-line `/rehampass\n<key>` (Alt+Enter inserts a literal
 // newline) activates via runSlash but slips a literal-space prefix match here,
 // leaking the verbatim key.
 //
@@ -66,13 +66,13 @@ func CloseDebugLog() {
 // history, and log.txt, so redaction errs wider than dispatch, the safe way.
 func redactSlash(line string) string {
 	fields := strings.Fields(line)
-	if len(fields) == 0 || !strings.EqualFold(fields[0], "/hamrpass") {
+	if len(fields) == 0 || !strings.EqualFold(fields[0], "/rehampass") {
 		return line
 	}
 	if len(fields) == 1 {
 		return line // no key portion to redact
 	}
-	return "/hamrpass <redacted>"
+	return "/rehampass <redacted>"
 }
 
 // dbgEnabled reports whether logging is on. Callers use it to skip building
@@ -169,3 +169,6 @@ func dbgWriteMessage(category string, msg chmctx.Message) {
 	}
 	dbgWritef(category, "%s", strings.TrimRight(b.String(), "\n"))
 }
+
+
+

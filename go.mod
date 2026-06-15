@@ -1,4 +1,4 @@
-module github.com/codehamr/codehamr
+module github.com/DohmBoy64Bit/recomphamr
 
 go 1.26
 

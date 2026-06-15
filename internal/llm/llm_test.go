@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codehamr/codehamr/internal/cloud"
-	chmctx "github.com/codehamr/codehamr/internal/ctx"
+	"github.com/DohmBoy64Bit/recomphamr/internal/cloud"
+	chmctx "github.com/DohmBoy64Bit/recomphamr/internal/ctx"
 )
 
 func collect(ch <-chan Event) []Event {
@@ -791,7 +791,7 @@ func TestNewHasNoHTTPTimeout(t *testing.T) {
 	}
 }
 
-// TestIdleTimeoutFromEnv pins the CODEHAMR_IDLE_TIMEOUT contract: a Go duration
+// TestIdleTimeoutFromEnv pins the RECOMPHAMR_IDLE_TIMEOUT contract: a Go duration
 // or bare-seconds string wins, anything else (unset, garbage, non-positive)
 // falls back to the default. The default is deliberately generous because this
 // is a dead-connection detector, not a loop guard.
@@ -817,9 +817,9 @@ func TestIdleTimeoutFromEnv(t *testing.T) {
 	}
 	for _, tc := range cases {
 		if tc.set {
-			t.Setenv("CODEHAMR_IDLE_TIMEOUT", tc.val)
+			t.Setenv("RECOMPHAMR_IDLE_TIMEOUT", tc.val)
 		} else {
-			os.Unsetenv("CODEHAMR_IDLE_TIMEOUT")
+			os.Unsetenv("RECOMPHAMR_IDLE_TIMEOUT")
 		}
 		if got := idleTimeoutFromEnv(); got != tc.want {
 			t.Errorf("idleTimeoutFromEnv(%q, set=%v) = %v, want %v", tc.val, tc.set, got, tc.want)
@@ -918,3 +918,6 @@ func TestToWireParseErrorArgsStayValidJSON(t *testing.T) {
 		t.Fatalf("arguments must stay valid JSON to avoid poisoning the session: %q", args)
 	}
 }
+
+
+

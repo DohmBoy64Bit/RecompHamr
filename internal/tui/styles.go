@@ -42,3 +42,6 @@ var (
 	stylePopoverCurrent  = lipgloss.NewStyle().Bold(true)
 	stylePopoverSelected = lipgloss.NewStyle().Bold(true).Foreground(hamrColor)
 )
+
+
+
