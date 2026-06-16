@@ -91,6 +91,13 @@ Output from `repomixr` lands in `.rehamr/repos/<owner>-<repo>/` — use
 `read_file` to ingest the packed XML. Drop a `.rehamr/repomix-instruction.md`
 file to inject a custom prompt into every packed repository.
 
+## Doctor
+
+`/doctor` validates your environment: system info, active model, all
+profiles, GPU drivers, toolchain availability, MCP server status, endpoint
+reachability, and workspace state. Full output reference in
+**[docs/doctor.md](docs/doctor.md)**.
+
 ## Compare
 
 | Tool | Pick if |
