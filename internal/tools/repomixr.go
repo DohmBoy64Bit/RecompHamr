@@ -95,7 +95,11 @@ func Repomixr(ctx context.Context, repoURL, branch string, removeComments, remov
 
 	var out bytes.Buffer
 	out.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-	fmt.Fprintf(&out, "<repository url=\"%s\" branch=\"%s\">\n", repoURL, branch)
+	fmt.Fprintf(&out, "<repository url=\"%s\" branch=\"%s\" files=\"%d\">\n", repoURL, branch, len(files))
+
+	out.WriteString("  <directory_structure>\n")
+	out.WriteString(dirTree(cloneDir, files))
+	out.WriteString("  </directory_structure>\n")
 
 	for _, f := range files {
 		rel, _ := filepath.Rel(cloneDir, f)
@@ -142,6 +146,18 @@ func Repomixr(ctx context.Context, repoURL, branch string, removeComments, remov
 		}
 		out.WriteString("]]>\n")
 		out.WriteString("  </file>\n")
+	}
+
+	instPath := filepath.Join(RepomixrDir, "..", "repomix-instruction.md")
+	if inst, err := os.ReadFile(instPath); err == nil && len(inst) > 0 {
+		out.WriteString("  <instruction>\n")
+		out.WriteString("    <![CDATA[")
+		out.Write(inst)
+		if len(inst) > 0 && inst[len(inst)-1] != '\n' {
+			out.WriteByte('\n')
+		}
+		out.WriteString("]]>\n")
+		out.WriteString("  </instruction>\n")
 	}
 
 	out.WriteString("</repository>\n")
@@ -265,4 +281,50 @@ func humanSize(n int64) string {
 	default:
 		return fmt.Sprintf("%d B", n)
 	}
+}
+
+func dirTree(root string, files []string) string {
+	type node struct {
+		name     string
+		children map[string]*node
+		isFile   bool
+	}
+	tree := &node{children: make(map[string]*node)}
+
+	for _, f := range files {
+		rel, _ := filepath.Rel(root, f)
+		rel = filepath.ToSlash(rel)
+		parts := strings.Split(rel, "/")
+		cur := tree
+		for i, p := range parts {
+			isFile := i == len(parts)-1
+			if cur.children[p] == nil {
+				cur.children[p] = &node{name: p, children: make(map[string]*node)}
+			}
+			cur = cur.children[p]
+			cur.isFile = isFile
+		}
+	}
+
+	var b strings.Builder
+	var walk func(n *node, depth int)
+	walk = func(n *node, depth int) {
+		names := make([]string, 0, len(n.children))
+		for name := range n.children {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			child := n.children[name]
+			indent := strings.Repeat("  ", depth+1)
+			if child.isFile && len(child.children) == 0 {
+				fmt.Fprintf(&b, "%s%s\n", indent, child.name)
+			} else {
+				fmt.Fprintf(&b, "%s%s/\n", indent, child.name)
+				walk(child, depth+1)
+			}
+		}
+	}
+	walk(tree, 0)
+	return b.String()
 }

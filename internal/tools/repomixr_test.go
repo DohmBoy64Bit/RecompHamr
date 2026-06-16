@@ -227,3 +227,95 @@ func TestRepomixrUsesDefaultBranch(t *testing.T) {
 		t.Logf("clone result: %s", result)
 	}
 }
+
+func TestDirTree(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "src"), 0o755)
+	os.MkdirAll(filepath.Join(dir, "include"), 0o755)
+	os.WriteFile(filepath.Join(dir, "README.md"), []byte("readme"), 0o644)
+	os.WriteFile(filepath.Join(dir, "src", "main.c"), []byte("main"), 0o644)
+	os.WriteFile(filepath.Join(dir, "include", "header.h"), []byte("h"), 0o644)
+
+	files := []string{
+		filepath.Join(dir, "README.md"),
+		filepath.Join(dir, "include", "header.h"),
+		filepath.Join(dir, "src", "main.c"),
+	}
+	tree := dirTree(dir, files)
+	if !strings.Contains(tree, "src/") {
+		t.Errorf("tree should contain src/: %s", tree)
+	}
+	if !strings.Contains(tree, "main.c") {
+		t.Errorf("tree should contain main.c: %s", tree)
+	}
+	if !strings.Contains(tree, "include/") {
+		t.Errorf("tree should contain include/: %s", tree)
+	}
+	if !strings.Contains(tree, "header.h") {
+		t.Errorf("tree should contain header.h: %s", tree)
+	}
+	if !strings.Contains(tree, "README.md") {
+		t.Errorf("tree should contain README.md: %s", tree)
+	}
+}
+
+func TestDirTreeDeepNesting(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "a", "b", "c"), 0o755)
+	os.WriteFile(filepath.Join(dir, "a", "b", "c", "d.c"), []byte("d"), 0o644)
+
+	files := []string{filepath.Join(dir, "a", "b", "c", "d.c")}
+	tree := dirTree(dir, files)
+	if !strings.Contains(tree, "a/") {
+		t.Errorf("tree should contain a/: %s", tree)
+	}
+	if !strings.Contains(tree, "d.c") {
+		t.Errorf("tree should contain d.c at correct depth: %s", tree)
+	}
+}
+
+func TestRepomixrOutputSkipsInstructionWhenMissing(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(dir, 0o755)
+	os.MkdirAll(filepath.Join(dir, "test-repo", "repo"), 0o755)
+	os.WriteFile(filepath.Join(dir, "test-repo", "repo", "readme.md"), []byte("readme"), 0o644)
+
+	old := RepomixrDir
+	RepomixrDir = dir
+	defer func() { RepomixrDir = old }()
+
+	result := Repomixr(context.Background(), "https://github.com/test/skip", "main", false, false, false, false)
+	if strings.Contains(result, "Packed") {
+		data, _ := os.ReadFile(filepath.Join(RepomixrDir, "test-repo", "packed.xml"))
+		content := string(data)
+		if strings.Contains(content, "<instruction>") {
+			t.Errorf("output should NOT contain instruction when file missing: %s", content)
+		}
+	}
+}
+
+func TestRepomixrOutputIncludesInstruction(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(dir, 0o755)
+	instrPath := filepath.Join(dir, "..", "repomix-instruction.md")
+	os.WriteFile(instrPath, []byte("Focus on the rendering pipeline."), 0o644)
+
+	old := RepomixrDir
+	RepomixrDir = dir
+	defer func() { RepomixrDir = old }()
+
+	os.MkdirAll(filepath.Join(RepomixrDir, "test-repo", "repo"), 0o755)
+	os.WriteFile(filepath.Join(RepomixrDir, "test-repo", "repo", "readme.md"), []byte("readme"), 0o644)
+
+	result := Repomixr(context.Background(), "https://github.com/test/with-instr", "main", false, false, false, false)
+	if strings.Contains(result, "Packed") {
+		data, _ := os.ReadFile(filepath.Join(RepomixrDir, "test-repo", "packed.xml"))
+		content := string(data)
+		if !strings.Contains(content, "<instruction>") {
+			t.Errorf("output should contain instruction: %s", content)
+		}
+		if !strings.Contains(content, "Focus on the rendering pipeline") {
+			t.Errorf("instruction should contain file content: %s", content)
+		}
+	}
+}
