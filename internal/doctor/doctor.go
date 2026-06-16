@@ -25,6 +25,17 @@ func Run(projectDir string, cfg config.Config, cfgPath string) string {
 	fmt.Fprintf(&b, "Active profile: %s\n", cfg.Active)
 	p := cfg.ActiveProfile()
 	fmt.Fprintf(&b, "Model: %s\nEndpoint: %s\nContext: %d\n", p.LLM, p.URL, p.ContextSize)
+
+	b.WriteString("\nProfiles\n--------\n")
+	for _, n := range cfg.ModelNames() {
+		pr := cfg.Models[n]
+		mark := "  "
+		if n == cfg.Active {
+			mark = " *"
+		}
+		fmt.Fprintf(&b, "%s %-16s %-24s %s\n", mark, n, pr.LLM, pr.URL)
+	}
+
 	b.WriteString("\nMemory/GPU hints\n----------------\n")
 	b.WriteString(memoryInfo())
 	b.WriteString(commandHint("rocm-smi", "--showproductname"))
@@ -32,17 +43,68 @@ func Run(projectDir string, cfg config.Config, cfgPath string) string {
 	b.WriteString(commandHint("vulkaninfo", "--summary"))
 	b.WriteString(commandHint("nvidia-smi"))
 	b.WriteString(commandHint("lspci"))
+
 	b.WriteString("\nToolchain hints\n---------------\n")
 	for _, tool := range []string{"git", "go", "python", "python3", "cmake", "ninja", "make", "ghidraRun", "java"} {
 		b.WriteString(which(tool))
 	}
+
+	b.WriteString("\nMCP servers\n-----------\n")
+	b.WriteString(which("ghidra-mcp"))
+	b.WriteString(which("n64-debug-mcp"))
+	for _, ev := range []string{
+		"RECOMPHAMR_MCP_GHIDRA_COMMAND", "RECOMPHAMR_MCP_N64_COMMAND",
+		"RECOMPHAMR_MCP_GHIDRA_TOOLS", "RECOMPHAMR_MCP_AUTOSTART",
+	} {
+		if v := os.Getenv(ev); v != "" {
+			fmt.Fprintf(&b, "  %s=%s\n", ev, v)
+		} else {
+			fmt.Fprintf(&b, "  %s (unset)\n", ev)
+		}
+	}
+
 	b.WriteString("\nEndpoint check\n--------------\n")
 	b.WriteString(endpointCheck(p.URL))
-	if _, err := os.Stat(filepath.Join(projectDir, ".rehamr", "PROJECT.md")); err == nil {
-		b.WriteString(".rehamr workspace: present\n")
-	} else {
-		b.WriteString(".rehamr workspace: not initialized; run /init-re\n")
+
+	b.WriteString("\nWorkspace (.rehamr/)\n-------------------\n")
+	rehamr := filepath.Join(projectDir, ".rehamr")
+	workspaceEntries := []struct{ path, label string }{
+		{"PROJECT.md", "PROJECT.md"},
+		{"REPHAMR_STATE.md", "REPHAMR_STATE.md (persistent memory)"},
+		{"EVIDENCE.md", "EVIDENCE.md"},
+		{"BLOCKERS.md", "BLOCKERS.md"},
+		{"CHANGELOG.md", "CHANGELOG.md"},
+		{"repomix-instruction.md", "repomix-instruction.md"},
 	}
+	for _, e := range workspaceEntries {
+		full := filepath.Join(rehamr, e.path)
+		if info, err := os.Stat(full); err == nil {
+			fmt.Fprintf(&b, "  %-50s present (%s)\n", e.label, humanSize(info.Size()))
+		} else {
+			fmt.Fprintf(&b, "  %-50s missing\n", e.label)
+		}
+	}
+
+	skillsDir := filepath.Join(rehamr, "skills")
+	if entries, err := os.ReadDir(skillsDir); err == nil {
+		count := 0
+		for _, e := range entries {
+			if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
+				count++
+			}
+		}
+		fmt.Fprintf(&b, "  %-50s %d custom skill(s)\n", "skills/", count)
+	} else {
+		fmt.Fprintf(&b, "  %-50s none\n", "skills/")
+	}
+
+	reposDir := filepath.Join(rehamr, "repos")
+	if entries, err := os.ReadDir(reposDir); err == nil {
+		fmt.Fprintf(&b, "  %-50s %d cached repo(s)\n", "repos/", len(entries))
+	} else {
+		fmt.Fprintf(&b, "  %-50s none\n", "repos/")
+	}
+
 	return b.String()
 }
 
@@ -119,5 +181,18 @@ func endpointCheck(base string) string {
 	}
 	defer resp.Body.Close()
 	return fmt.Sprintf("endpoint: %s returned %s\n", url, resp.Status)
+}
+
+func humanSize(n int64) string {
+	const kb = 1024
+	const mb = 1024 * kb
+	switch {
+	case n >= mb:
+		return fmt.Sprintf("%.1f MB", float64(n)/float64(mb))
+	case n >= kb:
+		return fmt.Sprintf("%.1f KB", float64(n)/float64(kb))
+	default:
+		return fmt.Sprintf("%d B", n)
+	}
 }
 
