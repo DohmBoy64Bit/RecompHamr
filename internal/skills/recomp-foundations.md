@@ -12,15 +12,11 @@ after cloning via `repomixr` or `bash curl`.
 ## How to use
 
 1. Find your platform + topic in the tables below
-2. Clone the relevant source via `repomixr`, or use `bash curl -L <url>` for
-   single-page references
-3. Read the documentation: use `read_file` with **offset=0, limit=200** for
-   large documents. Read more chunks (offset=200, limit=200) if the first
-   200 lines don't answer your question. Never read entire documents at once
+2. Use `recomp_reference` to fetch and cache the URL locally
+3. Read the cached page with `read_file` (use **offset=0, limit=200** for
+   large pages; read more chunks if needed). Never read entire documents at once
 4. Apply to your project — verify every claim against real tool output
 5. Never cite references as evidence — they explain concepts, not your binary
-6. Use `read_file` with offset/limit to inspect cached HTML/markdown files;
-   for live URLs, use `bash curl -sL <url> | head -200`
 
 ## Reference sources by platform
 

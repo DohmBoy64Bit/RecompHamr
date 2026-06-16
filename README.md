@@ -81,7 +81,7 @@ project needs; it cannot install them itself. If a check can't run, it reports
 
 ## Built-in Tools
 
-Five tools are always available to the LLM:
+Six tools are always available to the LLM:
 
 | Tool | Purpose |
 |---|---|
@@ -90,6 +90,7 @@ Five tools are always available to the LLM:
 | `write_file` | Write a file to disk |
 | `edit_file` | Surgical string replacements |
 | `repomixr` | Clone + pack a GitHub repo into XML for analysis |
+| `recomp_reference` | Fetch and cache a web page for offline reading |
 
 Output from `repomixr` lands in `.rehamr/repos/<owner>-<repo>/` — use
 `read_file` to ingest the packed XML. Drop a `.rehamr/repomix-instruction.md`

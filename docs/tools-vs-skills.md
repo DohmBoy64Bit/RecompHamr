@@ -11,7 +11,7 @@ then chooses which to invoke by name. The result returns to the conversation
 as a `tool` message.
 
 **Built-in tools** (see [README.md](../README.md#built-in-tools), [tool-repomixr.md](tool-repomixr.md)):
-`bash`, `read_file`, `write_file`, `edit_file`, `repomixr`
+`bash`, `read_file`, `write_file`, `edit_file`, `repomixr`, `recomp_reference`
 
 **MCP tools** (available when connected + skill loaded):
 `ghidra.*`, `n64-debug-mcp.*`, `pcrecomp.*`, `mcp-pine.*`, `objdiff.*`, `pcsx2.*`, `bizhawk.*`, `sega2asm.*`

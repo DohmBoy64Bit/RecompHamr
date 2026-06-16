@@ -1210,6 +1210,7 @@ func TestBuildToolsExposesExactlyFourTools(t *testing.T) {
 		tools.WriteFileName,
 		tools.EditFileName,
 		tools.RepomixrName,
+		tools.RecompRefName,
 	}
 	if len(got) != len(want) {
 		t.Fatalf("buildTools returned %d tools, want %d: %+v", len(got), len(want), got)
