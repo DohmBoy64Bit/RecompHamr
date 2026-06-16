@@ -183,30 +183,78 @@ Any stdio MCP server can be registered at startup:
 mcp.Register(mcp.ServerConfig{
     Name:         "my-tools",
     Command:      "my-mcp-server",
-    RequireSkill: false,  // always available
-    AllowedTools: []string{"tool_a", "tool_b"},  // optional whitelist
+    RequireSkill: false,  // always available, no skill needed
+    AllowedTools: []string{"tool_a", "tool_b"},
 })
 ```
 
-Tools appear as `my-tools.tool_a` and `my-tools.tool_b` to the LLM.
+For skill-gated servers, set `RequireSkill: true` and name the skill `.md`
+file after the server:
+
+```go
+mcp.Register(mcp.ServerConfig{
+    Name:         "my-mcp",
+    Command:      "my-mcp-server",
+    RequireSkill: true,  // only activated via /skill my-mcp
+})
+```
+
+Then drop `.rehamr/skills/my-mcp.md` with your methodology. Loading
+`/skill my-mcp` injects both the skill text and the `my-mcp.*` tools.
 
 ## Skills
 
-Eight embedded RE skills are loaded on demand via `/skill <name>`:
+Skills inject focused context into the system prompt, giving the LLM
+methodology and guardrails for specific tasks. MCP skills also gate which
+server tools the LLM sees.
 
-| Command | Effect |
+### How skills work
+
+When loaded via `/skill <name>`, the skill's full markdown body is appended
+to the system prompt under `## Active RE Skills`. This text travels with every
+turn until recomphamr is restarted — skills survive `/clear` and `/models`
+switches.
+
+Skills also unlock MCP tools by convention: if a registered MCP server has
+`RequireSkill: true`, loading a skill whose name matches the server (or maps
+to it via the built-in `SkillServers` table) exposes that server's tools to
+the LLM. For example, `/skill ghidra-mcp` maps to the `ghidra` server,
+injecting `ghidra.*` tools.
+
+### Built-in skills
+
+Eight skills are compiled into the binary:
+
+| `/skill <name>` | Purpose |
 |---|---|
-| `/skill core-re` | General RE workflow |
-| `/skill evidence-mode` | Evidence-first methodology |
-| `/skill build-fix-loop` | Iterate on build failures |
-| `/skill file-format-reversing` | Binary format analysis |
-| `/skill function-discovery` | Find and classify functions |
-| `/skill ghidra-mcp` | Ghidra MCP integration |
-| `/skill n64-debug-mcp` | N64 runtime debugging via Mupen64Plus MCP |
-| `/skill project-handoff` | Generate project docs for handoff |
+| `core-re` | General RE workflow |
+| `evidence-mode` | Evidence-first methodology |
+| `build-fix-loop` | Iterate on build failures |
+| `file-format-reversing` | Binary format analysis |
+| `function-discovery` | Find and classify functions |
+| `ghidra-mcp` | Ghidra MCP integration (gates `ghidra.*` tools) |
+| `n64-debug-mcp` | N64 runtime debugging via Mupen64Plus MCP (gates `n64-debug-mcp.*` tools) |
+| `project-handoff` | Generate project docs for handoff |
 
-Skills inject targeted context into the system prompt when active. MCP skills
-also gate which server tools the LLM sees.
+List them with `/skills`; active skills are marked `*`.
+
+### Custom skills
+
+Drop `.md` files into `.rehamr/skills/` and they appear in `/skills` with a
+`(custom)` label. Custom skills take precedence over built-in skills with the
+same name.
+
+```
+.rehamr/
+├── config.yaml
+├── skills/
+│   ├── my-workflow.md       # /skill my-workflow
+│   └── my-mcp.md            # gates my-mcp.* tools if server registered
+└── history
+```
+
+To pair a custom skill with a custom MCP server, name the skill after the
+server and register it with `RequireSkill: true`:
 
 ## License
 
