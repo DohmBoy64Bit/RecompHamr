@@ -58,7 +58,8 @@ models:
         context_size: 200000
 ```
 
-`/models` lists profiles, `/models <name>` switches.
+`/models` lists profiles, `/models <name>` switches. See
+**[docs/profiles.md](docs/profiles.md)** for the full profile reference.
 
 ## Hardware
 
