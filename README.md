@@ -9,12 +9,12 @@ LLMs, also runs on OpenAI-compatible endpoints.
 ## RE-first, local-first
 
 recomphamr extends upstream CodeHAMR with RE-specific tooling: embedded skills
-for reversing workflows, project handoff docs, and a system prompt tuned for
-unfamiliar codebases. It keeps upstream's simplicity — one loop, minimal tool
-set, context-efficient packing — and adds only what RE work needs.
+for reversing workflows, MCP servers for Ghidra and N64 debugging, project
+handoff docs, and a system prompt tuned for unfamiliar codebases.
 
 **Slash commands:** `/help`, `/models`, `/skills`, `/skill`, `/init-re`,
-`/status-re`, `/doctor`. Skills wire into the system prompt dynamically.
+`/status-re`, `/doctor`, `/mcp`. Skills and MCP tools wire into the system
+prompt dynamically.
 
 ## Install
 
@@ -80,7 +80,31 @@ project needs; it cannot install them itself. If a check can't run, it reports
 | **[opencode](https://github.com/anomalyco/opencode)** | you want a great, loaded Swiss army knife and embrace plugin complexity |
 | **[pi-agent](https://github.com/badlogic/pi-mono)** | you want something lighter than opencode and accept configuring your own extensions |
 | **[CodeHAMR](https://github.com/codehamr/codehamr)** | you want the lightest coding agent with no skills, no plugins, just three slash commands |
-| **recomphamr** | you do RE work (binaries, decompilation, unknown codebases) and want lightweight skill-backed tooling |
+| **recomphamr** | you do RE work (binaries, decompilation, unknown codebases), want MCP tool integration for Ghidra/Mupen64, and prefer lightweight skill-backed tooling |
+
+## MCP Servers
+
+recomphamr connects to MCP (Model Context Protocol) servers over stdio,
+exposing their tools to the LLM alongside built-in tools. Two servers ship
+with built-in configs:
+
+| Server | Default command | Env override |
+|---|---|---|
+| `ghidra` | `ghidra-mcp` | `RECOMPHAMR_MCP_GHIDRA_COMMAND` |
+| `n64-debug-mcp` | `n64-debug-mcp` | `RECOMPHAMR_MCP_N64_COMMAND` |
+
+Servers auto-connect on startup (set `RECOMPHAMR_MCP_AUTOSTART=0` to disable).
+When connected, the LLM sees prefixed tools like `ghidra.decompile_function`
+and `n64-debug-mcp.n64_read_memory`.
+
+```
+/mcp                         show server status
+/mcp connect <name>          connect to a server
+/mcp disconnect <name>       disconnect from a server
+```
+
+Server status appears on the startup splash — `* Connected (45 tools)` or
+`  Disconnected`.
 
 ## Skills
 
