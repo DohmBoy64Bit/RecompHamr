@@ -81,8 +81,8 @@ When the LLM calls `ghidra.decompile_function`:
 | `objdiff` | `objdiff-mcp` | `RECOMPHAMR_MCP_OBJDIFF_COMMAND` |
 
 Ghidra ships with the 20 most-used RE tools enabled by default
-(`RECOMPHAMR_MCP_GHIDRA_TOOLS=*` for all). n64-debug-mcp and mcp-pine allow
-all tools by default. pcrecomp ships with 8 pipeline tools
+(`RECOMPHAMR_MCP_GHIDRA_TOOLS=*` for all). n64-debug-mcp, mcp-pine, and
+objdiff allow all tools by default. pcrecomp ships with 8 pipeline tools
 (`RECOMPHAMR_MCP_PCRECOMP_TOOLS=*` for all).
 
 ## Runtime management

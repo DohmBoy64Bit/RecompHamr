@@ -14,7 +14,7 @@ as a `tool` message.
 `bash`, `read_file`, `write_file`, `edit_file`, `repomixr`
 
 **MCP tools** (available when connected + skill loaded):
-`ghidra.*`, `n64-debug-mcp.*`, `pcrecomp.*`
+`ghidra.*`, `n64-debug-mcp.*`, `pcrecomp.*`, `mcp-pine.*`, `objdiff.*`
 
 ## Skills: what the LLM *knows*
 
