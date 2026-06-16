@@ -22,6 +22,7 @@ Full architecture details in **[mcp.md](mcp.md)**.
 | `RECOMPHAMR_MCP_N64_COMMAND` | Override n64-debug-mcp server command/path |
 | `RECOMPHAMR_MCP_PCRECOMP_COMMAND` | Override pcrecomp MCP server command/path |
 | `RECOMPHAMR_MCP_PCRECOMP_TOOLS` | PCRECOMP tool list or `*` for all |
+| `RECOMPHAMR_MCP_PINE_COMMAND` | Override mcp-pine server command/path |
 | `RECOMPHAMR_PCRECOMP_PATH` | Path to PCRECOMP-Next clone directory |
 
 ## Runtime management
@@ -45,3 +46,4 @@ or `  Disconnected` if not running.
 | `ghidra` | [mcp-ghidra.md](mcp-ghidra.md) |
 | `n64-debug-mcp` | [mcp-n64.md](mcp-n64.md) |
 | `pcrecomp` | [mcp-pcrecomp.md](mcp-pcrecomp.md) |
+| `mcp-pine` | [mcp-pine.md](mcp-pine.md) |

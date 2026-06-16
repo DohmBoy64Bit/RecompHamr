@@ -70,6 +70,11 @@ func BuiltinServers() []ServerConfig {
 		pcrecompCmd = "pcrecomp-mcp"
 	}
 
+	pineCmd := os.Getenv("RECOMPHAMR_MCP_PINE_COMMAND")
+	if pineCmd == "" {
+		pineCmd = "mcp-pine"
+	}
+
 	ghidraTools := ghidraDefaultTools
 	if env := os.Getenv("RECOMPHAMR_MCP_GHIDRA_TOOLS"); env == "*" {
 		ghidraTools = nil
@@ -103,6 +108,12 @@ func BuiltinServers() []ServerConfig {
 			Command:      pcrecompCmd,
 			Args:         []string{},
 			AllowedTools: pcrecompTools,
+			RequireSkill: true,
+		},
+		{
+			Name:         "mcp-pine",
+			Command:      pineCmd,
+			Args:         []string{},
 			RequireSkill: true,
 		},
 	}

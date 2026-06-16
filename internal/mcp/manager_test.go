@@ -262,6 +262,14 @@ func TestBuiltinServersGhidraHasAllowedTools(t *testing.T) {
 				t.Errorf("pcrecomp command should be pcrecomp-mcp, got %q", s.Command)
 			}
 		}
+		if s.Name == "mcp-pine" {
+			if s.AllowedTools != nil {
+				t.Error("mcp-pine should have nil AllowedTools (all tools)")
+			}
+			if !s.RequireSkill {
+				t.Error("built-in mcp-pine should require skill")
+			}
+		}
 	}
 }
 
@@ -389,16 +397,16 @@ func TestSkillServersHasPcrecomp(t *testing.T) {
 	}
 }
 
-func TestBuiltinServersHasThreeServers(t *testing.T) {
+func TestBuiltinServersHasFourServers(t *testing.T) {
 	servers := BuiltinServers()
-	if len(servers) != 3 {
-		t.Errorf("expected 3 built-in servers, got %d", len(servers))
+	if len(servers) != 4 {
+		t.Errorf("expected 4 built-in servers, got %d", len(servers))
 	}
 	names := map[string]bool{}
 	for _, s := range servers {
 		names[s.Name] = true
 	}
-	for _, want := range []string{"ghidra", "n64-debug-mcp", "pcrecomp"} {
+	for _, want := range []string{"ghidra", "n64-debug-mcp", "pcrecomp", "mcp-pine"} {
 		if !names[want] {
 			t.Errorf("missing built-in server %q", want)
 		}
