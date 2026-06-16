@@ -48,7 +48,7 @@ or `  Disconnected` if not running.
 | Server | Setup guide |
 |---|---|
 | `ghidra` | [mcp-ghidra.md](mcp-ghidra.md) |
-| `n64-debug-mcp` | [mcp-n64.md](mcp-n64.md) |
+| `n64-debug-mcp` | [mcp-n64-debug-mcp.md](mcp-n64-debug-mcp.md) |
 | `pcrecomp` | [mcp-pcrecomp.md](mcp-pcrecomp.md) |
 | `mcp-pine` | [mcp-pine.md](mcp-pine.md) |
 | `objdiff` | [mcp-objdiff.md](mcp-objdiff.md) |

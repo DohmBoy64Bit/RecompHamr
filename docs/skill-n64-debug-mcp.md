@@ -25,4 +25,4 @@ breakpoints, trace execution, and capture runtime evidence directly.
 
 ## Setup
 
-See **[mcp-n64.md](mcp-n64.md)** for install and enable instructions.
+See **[mcp-n64-debug-mcp.md](mcp-n64-debug-mcp.md)** for install and enable instructions.
