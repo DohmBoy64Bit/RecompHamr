@@ -25,6 +25,7 @@ func TestRunContainsExpectedSections(t *testing.T) {
 		"MCP servers",
 		"Endpoint check",
 		"Workspace (.rehamr/)",
+		"PCRECOMP-Next",
 	}
 	for _, s := range sections {
 		if !strings.Contains(result, s) {
@@ -70,7 +71,9 @@ func TestRunShowsMCPEnvVars(t *testing.T) {
 	envVars := []string{
 		"RECOMPHAMR_MCP_GHIDRA_COMMAND",
 		"RECOMPHAMR_MCP_N64_COMMAND",
+		"RECOMPHAMR_MCP_PCRECOMP_COMMAND",
 		"RECOMPHAMR_MCP_GHIDRA_TOOLS",
+		"RECOMPHAMR_MCP_PCRECOMP_TOOLS",
 		"RECOMPHAMR_MCP_AUTOSTART",
 	}
 	for _, ev := range envVars {
@@ -90,6 +93,9 @@ func TestRunShowsMCPServerTools(t *testing.T) {
 	}
 	if !strings.Contains(result, "n64-debug-mcp") {
 		t.Error("should mention n64-debug-mcp")
+	}
+	if !strings.Contains(result, "pcrecomp-mcp") {
+		t.Error("should mention pcrecomp-mcp")
 	}
 }
 

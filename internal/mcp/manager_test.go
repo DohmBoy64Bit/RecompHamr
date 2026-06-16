@@ -251,6 +251,17 @@ func TestBuiltinServersGhidraHasAllowedTools(t *testing.T) {
 				t.Error("built-in n64 should require skill")
 			}
 		}
+		if s.Name == "pcrecomp" {
+			if len(s.AllowedTools) != 8 {
+				t.Errorf("pcrecomp should have 8 default tools, got %d", len(s.AllowedTools))
+			}
+			if !s.RequireSkill {
+				t.Error("built-in pcrecomp should require skill")
+			}
+			if s.Command != "pcrecomp-mcp" {
+				t.Errorf("pcrecomp command should be pcrecomp-mcp, got %q", s.Command)
+			}
+		}
 	}
 }
 
@@ -369,5 +380,72 @@ func TestServerStatusFields(t *testing.T) {
 	}
 	if s.Version != "" {
 		t.Errorf("expected empty version, got %q", s.Version)
+	}
+}
+
+func TestSkillServersHasPcrecomp(t *testing.T) {
+	if s, ok := SkillServers["pcrecomp"]; !ok || s != "pcrecomp" {
+		t.Errorf("pcrecomp should map to pcrecomp, got %q", s)
+	}
+}
+
+func TestBuiltinServersHasThreeServers(t *testing.T) {
+	servers := BuiltinServers()
+	if len(servers) != 3 {
+		t.Errorf("expected 3 built-in servers, got %d", len(servers))
+	}
+	names := map[string]bool{}
+	for _, s := range servers {
+		names[s.Name] = true
+	}
+	for _, want := range []string{"ghidra", "n64-debug-mcp", "pcrecomp"} {
+		if !names[want] {
+			t.Errorf("missing built-in server %q", want)
+		}
+	}
+}
+
+func TestPcrecompToolsEnvWildcard(t *testing.T) {
+	old := os.Getenv("RECOMPHAMR_MCP_PCRECOMP_TOOLS")
+	os.Setenv("RECOMPHAMR_MCP_PCRECOMP_TOOLS", "*")
+	defer func() { os.Setenv("RECOMPHAMR_MCP_PCRECOMP_TOOLS", old) }()
+
+	servers := BuiltinServers()
+	for _, s := range servers {
+		if s.Name == "pcrecomp" {
+			if s.AllowedTools != nil {
+				t.Errorf("pcrecomp AllowedTools should be nil when wildcard, got %v", s.AllowedTools)
+			}
+		}
+	}
+}
+
+func TestPcrecompToolsEnvCustomList(t *testing.T) {
+	old := os.Getenv("RECOMPHAMR_MCP_PCRECOMP_TOOLS")
+	os.Setenv("RECOMPHAMR_MCP_PCRECOMP_TOOLS", "pe.analyze,lift32.run")
+	defer func() { os.Setenv("RECOMPHAMR_MCP_PCRECOMP_TOOLS", old) }()
+
+	servers := BuiltinServers()
+	for _, s := range servers {
+		if s.Name == "pcrecomp" {
+			if len(s.AllowedTools) != 2 {
+				t.Errorf("pcrecomp should have 2 tools, got %d: %v", len(s.AllowedTools), s.AllowedTools)
+			}
+		}
+	}
+}
+
+func TestPcrecompToolsEnvCommand(t *testing.T) {
+	old := os.Getenv("RECOMPHAMR_MCP_PCRECOMP_COMMAND")
+	os.Setenv("RECOMPHAMR_MCP_PCRECOMP_COMMAND", "/custom/path/pcrecomp-mcp")
+	defer func() { os.Setenv("RECOMPHAMR_MCP_PCRECOMP_COMMAND", old) }()
+
+	servers := BuiltinServers()
+	for _, s := range servers {
+		if s.Name == "pcrecomp" {
+			if s.Command != "/custom/path/pcrecomp-mcp" {
+				t.Errorf("pcrecomp should use custom command, got %q", s.Command)
+			}
+		}
 	}
 }

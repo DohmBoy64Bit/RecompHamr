@@ -52,9 +52,12 @@ func Run(projectDir string, cfg config.Config, cfgPath string) string {
 	b.WriteString("\nMCP servers\n-----------\n")
 	b.WriteString(which("ghidra-mcp"))
 	b.WriteString(which("n64-debug-mcp"))
+	b.WriteString(which("pcrecomp-mcp"))
 	for _, ev := range []string{
 		"RECOMPHAMR_MCP_GHIDRA_COMMAND", "RECOMPHAMR_MCP_N64_COMMAND",
-		"RECOMPHAMR_MCP_GHIDRA_TOOLS", "RECOMPHAMR_MCP_AUTOSTART",
+		"RECOMPHAMR_MCP_PCRECOMP_COMMAND",
+		"RECOMPHAMR_MCP_GHIDRA_TOOLS", "RECOMPHAMR_MCP_PCRECOMP_TOOLS",
+		"RECOMPHAMR_MCP_AUTOSTART",
 	} {
 		if v := os.Getenv(ev); v != "" {
 			fmt.Fprintf(&b, "  %s=%s\n", ev, v)
@@ -104,6 +107,18 @@ func Run(projectDir string, cfg config.Config, cfgPath string) string {
 	} else {
 		fmt.Fprintf(&b, "  %-50s none\n", "repos/")
 	}
+
+	b.WriteString("\nPCRECOMP-Next\n-------------\n")
+	if pcrecompPath := os.Getenv("RECOMPHAMR_PCRECOMP_PATH"); pcrecompPath != "" {
+		if info, err := os.Stat(pcrecompPath); err == nil && info.IsDir() {
+			fmt.Fprintf(&b, "  path: %s  (present)\n", pcrecompPath)
+		} else {
+			fmt.Fprintf(&b, "  path: %s  (not found)\n", pcrecompPath)
+		}
+	} else {
+		b.WriteString("  RECOMPHAMR_PCRECOMP_PATH (unset)\n")
+	}
+	b.WriteString(which("python"))
 
 	return b.String()
 }

@@ -28,6 +28,17 @@ var ghidraDefaultTools = []string{
 	"analyze_data_region",
 }
 
+var pcrecompDefaultTools = []string{
+	"pe.analyze",
+	"pe.extract_imports",
+	"disasm32.run",
+	"disasm32.callgraph",
+	"lift32.run",
+	"classify.run",
+	"ghidra.decompile_all",
+	"ghidra.function_stats",
+}
+
 func parseToolsEnv(val string) []string {
 	if val == "" || val == "*" {
 		return nil // allow all
@@ -54,11 +65,23 @@ func BuiltinServers() []ServerConfig {
 		n64Cmd = "n64-debug-mcp"
 	}
 
+	pcrecompCmd := os.Getenv("RECOMPHAMR_MCP_PCRECOMP_COMMAND")
+	if pcrecompCmd == "" {
+		pcrecompCmd = "pcrecomp-mcp"
+	}
+
 	ghidraTools := ghidraDefaultTools
 	if env := os.Getenv("RECOMPHAMR_MCP_GHIDRA_TOOLS"); env == "*" {
-		ghidraTools = nil // allow all
+		ghidraTools = nil
 	} else if env != "" {
 		ghidraTools = parseToolsEnv(env)
+	}
+
+	pcrecompTools := pcrecompDefaultTools
+	if env := os.Getenv("RECOMPHAMR_MCP_PCRECOMP_TOOLS"); env == "*" {
+		pcrecompTools = nil
+	} else if env != "" {
+		pcrecompTools = parseToolsEnv(env)
 	}
 
 	return []ServerConfig{
@@ -73,6 +96,13 @@ func BuiltinServers() []ServerConfig {
 			Name:         "n64-debug-mcp",
 			Command:      n64Cmd,
 			Args:         []string{},
+			RequireSkill: true,
+		},
+		{
+			Name:         "pcrecomp",
+			Command:      pcrecompCmd,
+			Args:         []string{},
+			AllowedTools: pcrecompTools,
 			RequireSkill: true,
 		},
 	}
