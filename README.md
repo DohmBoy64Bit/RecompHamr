@@ -115,7 +115,8 @@ MCP skills also gate which server tools the LLM sees.
 ```
 
 Full details, built-in skill table, custom skill setup, and MCP pairing are
-documented in **[docs/skills.md](docs/skills.md)**.
+documented in **[docs/skills.md](docs/skills.md)**. For the distinction
+between tools and skills, see **[docs/tools-vs-skills.md](docs/tools-vs-skills.md)**.
 
 ## License
 
