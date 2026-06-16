@@ -13,6 +13,7 @@ var SkillServers = map[string]string{
 	"n64-debug-mcp":   "n64-debug-mcp",
 	"pcrecomp":        "pcrecomp",
 	"mcp-pine":        "mcp-pine",
+	"objdiff":         "objdiff",
 }
 
 type ServerState int

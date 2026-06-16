@@ -54,9 +54,11 @@ func Run(projectDir string, cfg config.Config, cfgPath string) string {
 	b.WriteString(which("n64-debug-mcp"))
 	b.WriteString(which("pcrecomp-mcp"))
 	b.WriteString(which("mcp-pine"))
+	b.WriteString(which("objdiff-mcp"))
 	for _, ev := range []string{
 		"RECOMPHAMR_MCP_GHIDRA_COMMAND", "RECOMPHAMR_MCP_N64_COMMAND",
 		"RECOMPHAMR_MCP_PCRECOMP_COMMAND", "RECOMPHAMR_MCP_PINE_COMMAND",
+		"RECOMPHAMR_MCP_OBJDIFF_COMMAND",
 		"RECOMPHAMR_MCP_GHIDRA_TOOLS", "RECOMPHAMR_MCP_PCRECOMP_TOOLS",
 		"RECOMPHAMR_MCP_AUTOSTART",
 	} {

@@ -75,6 +75,11 @@ func BuiltinServers() []ServerConfig {
 		pineCmd = "mcp-pine"
 	}
 
+	objdiffCmd := os.Getenv("RECOMPHAMR_MCP_OBJDIFF_COMMAND")
+	if objdiffCmd == "" {
+		objdiffCmd = "objdiff-mcp"
+	}
+
 	ghidraTools := ghidraDefaultTools
 	if env := os.Getenv("RECOMPHAMR_MCP_GHIDRA_TOOLS"); env == "*" {
 		ghidraTools = nil
@@ -113,6 +118,12 @@ func BuiltinServers() []ServerConfig {
 		{
 			Name:         "mcp-pine",
 			Command:      pineCmd,
+			Args:         []string{},
+			RequireSkill: true,
+		},
+		{
+			Name:         "objdiff",
+			Command:      objdiffCmd,
 			Args:         []string{},
 			RequireSkill: true,
 		},

@@ -116,9 +116,9 @@ reachability, and workspace state. Full output reference in
 recomphamr connects to MCP (Model Context Protocol) servers over stdio via
 JSON-RPC 2.0, exposing their tools to the LLM.
 
-Four servers ship with built-in configs: `ghidra` (20 tools by default),
-`n64-debug-mcp` (all tools), `pcrecomp` (8 PC recompilation tools), and
-`mcp-pine` (RPCS3 debug bridge).
+Five servers ship with built-in configs: `ghidra` (20 tools by default),
+`n64-debug-mcp` (all tools), `pcrecomp` (8 PC recompilation tools),
+`mcp-pine` (RPCS3 debug bridge), and `objdiff` (object diffing).
 MCP tools are skill-gated to keep the token budget lean — zero MCP tools are
 sent unless a matching skill is loaded.
 
@@ -135,7 +135,7 @@ setup, see **[docs/mcp-setup.md](docs/mcp-setup.md)**.
 
 ## Skills
 
-Skills inject RE methodology and guardrails into the system prompt. Sixteen
+Skills inject RE methodology and guardrails into the system prompt. Seventeen
 are compiled into the binary; custom ones can be dropped in `.rehamr/skills/`.
 MCP skills also gate which server tools the LLM sees.
 

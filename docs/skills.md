@@ -19,7 +19,7 @@ injecting `ghidra.*` tools.
 
 ## Built-in skills
 
-Sixteen skills are compiled into the binary:
+Seventeen skills are compiled into the binary:
 
 | `/skill <name>` | Purpose | Details |
 |---|---|---|
@@ -31,6 +31,7 @@ Sixteen skills are compiled into the binary:
 | `ghidra-mcp` | Ghidra integration (gates `ghidra.*`) | [doc](skill-ghidra-mcp.md) |
 | `n64-debug-mcp` | N64 runtime debugging (gates `n64-debug-mcp.*`) | [doc](skill-n64-debug-mcp.md) |
 | `n64-decomp` | N64 matching decomp + N64Recomp pipeline | [doc](skill-n64-decomp.md) |
+| `objdiff` | Object file diffing (gates `objdiff.*` tools) | [doc](skill-objdiff.md) |
 | `pcrecomp` | PC recomp pipeline (gates `pcrecomp.*`) | [doc](skill-pcrecomp.md) |
 | `windows-game-decomp` | Windows game matching decomp + compiler-matrix | [doc](skill-windows-game-decomp.md) |
 | `xbox360-decomp` | Xbox 360 static recompilation (4 tracks, ReXGlue+Xenon) | [doc](skill-xbox360-decomp.md) |
@@ -64,6 +65,6 @@ for details.
 ## Token cost
 
 Each skill `.md` file averages ~10-15 lines (~200-400 tokens). Loading all
-sixteen adds ~4,500-6,400 tokens to the system prompt. Loading none adds zero —
+seventeen adds ~4,700-6,800 tokens to the system prompt. Loading none adds zero —
 `buildSystem()` skips the `## Active RE Skills` block entirely when
 `activeSkills` is empty.
