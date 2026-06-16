@@ -139,7 +139,7 @@ setup, see **[docs/mcp-setup.md](docs/mcp-setup.md)**.
 
 ## Skills
 
-Skills inject RE methodology and guardrails into the system prompt. Twenty-five
+Skills inject RE methodology and guardrails into the system prompt. Twenty-six
 are compiled into the binary; custom ones can be dropped in `.rehamr/skills/`.
 MCP skills also gate which server tools the LLM sees.
 
