@@ -390,10 +390,7 @@ func (m *Model) activateHamrpass(key string) tea.Cmd {
 // ---------------------------------------------------------------------------
 
 func (m Model) cmdSkills(_ []string) (tea.Model, tea.Cmd) {
-	m.appendLine("Built-in RE skills:")
 	m.appendLine(skills.ListMarkdown(m.activeSkills))
-	m.appendLine("")
-	m.appendLine(styleDim.Render("Load one with /skill <name>. Platform-specific packs intentionally omitted."))
 	return m, nil
 }
 

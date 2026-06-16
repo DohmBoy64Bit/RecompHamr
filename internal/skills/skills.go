@@ -52,7 +52,7 @@ func ListMarkdown(active []string) string {
 		activeSet[a] = true
 	}
 	var b strings.Builder
-	b.WriteString("Built-in skills for v0.1.0:\n")
+	b.WriteString("Built-in RE skills:\n")
 	for _, n := range Names() {
 		mark := " "
 		if activeSet[n] {
@@ -60,7 +60,7 @@ func ListMarkdown(active []string) string {
 		}
 		fmt.Fprintf(&b, "%s %s\n", mark, n)
 	}
-	b.WriteString("\nLoad one with /skill <name>. Platform-specific packs intentionally omitted in this first release.\n")
+	b.WriteString("\nLoad one with /skill <name>.\n")
 	return b.String()
 }
 
