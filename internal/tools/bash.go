@@ -154,6 +154,14 @@ func runRaw(parent context.Context, call chmctx.ToolCall) string {
 	case ReadFileName:
 		path, _ := call.Arguments["path"].(string)
 		return ReadFile(path)
+	case RepomixrName:
+		url, _ := call.Arguments["repo_url"].(string)
+		branch, _ := call.Arguments["branch"].(string)
+		rmComments, _ := call.Arguments["remove_comments"].(bool)
+		rmEmpty, _ := call.Arguments["remove_empty_lines"].(bool)
+		showLines, _ := call.Arguments["show_line_numbers"].(bool)
+		compress, _ := call.Arguments["compress"].(bool)
+		return Repomixr(parent, url, branch, rmComments, rmEmpty, showLines, compress)
 	default:
 		if MCPExec != nil {
 			result, mcpErr := MCPExec(parent, call.Name, call.Arguments)
@@ -205,6 +213,9 @@ func InlineStatus(call chmctx.ToolCall) string {
 	case ReadFileName:
 		path, _ := call.Arguments["path"].(string)
 		return "▶ read_file: " + path
+	case RepomixrName:
+		url, _ := call.Arguments["repo_url"].(string)
+		return "▶ repomixr: " + firstLine(url)
 	default:
 		// Fall back to the first non-empty string arg.
 		for _, v := range call.Arguments {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -285,12 +286,13 @@ func New(cfg *config.Config, cli *llm.Client, projectDir, version string, mcpmgr
 		histIdx:         -1,
 		liveContextSize: map[string]int{},
 	}
+	tools.RepomixrDir = filepath.Join(cfg.Dir, "repos")
 	// Record the active backend + budget once, before any turn, so a shared log
 	// names exactly which model/endpoint/context window produced the behaviour.
 	// Gated on dbgEnabled so the profile derefs run only when logging is on;
 	// off (the default) means New behaves exactly as before.
 	if dbgEnabled() {
-		toolNames := []string{tools.BashName, tools.ReadFileName, tools.WriteFileName, tools.EditFileName}
+		toolNames := []string{tools.BashName, tools.ReadFileName, tools.WriteFileName, tools.EditFileName, tools.RepomixrName}
 		if mcpmgr != nil {
 			for _, t := range mcpmgr.AllTools() {
 				toolNames = append(toolNames, t.Name)
@@ -708,6 +710,7 @@ func (m *Model) buildTools() []llm.Tool {
 		schemaToTool(tools.ReadFileSchema()),
 		schemaToTool(tools.WriteFileSchema()),
 		schemaToTool(tools.EditFileSchema()),
+		schemaToTool(tools.RepomixrSchema()),
 	}
 	if m.mcpManager != nil {
 		for _, t := range m.mcpManager.ToolsForSkills(m.activeSkills) {
