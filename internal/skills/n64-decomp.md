@@ -96,11 +96,15 @@ sane. Use `bash` for toolchain.
 load order before `jalr`. Verify with `n64-debug-mcp.n64_get_pc`,
 `n64-debug-mcp.n64_read_memory`.
 
-**Phase B3 — Renderer / host.** RT64, input, audio, saves. Boot past first
-indirect. Verify with `n64-debug-mcp.n64_decode_display_list`,
-`n64-debug-mcp.n64_get_frame_count`.
+**Phase B3 — Renderer / host.** RT64, RecompFrontend (input + menus via
+[N64Recomp/RecompFrontend](https://github.com/N64Recomp/RecompFrontend)),
+audio, saves. Boot past first indirect. Verify with
+`n64-debug-mcp.n64_decode_display_list`, `n64-debug-mcp.n64_get_frame_count`.
 
-**Phase B4 — Polish.** Launcher, UI, extras (optional, only if requested).
+**Phase B4 — Polish.** Launcher, UI, controller mapping, multiplayer profiles,
+extras (optional, only if requested). RecompFrontend provides `recompinput`
+(SDL2 controller/keyboard/mouse) and `recompui` (RmlUi menus via RT64/plume).
+Ensure version matches N64Recomp + RT64 upstream release.
 
 ### Which track?
 
