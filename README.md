@@ -20,16 +20,18 @@ wire into the system prompt dynamically.
 
 ## Install
 
-Linux, macOS:
+Requires **Go 1.26+** and **git**.
 
 ```bash
-curl -fsSL https://recomphamr.com/install.sh | bash
+go install github.com/DohmBoy64Bit/recomphamr/cmd/recomphamr@latest
 ```
 
-Windows:
+Or build from source:
 
-```cmd
-curl -fsSL https://recomphamr.com/install.cmd -o install.cmd && install.cmd
+```bash
+git clone https://github.com/DohmBoy64Bit/RecompHamr.git
+cd RecompHamr
+go build -o recomphamr ./cmd/recomphamr/
 ```
 
 Then run `recomphamr` in your project.
