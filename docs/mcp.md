@@ -20,7 +20,7 @@ Model (TUI)
 ## Connection lifecycle
 
 1. **Startup** — `BuiltinServers()` reads env vars for command paths and
-   registers both servers. `ConnectAll()` runs in a background goroutine so
+   registers all servers. `ConnectAll()` runs in a background goroutine so
    the TUI isn't blocked. Set `RECOMPHAMR_MCP_AUTOSTART=0` to skip.
 
 2. **Connect** — launches the server as a child process, speaks JSON-RPC 2.0
@@ -87,8 +87,8 @@ When the LLM calls `ghidra.decompile_function`:
 | `sega2asm` | `sega2asm-mcp` | `RECOMPHAMR_MCP_SEGA2ASM_COMMAND` |
 
 Ghidra ships with the 20 most-used RE tools enabled by default
-(`RECOMPHAMR_MCP_GHIDRA_TOOLS=*` for all). n64-debug-mcp, mcp-pine, objdiff,
-and pcsx2 allow all tools by default. pcrecomp ships with 8 pipeline tools
+(`RECOMPHAMR_MCP_GHIDRA_TOOLS=*` for all). All other servers allow all tools
+by default. pcrecomp ships with 8 pipeline tools
 (`RECOMPHAMR_MCP_PCRECOMP_TOOLS=*` for all).
 
 ## Runtime management
