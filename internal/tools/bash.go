@@ -155,7 +155,38 @@ func runRaw(parent context.Context, call chmctx.ToolCall) string {
 		path, _ := call.Arguments["path"].(string)
 		return ReadFile(path)
 	default:
+		if MCPExec != nil {
+			result, mcpErr := MCPExec(parent, call.Name, call.Arguments)
+			if mcpErr == nil {
+				return result
+			}
+			return fmt.Sprintf("(mcp error: %s)", mcpErr.Error())
+		}
 		return fmt.Sprintf("(unknown tool: %s)", call.Name)
+	}
+}
+
+var MCPExec func(ctx context.Context, toolName string, args map[string]interface{}) (string, error)
+
+func MCPSchema(name, description string, inputSchema map[string]interface{}) map[string]any {
+	params := map[string]any{
+		"type":       "object",
+		"properties": map[string]any{},
+		"required":   []string{},
+	}
+	if props, ok := inputSchema["properties"].(map[string]interface{}); ok {
+		params["properties"] = props
+	}
+	if req, ok := inputSchema["required"].([]interface{}); ok {
+		params["required"] = req
+	}
+	return map[string]any{
+		"type": "function",
+		"function": map[string]any{
+			"name":        name,
+			"description": description,
+			"parameters":  params,
+		},
 	}
 }
 

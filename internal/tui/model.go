@@ -18,6 +18,7 @@ import (
 	"github.com/DohmBoy64Bit/recomphamr/internal/config"
 	chmctx "github.com/DohmBoy64Bit/recomphamr/internal/ctx"
 	"github.com/DohmBoy64Bit/recomphamr/internal/llm"
+	"github.com/DohmBoy64Bit/recomphamr/internal/mcp"
 	"github.com/DohmBoy64Bit/recomphamr/internal/skills"
 	"github.com/DohmBoy64Bit/recomphamr/internal/tools"
 )
@@ -248,9 +249,12 @@ type Model struct {
 	// activeSkills holds the names of currently loaded RE skills,
 	// injected into the system prompt by buildSystem.
 	activeSkills []string
+
+	// mcpManager holds connected MCP servers and their tools.
+	mcpManager *mcp.Manager
 }
 
-func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model {
+func New(cfg *config.Config, cli *llm.Client, projectDir, version string, mcpmgr *mcp.Manager) Model {
 	ta := newPromptInput()
 
 	// Fixed dark style: WithAutoStyle queries the terminal (OSC 11) before
@@ -271,7 +275,8 @@ func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model 
 		ta:         ta,
 		renderer:   r,
 		spinner:    sp,
-		connected:  true, // optimistic until the first ping proves otherwise
+		connected:  true,
+		mcpManager: mcpmgr, // optimistic until the first ping proves otherwise
 		// width/height left at 0; View() returns "" until the first
 		// WindowSizeMsg, so we don't flash an 80×24 frame then resize.
 		streaming:       new(strings.Builder),
@@ -285,15 +290,31 @@ func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model 
 	// Gated on dbgEnabled so the profile derefs run only when logging is on;
 	// off (the default) means New behaves exactly as before.
 	if dbgEnabled() {
+		toolNames := []string{tools.BashName, tools.ReadFileName, tools.WriteFileName, tools.EditFileName}
+		if mcpmgr != nil {
+			for _, t := range mcpmgr.AllTools() {
+				toolNames = append(toolNames, t.Name)
+			}
+		}
 		dbgWriteSession(version, cfg.Active, cfg.ActiveProfile().LLM, cfg.ActiveURL(),
-			m.activeContextSize(), chmctx.Tokens(m.system),
-			[]string{tools.BashName, tools.ReadFileName, tools.WriteFileName, tools.EditFileName})
+			m.activeContextSize(), chmctx.Tokens(m.system), toolNames)
 	}
 	// Seed prompt history from .rehamr/history so ↑ recalls prompts from
 	// earlier sessions. Loaded entries carry no chip metadata (the on-disk
 	// format stores expanded text only), so a recalled multi-line paste
 	// appears uncollapsed, the right tradeoff for a cat-friendly history file.
 	m.promptHistory = loadPromptHistory(cfg.Dir)
+
+	if mcpmgr != nil {
+		tools.MCPExec = func(ctx context.Context, fullName string, args map[string]interface{}) (string, error) {
+			result, err := mcpmgr.CallTool(ctx, fullName, args)
+			if err != nil {
+				return "", err
+			}
+			return result.Text(), nil
+		}
+	}
+
 	return m
 }
 
@@ -342,6 +363,12 @@ type pingMsg struct {
 // quitArmResetMsg fires ~3s after Ctrl+C arms the quit: if not already quit or
 // re-armed, clear the hint from the status bar.
 type quitArmResetMsg struct{}
+
+// mcpConnectMsg carries the result of an async MCP connect operation.
+type mcpConnectMsg struct {
+	name string
+	err  error
+}
 
 func (m Model) Init() tea.Cmd {
 	// Keyed (cloud) profiles get a silent Probe at startup so the status bar
@@ -420,6 +447,15 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.connected = msg.ok
+		return m, nil
+
+	case mcpConnectMsg:
+		if msg.err != nil {
+			m.appendLine(styleError.Render("mcp " + msg.name + ": " + msg.err.Error()))
+		} else {
+			st := m.mcpManager.Status(msg.name)
+			m.appendLine(styleOK.Render(fmt.Sprintf("mcp %s: %s (%d tools)", st.Name, st.State, st.Tools)))
+		}
 		return m, nil
 
 	case probeMsg:
@@ -666,12 +702,18 @@ func (m *Model) buildMessages() []chmctx.Message {
 // write_file, edit_file. No loop/control tool; a turn ends when the model
 // stops emitting tool calls (see handleStreamClosed).
 func (m *Model) buildTools() []llm.Tool {
-	return []llm.Tool{
+	local := []llm.Tool{
 		schemaToTool(tools.BashSchema()),
 		schemaToTool(tools.ReadFileSchema()),
 		schemaToTool(tools.WriteFileSchema()),
 		schemaToTool(tools.EditFileSchema()),
 	}
+	if m.mcpManager != nil {
+		for _, t := range m.mcpManager.AllTools() {
+			local = append(local, schemaToTool(tools.MCPSchema(t.Name, t.Description, t.InputSchema.Map())))
+		}
+	}
+	return local
 }
 
 // schemaToTool unwraps a tool schema (the map[string]any shape shared by bash

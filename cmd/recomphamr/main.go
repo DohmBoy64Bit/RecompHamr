@@ -14,6 +14,7 @@ import (
 
 	"github.com/DohmBoy64Bit/recomphamr/internal/config"
 	"github.com/DohmBoy64Bit/recomphamr/internal/llm"
+	"github.com/DohmBoy64Bit/recomphamr/internal/mcp"
 	"github.com/DohmBoy64Bit/recomphamr/internal/tui"
 	"github.com/DohmBoy64Bit/recomphamr/internal/update"
 )
@@ -70,8 +71,17 @@ func main() {
 	p := cfg.ActiveProfile()
 	client := llm.New(cfg.ActiveURL(), p.LLM, p.Key)
 
+	mcpmgr := mcp.NewManager()
+	for _, s := range mcp.BuiltinServers() {
+		mcpmgr.Register(s)
+	}
+
 	abs, _ := filepath.Abs(cwd)
-	m := tui.New(cfg, client, abs, version)
+	m := tui.New(cfg, client, abs, version, mcpmgr)
+
+	if os.Getenv("RECOMPHAMR_MCP_AUTOSTART") != "0" {
+		go mcpmgr.ConnectAll(context.Background())
+	}
 
 	// Hard clear before the TUI takes over: \x1b[2J viewport, \x1b[3J
 	// scrollback, \x1b[H cursor home, a clean canvas free of prior shell

@@ -1,11 +1,13 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -111,6 +113,11 @@ var commands = []command{
 		name:        "/doctor",
 		description: "run environment diagnostics",
 		handler:     (Model).cmdDoctor,
+	},
+	{
+		name:        "/mcp",
+		description: "show MCP server status, connect or disconnect",
+		handler:     (Model).cmdMcp,
 	},
 	{
 		name:        "/help",
@@ -445,6 +452,34 @@ func (m Model) cmdDoctor(_ []string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) cmdMcp(args []string) (tea.Model, tea.Cmd) {
+	if m.mcpManager == nil {
+		m.appendLine(styleWarn.Render("MCP not available."))
+		return m, nil
+	}
+	if len(args) == 0 {
+		m.appendLine(m.mcpManager.FormatStatus())
+		m.appendLine("")
+		m.appendLine(styleDim.Render("/mcp connect <name> · /mcp disconnect <name>"))
+		return m, nil
+	}
+	if args[0] == "connect" && len(args) >= 2 {
+		m.appendLine(fmt.Sprintf("mcp: connecting to %s...", args[1]))
+		return m, func() tea.Msg {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			return mcpConnectMsg{name: args[1], err: m.mcpManager.Connect(ctx, args[1])}
+		}
+	}
+	if args[0] == "disconnect" && len(args) >= 2 {
+		m.mcpManager.Disconnect(args[1])
+		m.appendLine(fmt.Sprintf("mcp %s: disconnected", args[1]))
+		return m, nil
+	}
+	m.appendLine(styleWarn.Render("usage: /mcp [connect|disconnect] <name>"))
+	return m, nil
+}
+
 func (m Model) cmdHelp(_ []string) (tea.Model, tea.Cmd) {
 	// Avoid import cycle: list commands statically instead of iterating commands slice.
 	m.appendLine("Commands:")
@@ -458,6 +493,7 @@ func (m Model) cmdHelp(_ []string) (tea.Model, tea.Cmd) {
 		{"/init-re", "create .rehamr/ evidence workspace"},
 		{"/status-re", "summarize RE project state"},
 		{"/doctor", "run environment diagnostics"},
+		{"/mcp", "show MCP server status"},
 		{"/help", "show this help"},
 	} {
 		m.appendLine(fmt.Sprintf("  %-14s %s", c.name, c.desc))

@@ -8,6 +8,8 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-runewidth"
+
+	"github.com/DohmBoy64Bit/recomphamr/internal/mcp"
 )
 
 // splashRecomp and splashHamr form the two-tone "RECOMPHAMR" wordmark printed
@@ -229,7 +231,23 @@ func (m Model) splashLines() []string {
 			"", styleDim.Render("  RE · decomp · recomp · evidence-backed reconstruction"),
 			"", styleDim.Render(fmt.Sprintf("  recomphamr %s · %s @ %s",
 				m.Version, m.cfg.ActiveProfile().LLM, m.cfg.Active)),
-			"",
+		)
+		if m.mcpManager != nil {
+			for _, s := range m.mcpManager.AllStatus() {
+				icon := "*"
+				label := styleHamr.Render(s.State.String())
+				if s.State != mcp.StateConnected {
+					icon = " "
+					label = styleDim.Render(s.State.String())
+				}
+				extra := ""
+				if s.State == mcp.StateConnected {
+					extra = fmt.Sprintf(" (%d tools)", s.Tools)
+				}
+				lines = append(lines, styleDim.Render(fmt.Sprintf("  MCP %s %s %s%s", icon, s.Name, label, extra)))
+			}
+		}
+		lines = append(lines,
 			styleDim.Render("  AI systems can make mistakes. RecompHAMR executes their commands with full shell and filesystem access."),
 			styleDim.Render("  Run inside a devcontainer or VM where it cannot cause damage outside the sandbox."),
 			"",
