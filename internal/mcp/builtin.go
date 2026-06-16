@@ -85,6 +85,11 @@ func BuiltinServers() []ServerConfig {
 		pcsx2Cmd = "pcsx2-mcp"
 	}
 
+	bizhawkCmd := os.Getenv("RECOMPHAMR_MCP_BIZHAWK_COMMAND")
+	if bizhawkCmd == "" {
+		bizhawkCmd = "mcp-bizhawk"
+	}
+
 	ghidraTools := ghidraDefaultTools
 	if env := os.Getenv("RECOMPHAMR_MCP_GHIDRA_TOOLS"); env == "*" {
 		ghidraTools = nil
@@ -135,6 +140,12 @@ func BuiltinServers() []ServerConfig {
 		{
 			Name:         "pcsx2",
 			Command:      pcsx2Cmd,
+			Args:         []string{},
+			RequireSkill: true,
+		},
+		{
+			Name:         "bizhawk",
+			Command:      bizhawkCmd,
 			Args:         []string{},
 			RequireSkill: true,
 		},

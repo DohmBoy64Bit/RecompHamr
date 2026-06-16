@@ -19,10 +19,11 @@ injecting `ghidra.*` tools.
 
 ## Built-in skills
 
-Twenty skills are compiled into the binary:
+Twenty-one skills are compiled into the binary:
 
 | `/skill <name>` | Purpose | Details |
 |---|---|---|
+| `bizhawk` | Multi-system emulator debug (gates `bizhawk.*`) | [doc](skill-bizhawk.md) |
 | `core-re` | General RE workflow | [doc](skill-core-re.md) |
 | `evidence-mode` | Evidence-first methodology | [doc](skill-evidence-mode.md) |
 | `build-fix-loop` | Iterate on build failures | [doc](skill-build-fix-loop.md) |
@@ -68,6 +69,6 @@ for details.
 ## Token cost
 
 Each skill `.md` file averages ~10-15 lines (~200-400 tokens). Loading all
-twenty adds ~5,500-8,000 tokens to the system prompt. Loading none adds zero —
+twenty-one adds ~5,700-8,400 tokens to the system prompt. Loading none adds zero —
 `buildSystem()` skips the `## Active RE Skills` block entirely when
 `activeSkills` is empty.

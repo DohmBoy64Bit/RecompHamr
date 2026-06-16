@@ -15,6 +15,7 @@ var SkillServers = map[string]string{
 	"mcp-pine":        "mcp-pine",
 	"objdiff":         "objdiff",
 	"pcsx2":           "pcsx2",
+	"bizhawk":          "bizhawk",
 }
 
 type ServerState int
