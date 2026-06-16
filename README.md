@@ -10,7 +10,9 @@ LLMs, also runs on OpenAI-compatible endpoints.
 
 recomphamr extends upstream CodeHAMR with RE-specific tooling: embedded skills
 for reversing workflows, MCP servers for Ghidra and N64 debugging, project
-handoff docs, and a system prompt tuned for unfamiliar codebases.
+handoff docs, and a system prompt tuned for unfamiliar codebases. Ghidra
+extensions (MCP bridge, XEX loader, N64 loader) are available pre-built at
+**[REPlugins](https://github.com/DohmBoy64Bit/REPlugins)** for Ghidra 12.1.2.
 
 **Slash commands:** `/help`, `/clear`, `/models`, `/rehampass`, `/skills`,
 `/skill`, `/init-re`, `/status-re`, `/doctor`, `/mcp`. Skills and MCP tools
@@ -116,7 +118,8 @@ lean — zero MCP tools are sent unless a matching skill is loaded.
 ```
 
 Full architecture, two-gate filtering, custom servers, and tool execution flow
-are documented in **[docs/mcp.md](docs/mcp.md)**.
+are documented in **[docs/mcp.md](docs/mcp.md)**. For server dependencies and
+setup, see **[docs/mcp-setup.md](docs/mcp-setup.md)**.
 
 ## Skills
 
