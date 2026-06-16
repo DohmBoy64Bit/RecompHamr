@@ -223,9 +223,8 @@ func stripComments(s string) string {
 			continue
 		}
 		if idx := strings.Index(line, "//"); idx >= 0 {
-			before := line[:idx]
-			if !strings.Contains(before, "://") {
-				line = before
+			if idx == 0 || line[idx-1] != ':' {
+				line = line[:idx]
 			}
 		}
 		out.WriteString(line)

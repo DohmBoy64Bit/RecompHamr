@@ -54,9 +54,11 @@ func BuiltinServers() []ServerConfig {
 		n64Cmd = "n64-debug-mcp"
 	}
 
-	ghidraTools := parseToolsEnv(os.Getenv("RECOMPHAMR_MCP_GHIDRA_TOOLS"))
-	if ghidraTools == nil {
-		ghidraTools = ghidraDefaultTools
+	ghidraTools := ghidraDefaultTools
+	if env := os.Getenv("RECOMPHAMR_MCP_GHIDRA_TOOLS"); env == "*" {
+		ghidraTools = nil // allow all
+	} else if env != "" {
+		ghidraTools = parseToolsEnv(env)
 	}
 
 	return []ServerConfig{
