@@ -19,7 +19,7 @@ injecting `ghidra.*` tools.
 
 ## Built-in skills
 
-Seventeen skills are compiled into the binary:
+Nineteen skills are compiled into the binary:
 
 | `/skill <name>` | Purpose | Details |
 |---|---|---|
@@ -39,6 +39,8 @@ Seventeen skills are compiled into the binary:
 | `mcp-pine` | RPCS3 debug bridge (gates `mcp-pine.*` tools) | [doc](skill-mcp-pine.md) |
 | `ps3recomp` | PS3 static recompilation (PPU/SPU lifting, HLE, RSX) | [doc](skill-ps3recomp.md) |
 | `xboxrecomp` | OG Xbox static recompilation (XBE→C, kernel, D3D, ICALL) | [doc](skill-xboxrecomp.md) |
+| `pcsx2` | PCSX2 debug bridge (gates `pcsx2.*` tools) | [doc](skill-pcsx2.md) |
+| `ps2recomp` | PS2 static recomp (MIPS→C++, syscalls, PCSX2) | [doc](skill-ps2recomp.md) |
 | `project-handoff` | Generate project docs | [doc](skill-project-handoff.md) |
 
 List them with `/skills`; active skills are marked `*`.
@@ -65,6 +67,6 @@ for details.
 ## Token cost
 
 Each skill `.md` file averages ~10-15 lines (~200-400 tokens). Loading all
-seventeen adds ~4,700-6,800 tokens to the system prompt. Loading none adds zero —
+nineteen adds ~5,200-7,600 tokens to the system prompt. Loading none adds zero —
 `buildSystem()` skips the `## Active RE Skills` block entirely when
 `activeSkills` is empty.

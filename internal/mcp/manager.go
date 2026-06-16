@@ -14,6 +14,7 @@ var SkillServers = map[string]string{
 	"pcrecomp":        "pcrecomp",
 	"mcp-pine":        "mcp-pine",
 	"objdiff":         "objdiff",
+	"pcsx2":           "pcsx2",
 }
 
 type ServerState int

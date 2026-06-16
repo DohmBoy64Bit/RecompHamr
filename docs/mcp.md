@@ -8,7 +8,7 @@ JSON-RPC 2.0, exposing their tools to the LLM alongside the built-in tools.
 ```
 main.go
   └─ mcp.NewManager()
-       ├─ Register(ServerConfig{...})  ← ghidra, n64-debug-mcp, pcrecomp, mcp-pine, objdiff
+       ├─ Register(ServerConfig{...})  ← ghidra, n64, pcrecomp, mcp-pine, objdiff, pcsx2
        └─ ConnectAll()                 ← goroutine at startup
 
 Model (TUI)
@@ -56,6 +56,7 @@ MCP tools are NOT always sent to the LLM. Two per-server gates decide:
 | `/skill pcrecomp` | Built-in + 8 pcrecomp tools |
 | `/skill mcp-pine` | Built-in + all mcp-pine tools |
 | `/skill objdiff` | Built-in + all objdiff tools |
+| `/skill pcsx2` | Built-in + all pcsx2 tools |
 
 No MCP skills loaded = zero MCP tools = same token cost as upstream CodeHAMR.
 
@@ -79,10 +80,11 @@ When the LLM calls `ghidra.decompile_function`:
 | `pcrecomp` | `pcrecomp-mcp` | `RECOMPHAMR_MCP_PCRECOMP_COMMAND` |
 | `mcp-pine` | `mcp-pine` | `RECOMPHAMR_MCP_PINE_COMMAND` |
 | `objdiff` | `objdiff-mcp` | `RECOMPHAMR_MCP_OBJDIFF_COMMAND` |
+| `pcsx2` | `pcsx2-mcp` | `RECOMPHAMR_MCP_PCSX2_COMMAND` |
 
 Ghidra ships with the 20 most-used RE tools enabled by default
-(`RECOMPHAMR_MCP_GHIDRA_TOOLS=*` for all). n64-debug-mcp, mcp-pine, and
-objdiff allow all tools by default. pcrecomp ships with 8 pipeline tools
+(`RECOMPHAMR_MCP_GHIDRA_TOOLS=*` for all). n64-debug-mcp, mcp-pine, objdiff,
+and pcsx2 allow all tools by default. pcrecomp ships with 8 pipeline tools
 (`RECOMPHAMR_MCP_PCRECOMP_TOOLS=*` for all).
 
 ## Runtime management

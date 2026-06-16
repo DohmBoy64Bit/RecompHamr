@@ -24,6 +24,7 @@ Full architecture details in **[mcp.md](mcp.md)**.
 | `RECOMPHAMR_MCP_PCRECOMP_TOOLS` | PCRECOMP tool list or `*` for all |
 | `RECOMPHAMR_MCP_PINE_COMMAND` | Override mcp-pine server command/path |
 | `RECOMPHAMR_MCP_OBJDIFF_COMMAND` | Override objdiff MCP server command/path |
+| `RECOMPHAMR_MCP_PCSX2_COMMAND` | Override pcsx2 MCP server command/path |
 | `RECOMPHAMR_PCRECOMP_PATH` | Path to PCRECOMP-Next clone directory |
 
 ## Runtime management
@@ -49,3 +50,4 @@ or `  Disconnected` if not running.
 | `pcrecomp` | [mcp-pcrecomp.md](mcp-pcrecomp.md) |
 | `mcp-pine` | [mcp-pine.md](mcp-pine.md) |
 | `objdiff` | [mcp-objdiff.md](mcp-objdiff.md) |
+| `pcsx2` | [mcp-pcsx2.md](mcp-pcsx2.md) |
