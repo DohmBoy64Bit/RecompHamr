@@ -38,7 +38,7 @@ Then run `recomphamr` in your project.
 ## Config
 
 On first run recomphamr seeds `.rehamr/config.yaml` with AMD-priority profiles
-(`lmstudio-amd` default, `ollama-amd`, `hamrpass`). The system prompt and RE
+(`lmstudio-amd` default, `ollama-amd`). The system prompt and RE
 skills are embedded in the binary.
 
 Any OpenAI-compatible endpoint works. Example profiles:
@@ -56,29 +56,15 @@ models:
         url: https://api.openai.com
         key: sk-...
         context_size: 200000
-    hamrpass:
-        llm: hamrpass
-        url: https://recomphamr.com
-        key: hp_...
 ```
 
 `/models` lists profiles, `/models <name>` switches.
 
 ## Hardware
 
-Local LLMs finally caught up. For RE workloads we recommend a **~30B-class**
-model on **32 GB+ unified RAM / VRAM**. AMD RX 7000-series GPUs with ROCm or
-Vulkan backends (llama.cpp) are the default target.
-
-Ollama users: raise the **Context length** slider to **64k+** (RAM/VRAM
-permitting) and set `context_size` in `.rehamr/config.yaml` to match.
-
-For coding, a ~30B-class model typically wants `temperature 0.6`, `top_p 0.95`,
-`top_k 20`, and never greedy decoding (temp 0), which loops. If it still loops,
-add `presence_penalty` and check your server applies it.
-
-If the model prints tool calls as text instead of acting, enable your server's
-tool-call parser; recomphamr warns you when that happens.
+For RE workloads we target **AMD GPUs** with ROCm or Vulkan backends via
+llama.cpp. A **~30B-class** model on **32 GB+ VRAM** recommended. Works with
+LM Studio, Ollama, or any OpenAI-compatible endpoint.
 
 ## Give the agent a runtime
 
@@ -112,15 +98,6 @@ Seven embedded RE skills are loaded on demand via `/skill <name>`:
 
 Skills inject targeted context into the system prompt when active, keeping the
 default prompt lean.
-
-## HamrPass
-
-HamrPass is optional. It's there if you want to support the project, or skip
-benchmarking the latest open-weight model and tuning every parameter. We do that
-work and ship it as one endpoint with sensible defaults.
-
-There's a waitlist at [recomphamr.com](https://recomphamr.com). HamrPass only
-gets built if real demand shows up there.
 
 ## License
 
