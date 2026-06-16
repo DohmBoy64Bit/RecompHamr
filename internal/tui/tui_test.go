@@ -55,7 +55,7 @@ func newTestModel(t *testing.T, handler http.HandlerFunc) Model {
 // resolves to a concrete path.
 func TestSystemPromptIncludesWorkingDirAndInvestigateRule(t *testing.T) {
 	cfg, _, _ := config.Bootstrap(t.TempDir())
-	projectDir := "/workspaces/codehamr"
+	projectDir := "/workspaces/recomphamr"
 	m := New(cfg, llm.New("http://x", cfg.ActiveProfile().LLM, ""), projectDir, "test")
 	if !strings.Contains(m.system, "reverse engineering") {
 		t.Fatalf("system prompt missing RE focus:\n%s", m.system)
@@ -73,7 +73,7 @@ func TestSystemPromptIncludesWorkingDirAndInvestigateRule(t *testing.T) {
 // don't loosen the assertion.
 func TestSystemPromptFitsFixedSystemReservation(t *testing.T) {
 	cfg, _, _ := config.Bootstrap(t.TempDir())
-	m := New(cfg, llm.New("http://x", cfg.ActiveProfile().LLM, ""), "/workspaces/codehamr", "test")
+	m := New(cfg, llm.New("http://x", cfg.ActiveProfile().LLM, ""), "/workspaces/recomphamr", "test")
 	cost := chmctx.Message{Role: chmctx.RoleSystem, Content: m.system}.Tokens()
 	if cost > chmctx.FixedSystem {
 		t.Fatalf("system prompt costs %d tokens, FixedSystem reserves only %d - "+

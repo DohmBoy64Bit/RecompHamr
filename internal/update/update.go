@@ -87,7 +87,7 @@ func assetName(goos, goarch string) (string, bool) {
 	case "darwin":
 		goos = "macos"
 	case "windows":
-		// Manifest row reads `<hash>  codehamr-windows-<arch>.exe`; match the
+		// Manifest row reads `<hash>  recomphamr-windows-<arch>.exe`; match the
 		// .exe or the asset 404s on download.
 		ext = ".exe"
 	default:

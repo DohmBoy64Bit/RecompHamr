@@ -46,7 +46,7 @@ jobs:
       #   2. a renamed/reformatted asset assetName can no longer resolve.
       - name: Verify delivered assets are static and consistently named
         run: |
-          for f in dist/codehamr-linux-amd64 dist/codehamr-linux-arm64; do
+          for f in dist/recomphamr-linux-amd64 dist/recomphamr-linux-arm64; do
             if readelf -d "$f" | grep -q NEEDED; then
               echo "::error::$f is dynamically linked (CGO leaked on?); it will fail to exec on musl/old-glibc after auto-update"
               exit 1

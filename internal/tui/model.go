@@ -976,7 +976,7 @@ func newestAssistantUnverified(history []chmctx.Message) bool {
 // (`{"name":…`): gating on the literal tag alone catches both while staying
 // specific enough that ordinary prose can't trip it. A message that carried a
 // real structured call never leaked, even if its prose quotes the tag, so a
-// non-empty ToolCalls short-circuits to clean. codehamr stays wire-only (it does
+// non-empty ToolCalls short-circuits to clean. recomphamr stays wire-only (it does
 // not parse or run the leaked call); it points the user at the server-side fix.
 // Empty string when there is nothing to warn.
 func toolCallLeakWarning(history []chmctx.Message) string {
@@ -1014,7 +1014,7 @@ func (m Model) dispatchNextTool() (tea.Model, tea.Cmd) {
 // hasn't given me a new task, I'll just stop"), the exact misread that turned the
 // finish nudge net-negative on the galaxy run (it re-prompted an honest
 // `unverified` finish into a confident, caveat-free "it works"). Naming the note
-// as codehamr's own automated check, not the user's, keeps the model oriented.
+// as recomphamr's own automated check, not the user's, keeps the model oriented.
 // Deliberately says nothing about whether to stop or keep going (each nudge body
 // owns that), so it can't induce the premature-completion failure the runaway /
 // verify wording fights.

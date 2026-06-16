@@ -1,4 +1,4 @@
-// Package llm is codehamr's only LLM client. It speaks the OpenAI
+// Package llm is recomphamr's only LLM client. It speaks the OpenAI
 // chat-completions wire format and nothing else: one POST to
 // `$BaseURL/v1/chat/completions`, SSE streamed back, no per-backend branches.
 //

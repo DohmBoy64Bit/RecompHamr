@@ -57,7 +57,7 @@ func loadPromptHistory(dir string) []promptEntry {
 // presses don't pollute recall; entries over historyMaxEntryBytes are
 // dropped (recall would fail at the scanner cap anyway).
 //
-// O_APPEND so two codehamr processes in the same project can each add a
+// O_APPEND so two recomphamr processes in the same project can each add a
 // line without one's load+rewrite eating the other's submit. The trim is
 // best-effort: an IO error during rewrite leaves the appended file as-is.
 // The next start trims it back down.

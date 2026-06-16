@@ -604,7 +604,7 @@ func TestBootstrapRejectsNilProfile(t *testing.T) {
 // TestBootstrapRefusesSymlinkedDir: a co-tenant could plant .rehamr → an
 // attacker-controlled dir before first run. Bootstrap must Lstat (not Stat) and
 // refuse any symlink: even with a 0o600 config.yaml, the attacker owns the
-// parent and can swap or read what codehamr writes. Same defence for a planted
+	// parent and can swap or read what recomphamr writes. Same defence for a planted
 // config.yaml symlink.
 func TestBootstrapRefusesSymlinkedDir(t *testing.T) {
 	root := t.TempDir()
@@ -692,7 +692,7 @@ func TestURLOverrideDoesNotPersist(t *testing.T) {
 }
 
 // TestSaveTightensPreexistingLoosePerms covers the upgrade path fresh-bootstrap
-// misses: a config.yaml from an older world-readable codehamr (or a hand-edit)
+	// misses: a config.yaml from an older world-readable recomphamr (or a hand-edit)
 // starts at 0o644, and os.WriteFile preserves an existing file's mode, so Save
 // would rewrite the bytes (including a fresh hamrpass token) while leaving it
 // world-readable. Save must tighten a pre-existing loose file to 0o600.
@@ -703,7 +703,7 @@ func TestSaveTightensPreexistingLoosePerms(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfgPath := filepath.Join(cdir, "config.yaml")
-	// World-readable file an older codehamr would have written.
+	// World-readable file an older recomphamr would have written.
 	loose := []byte("active: local\nmodels:\n  local:\n    llm: m\n    url: http://x\n    key: \"\"\n    context_size: 1\n")
 	if err := os.WriteFile(cfgPath, loose, 0o644); err != nil {
 		t.Fatal(err)
