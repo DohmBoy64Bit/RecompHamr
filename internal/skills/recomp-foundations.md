@@ -221,13 +221,30 @@ Also available in the clone: `docs/glossary.md`, `docs/tool-setup.md`,
 
 ## Known recomp projects (reference layouts)
 
+### N64
+
+| Project | URL |
+|---|---|
+| Zelda64Recomp | `https://github.com/N64Recomp/Zelda64Recomp` |
+| BanjoRecomp (Banjo-Kazooie) | `https://github.com/BanjoRecomp/BanjoRecomp` |
+| Kirby64Recomp | `https://github.com/Kirby64Ret/Kirby64Recomp` |
+| MarioKart64Recomp | `https://github.com/sonicdcer/MarioKart64Recomp` |
+| BM64Recomp (Bomberman 64) | `https://github.com/RevoSucks/BM64Recomp` |
+| BMHeroRecomp (Bomberman Hero) | `https://github.com/RevoSucks/BMHeroRecomp` |
+| dino-recomp (Dinosaur Planet) | `https://github.com/DinosaurPlanetRecomp/dino-recomp` |
+| drmario64_recomp_plus | `https://github.com/theboy181/drmario64_recomp_plus` |
+| DNZHRecomp (Densha de Go!) | `https://github.com/sonicdcer/DNZHRecomp` |
+| Goemon64Recomp | `https://github.com/klorfmorf/Goemon64Recomp` |
+| Quest64-Recomp | `https://github.com/Rainchus/Quest64-Recomp` |
+| Starship (Star Fox 64) | `https://github.com/HarbourMasters/Starship` |
+
+### Other platforms
+
 | Project | Platform | URL |
 |---|---|---|
-| Zelda64Recomp | N64 | `https://github.com/N64Recomp/Zelda64Recomp` |
 | MK (Super Mario Kart) | SNES | `https://github.com/sp00nznet/mk` |
 | Mario Paint | SNES | `https://github.com/sp00nznet/mariopaint` |
 | UnleashedRecomp | Xbox 360 | `https://github.com/hedge-dev/UnleashedRecomp` |
-| Sonic Unleashed | Xbox 360 | `https://github.com/hedge-dev/UnleashedRecomp` |
 
 ## Source quality key
 
