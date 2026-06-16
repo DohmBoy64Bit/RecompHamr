@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestInitRECreatesDirectories(t *testing.T) {
@@ -91,5 +92,78 @@ func TestStatusREShowsFiles(t *testing.T) {
 	}
 	if !strings.Contains(status, "Initialized RecompHAMR evidence workspace") {
 		t.Error("CHANGELOG should contain initialization entry")
+	}
+}
+
+func TestInitRECreatesStateFile(t *testing.T) {
+	dir := t.TempDir()
+	err := InitRE(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	statePath := filepath.Join(dir, ".rehamr", "REPHAMR_STATE.md")
+	data, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatalf("REPHAMR_STATE.md not created: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "RecompHAMR Project State") {
+		t.Errorf("state file missing title: %s", content)
+	}
+	if !strings.Contains(content, "Quick Rules") {
+		t.Errorf("state file missing Quick Rules: %s", content)
+	}
+	if !strings.Contains(content, "Current Phase") {
+		t.Errorf("state file missing Current Phase: %s", content)
+	}
+	if !strings.Contains(content, "Blockers") {
+		t.Errorf("state file missing Blockers: %s", content)
+	}
+	if !strings.Contains(content, "Learned Patterns") {
+		t.Errorf("state file missing Learned Patterns: %s", content)
+	}
+	if !strings.Contains(content, "Session Log") {
+		t.Errorf("state file missing Session Log: %s", content)
+	}
+}
+
+func TestStateTemplateHasQuickRules(t *testing.T) {
+	expectedRules := []string{
+		"Evidence first",
+		"Never hand-edit generated output",
+		"Verify paths before assuming",
+		"Read files before acting",
+		"Command outputs are evidence",
+	}
+	for _, rule := range expectedRules {
+		if !strings.Contains(repohamrStateTemplate, rule) {
+			t.Errorf("state template missing rule: %s", rule)
+		}
+	}
+}
+
+func TestStateTemplateHasSessionLogDate(t *testing.T) {
+	if !strings.Contains(repohamrStateTemplate, time.Now().Format("2006-01-02")) {
+		t.Errorf("state template should contain today's date, got: %s", repohamrStateTemplate)
+	}
+}
+
+func TestStateTemplateHasBlockersTable(t *testing.T) {
+	if !strings.Contains(repohamrStateTemplate, "| Issue | Status | Evidence |") {
+		t.Errorf("state template missing blockers table header: %s", repohamrStateTemplate)
+	}
+}
+
+func TestStateTemplateHasFunctionLedgerTable(t *testing.T) {
+	if !strings.Contains(repohamrStateTemplate, "| Name | Address | Classification | Confidence | Source |") {
+		t.Errorf("state template missing function ledger table: %s", repohamrStateTemplate)
+	}
+}
+
+func TestStateTemplateTokenBudget(t *testing.T) {
+	// State template should be under ~500 chars to keep token budget low
+	// (~4 chars per token on average, so 500 chars = ~125 tokens)
+	if len(repohamrStateTemplate) > 1500 {
+		t.Errorf("state template too large: %d chars (target <1500)", len(repohamrStateTemplate))
 	}
 }

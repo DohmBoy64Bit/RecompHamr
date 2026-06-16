@@ -136,6 +136,13 @@ Full details, built-in skill table, custom skill setup, and MCP pairing are
 documented in **[docs/skills.md](docs/skills.md)**. For the distinction
 between tools and skills, see **[docs/tools-vs-skills.md](docs/tools-vs-skills.md)**.
 
+## Persistent Memory
+
+recomphamr maintains `.rehamr/REPHAMR_STATE.md` — a project-wide state file
+that survives sessions, restarts, and `/clear`. The LLM sees it in its system
+prompt on every turn and updates it with `edit_file` after major actions.
+Created by `/init-re`. Full details in **[docs/memory.md](docs/memory.md)**.
+
 ## License
 
 [MIT](LICENSE). Fork of [CodeHAMR](https://github.com/codehamr/codehamr).

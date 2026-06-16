@@ -37,6 +37,7 @@ TODO
 ## Toolchain
 TODO
 `,
+		"REPHAMR_STATE.md": repohamrStateTemplate,
 		"EVIDENCE.md": `# Evidence
 
 Add confirmed facts only. Each entry should include the source file, command output, log, symbol, offset, or other evidence.
@@ -115,4 +116,53 @@ func StatusRE(root string) (string, error) {
 	}
 	return b.String(), nil
 }
+
+var repohamrStateTemplate = `# RecompHAMR Project State
+> Auto-maintained by agent. Read automatically at session start.
+
+## Quick Rules
+1. Evidence first — classify, cite, save to .rehamr/evidence/
+2. Never hand-edit generated output as primary fix — fix metadata/config first
+3. Verify paths before assuming; record them below
+4. Read files before acting — never guess file contents
+5. Command outputs are evidence — copy verbatim, don't summarize
+
+## Current Phase
+- **Track**: (reversing | decompilation | static-recomp | analysis | general)
+- **Phase**: PHASE_SETUP
+- **Current goal**:
+
+## Project Info
+- **Project / target**:
+- **Goal**:
+- **Source of truth**:
+- **Toolchain**:
+
+## Workspace Paths
+- **Project root**:
+- **Evidence dir**: .rehamr/evidence/
+- **Repos cache**: .rehamr/repos/
+- **Key reference files**:
+
+## Active Commands
+` + "``" + "`" + `
+# Record verbatim commands that work — do not reconstruct from memory
+` + "``" + "`" + `
+
+## Blockers
+| Issue | Status | Evidence |
+|-------|--------|----------|
+
+## Function / Symbol Ledger
+| Name | Address | Classification | Confidence | Source |
+|------|---------|----------------|------------|--------|
+
+## Learned Patterns
+> Session close: write patterns ("X causes Y, fix with Z"), not raw event logs.
+- 
+
+## Session Log
+| Date | Summary |
+|------|---------|
+| ` + time.Now().Format("2006-01-02") + ` | Initialized by /init-re |`
 

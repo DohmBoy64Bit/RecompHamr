@@ -82,6 +82,99 @@ func TestSystemPromptFitsFixedSystemReservation(t *testing.T) {
 	}
 }
 
+func TestBuildSystemInjectsStateFile(t *testing.T) {
+	dir := t.TempDir()
+	rehamr := filepath.Join(dir, ".rehamr")
+	os.MkdirAll(rehamr, 0o755)
+	os.WriteFile(filepath.Join(rehamr, "REPHAMR_STATE.md"), []byte("# Test State\nPhase: SETUP"), 0o644)
+
+	s := buildSystem(dir, nil)
+	if !strings.Contains(s, "## Persistent Memory") {
+		t.Errorf("buildSystem should inject Persistent Memory section:\n%s", s)
+	}
+	if !strings.Contains(s, "# Test State") {
+		t.Errorf("buildSystem should include state file content:\n%s", s)
+	}
+	if !strings.Contains(s, "Phase: SETUP") {
+		t.Errorf("buildSystem should include state details:\n%s", s)
+	}
+	if !strings.Contains(s, "Working directory") {
+		t.Errorf("buildSystem should still have working directory:\n%s", s)
+	}
+}
+
+func TestBuildSystemNoStateFileWhenMissing(t *testing.T) {
+	dir := t.TempDir()
+
+	s := buildSystem(dir, nil)
+	// The Persistent Memory *prompt section* is always present (explains the
+	// feature to the LLM), but no actual state file content should be injected
+	// when the file doesn't exist.  The prompt section text contains
+	// "You have a project state file" — test that no user-written state
+	// appears by verifying a sentinel isn't there.
+	if strings.Contains(s, "# RecompHAMR Project State") || strings.Contains(s, "## Quick Rules") {
+		t.Errorf("buildSystem should NOT inject state content when file missing:\n%s", s)
+	}
+}
+
+func TestBuildSystemStateAfterWorkingDir(t *testing.T) {
+	dir := t.TempDir()
+	rehamr := filepath.Join(dir, ".rehamr")
+	os.MkdirAll(rehamr, 0o755)
+	os.WriteFile(filepath.Join(rehamr, "REPHAMR_STATE.md"), []byte("state"), 0o644)
+
+	s := buildSystem(dir, nil)
+	wdIdx := strings.Index(s, "Working directory")
+	stateIdx := strings.Index(s, "Persistent Memory")
+	if wdIdx < 0 || stateIdx < 0 {
+		t.Fatal("missing expected sections")
+	}
+	if stateIdx < wdIdx {
+		t.Errorf("Persistent Memory should come AFTER working directory:\n%s", s)
+	}
+}
+
+func TestBuildSystemStateBeforeSkills(t *testing.T) {
+	dir := t.TempDir()
+	rehamr := filepath.Join(dir, ".rehamr")
+	os.MkdirAll(rehamr, 0o755)
+	os.WriteFile(filepath.Join(rehamr, "REPHAMR_STATE.md"), []byte("state"), 0o644)
+
+	s := buildSystem(dir, []string{"core-re"})
+	stateIdx := strings.Index(s, "Persistent Memory")
+	skillsIdx := strings.Index(s, "Active RE Skills")
+	if stateIdx < 0 || skillsIdx < 0 {
+		t.Fatal("missing expected sections")
+	}
+	if skillsIdx < stateIdx {
+		t.Errorf("Active RE Skills should come AFTER Persistent Memory:\n%s", s)
+	}
+}
+
+func TestRebuildSystemPicksUpStateFile(t *testing.T) {
+	cfg, _, _ := config.Bootstrap(t.TempDir())
+	m := New(cfg, llm.New("http://x", cfg.ActiveProfile().LLM, ""), t.TempDir(), "test", nil)
+
+	s1 := m.system
+
+	rehamr := filepath.Join(m.ProjectDir, ".rehamr")
+	os.MkdirAll(rehamr, 0o755)
+	os.WriteFile(filepath.Join(rehamr, "REPHAMR_STATE.md"), []byte("# Fresh state\nPhase: TEST"), 0o644)
+
+	m.system = m.rebuildSystem()
+	s2 := m.system
+
+	if strings.Contains(s1, "# Fresh state") {
+		t.Errorf("initial buildSystem should not inject state content (no file yet):\n%s", s1)
+	}
+	if !strings.Contains(s2, "# Fresh state") {
+		t.Errorf("rebuildSystem should pick up state file after it's written:\n%s", s2)
+	}
+	if !strings.Contains(s2, "Phase: TEST") {
+		t.Errorf("rebuildSystem should include state details:\n%s", s2)
+	}
+}
+
 // TestCtrlDEmptyQuits: Ctrl+D on empty textarea returns a Quit command.
 func TestCtrlDEmptyQuits(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})

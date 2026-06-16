@@ -1243,10 +1243,20 @@ func (m Model) cursorOnFirstLine() bool { return m.ta.Line() == 0 }
 func (m Model) cursorOnLastLine() bool  { return m.ta.Line() == m.ta.LineCount()-1 }
 
 // buildSystem appends the working-directory anchor to the embedded system
-// prompt so "hier" / "here" resolves to a concrete path. If activeSkills is
-// non-empty, the skill bodies are appended after the anchor.
+// prompt so "hier" / "here" resolves to a concrete path. Project-wide
+// persistent memory (REPHAMR_STATE.md) is injected between the anchor and any
+// active skills, so the LLM always has context about phase, paths, and
+// blockers — even after /clear or session restart.
 func buildSystem(projectDir string, activeSkills []string) string {
 	s := config.DefaultSystemPrompt + "\n\nWorking directory: " + projectDir
+
+	statePath := filepath.Join(projectDir, ".rehamr", "REPHAMR_STATE.md")
+	if state, err := os.ReadFile(statePath); err == nil && len(state) > 0 {
+		s += "\n\n## Persistent Memory\n"
+		s += "(Your project state file. Read it every session. Update it with edit_file after major actions. Keep it lean — 1500 tokens max.)\n\n"
+		s += string(state)
+	}
+
 	if len(activeSkills) > 0 {
 		s += "\n\n## Active RE Skills\n"
 		for _, name := range activeSkills {
