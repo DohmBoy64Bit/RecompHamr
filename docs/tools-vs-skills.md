@@ -24,7 +24,7 @@ the LLM reads them as instructions, not as callable functions. Skills don't
 appear in the tools array.
 
 **Built-in skills** (see [docs/skills.md](skills.md) for per-skill details):
-`cdb-debug`, `core-re`, `evidence-mode`, `build-fix-loop`, `file-format-reversing`, `function-discovery`, `ghidra-mcp`, `n64-debug-mcp`, `mcp-pine`, `objdiff`, `pcsx2`, `bizhawk`, `sega2asm`, `n64-decomp`, `gen-decomp`, `gc-decomp`, `pcrecomp`, `windows-game-decomp`, `xbox360-decomp`, `xboxrecomp`, `gb-recomp`, `ps2recomp`, `ps3recomp`, `snesrecomp`, `project-handoff`, `vb-decomp`, `recomp-foundations`
+`cdb-debug`, `core-re`, `evidence-mode`, `build-fix-loop`, `file-format-reversing`, `function-discovery`, `ghidra-mcp`, `imhex`, `n64-debug-mcp`, `mcp-pine`, `objdiff`, `pcsx2`, `bizhawk`, `sega2asm`, `n64-decomp`, `gen-decomp`, `gc-decomp`, `pcrecomp`, `windows-game-decomp`, `xbox360-decomp`, `xboxrecomp`, `gb-recomp`, `ps2recomp`, `ps3recomp`, `snesrecomp`, `project-handoff`, `vb-decomp`, `recomp-foundations`
 
 ## The overlap: MCP skills
 
