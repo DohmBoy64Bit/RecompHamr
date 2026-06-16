@@ -10,20 +10,11 @@ request — the LLM sees each tool's name, description, and parameter schema,
 then chooses which to invoke by name. The result returns to the conversation
 as a `tool` message.
 
-**Built-in tools** (always available):
-| Tool | What it does |
-|---|---|
-| `bash` | Run shell commands with a configurable timeout |
-| `read_file` | Read a file from disk |
-| `write_file` | Write a file to disk |
-| `edit_file` | Perform exact string replacements in a file |
-| `repomixr` | Clone a GitHub repo and pack all source files into XML |
+**Built-in tools** (see [README.md](../README.md#built-in-tools)):
+`bash`, `read_file`, `write_file`, `edit_file`, `repomixr`
 
 **MCP tools** (available when connected + skill loaded):
-| Server | Example tool |
-|---|---|
-| `ghidra` | `ghidra.decompile_function`, `ghidra.get_xrefs_to` |
-| `n64-debug-mcp` | `n64-debug-mcp.n64_read_memory`, `n64-debug-mcp.n64_set_breakpoint` |
+`ghidra.*`, `n64-debug-mcp.*`
 
 ## Skills: what the LLM *knows*
 
@@ -32,17 +23,8 @@ Markdown text appended under `## Active RE Skills` in the system message —
 the LLM reads them as instructions, not as callable functions. Skills don't
 appear in the tools array.
 
-**Built-in skills:**
-| Skill | What it teaches |
-|---|---|
-| `core-re` | General RE workflow — navigate, trace, rename, repeat |
-| `evidence-mode` | Evidence-first methodology — classify, cite, save |
-| `build-fix-loop` | Iterate on build failures — compile, read error, fix |
-| `file-format-reversing` | Binary format analysis — magic bytes, structs, offsets |
-| `function-discovery` | Find and classify functions — entry points, tool patterns |
-| `ghidra-mcp` | Ghidra MCP integration — exports, decompiler output, evidence |
-| `n64-debug-mcp` | N64 runtime debugging — breakpoints, traces, frame capture |
-| `project-handoff` | Generate project docs — state summary, ledger, next steps |
+**Built-in skills** (see [docs/skills.md](skills.md)):
+`core-re`, `evidence-mode`, `build-fix-loop`, `file-format-reversing`, `function-discovery`, `ghidra-mcp`, `n64-debug-mcp`, `project-handoff`
 
 ## The overlap: MCP skills
 

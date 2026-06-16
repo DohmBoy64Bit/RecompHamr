@@ -86,7 +86,8 @@ Five tools are always available to the LLM:
 | `repomixr` | Clone + pack a GitHub repo into a single XML file for analysis |
 
 Output from `repomixr` lands in `.rehamr/repos/<owner>-<repo>/` — use
-`read_file` to ingest the packed XML.
+`read_file` to ingest the packed XML. Drop a `.rehamr/repomix-instruction.md`
+file to inject a custom prompt into every packed repository.
 
 ## Compare
 
@@ -101,8 +102,7 @@ Output from `repomixr` lands in `.rehamr/repos/<owner>-<repo>/` — use
 ## MCP Servers
 
 recomphamr connects to MCP (Model Context Protocol) servers over stdio via
-JSON-RPC 2.0, exposing their tools to the LLM alongside the built-in tools
-(`bash`, `read_file`, `write_file`, `edit_file`, `repomixr`).
+JSON-RPC 2.0, exposing their tools to the LLM.
 
 Two servers ship with built-in configs: `ghidra` (20 tools by default) and
 `n64-debug-mcp` (all tools). MCP tools are skill-gated to keep the token budget

@@ -1,8 +1,7 @@
 # MCP Servers
 
 recomphamr connects to MCP (Model Context Protocol) servers over stdio via
-JSON-RPC 2.0, exposing their tools to the LLM alongside the four built-in
-tools (`bash`, `read_file`, `write_file`, `edit_file`).
+JSON-RPC 2.0, exposing their tools to the LLM alongside the built-in tools.
 
 ## Architecture
 
@@ -51,10 +50,10 @@ MCP tools are NOT always sent to the LLM. Two per-server gates decide:
 
 | Active skills | Tools sent to LLM |
 |---|---|
-| (none) | 4 (bash, read, write, edit) |
-| `/skill ghidra-mcp` | 4 + 20 ghidra tools |
-| `/skill n64-debug-mcp` | 4 + all n64 tools |
-| both skills | 4 + 20 + all n64 tools |
+| (none) | Built-in tools only |
+| `/skill ghidra-mcp` | Built-in + 20 ghidra tools |
+| `/skill n64-debug-mcp` | Built-in + all n64 tools |
+| both skills | Built-in + 20 ghidra + all n64 tools |
 
 No MCP skills loaded = zero MCP tools = same token cost as upstream CodeHAMR.
 
@@ -104,16 +103,6 @@ mcp.Register(mcp.ServerConfig{
 })
 ```
 
-For skill-gated servers, set `RequireSkill: true` and name the skill `.md`
-file after the server:
-
-```go
-mcp.Register(mcp.ServerConfig{
-    Name:         "my-mcp",
-    Command:      "my-mcp-server",
-    RequireSkill: true,  // only activated via /skill my-mcp
-})
-```
-
-Then drop `.rehamr/skills/my-mcp.md` with your methodology. Loading
-`/skill my-mcp` injects both the skill text and the `my-mcp.*` tools.
+For skill-gated servers, set `RequireSkill: true` — see
+**[docs/skills.md](skills.md)** for how to pair a custom skill with a custom
+MCP server.

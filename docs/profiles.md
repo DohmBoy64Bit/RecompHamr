@@ -80,22 +80,6 @@ The switch rebuilds the LLM client in-place. No restart needed.
 
 ## Adding profiles
 
-Edit `.rehamr/config.yaml` directly. Example:
-
-```yaml
-active: lmstudio-amd
-models:
-    lmstudio-amd:
-        llm: qwen/qwen3.6-35b-a3b
-        url: http://localhost:1234
-        key: ""
-        context_size: 32768
-    openai:
-        llm: gpt-4.1
-        url: https://api.openai.com
-        key: sk-...
-        context_size: 200000
-```
-
-Any OpenAI-compatible endpoint works — cloud, self-hosted, or local. The
-`key` field is optional for local backends.
+Edit `.rehamr/config.yaml` directly — any OpenAI-compatible endpoint works
+(cloud, self-hosted, or local). The `key` field is optional for local
+backends. See the **[Config section](../README.md#config)** for an example.
