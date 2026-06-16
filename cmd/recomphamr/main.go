@@ -15,6 +15,7 @@ import (
 	"github.com/DohmBoy64Bit/recomphamr/internal/config"
 	"github.com/DohmBoy64Bit/recomphamr/internal/llm"
 	"github.com/DohmBoy64Bit/recomphamr/internal/mcp"
+	"github.com/DohmBoy64Bit/recomphamr/internal/skills"
 	"github.com/DohmBoy64Bit/recomphamr/internal/tui"
 	"github.com/DohmBoy64Bit/recomphamr/internal/update"
 )
@@ -60,6 +61,9 @@ func main() {
 		log.Fatalf("recomphamr: %v", err)
 	}
 	applyEnvOverrides(cfg)
+
+	// Allow project-local custom skills in .rehamr/skills/.
+	skills.SetCustomDir(filepath.Join(cfg.Dir, "skills"))
 
 	// Opt-in debug log (`logging: true`): truncates .rehamr/log.txt and
 	// records every chat exchange. See tui.OpenDebugLog / dbgWrite.

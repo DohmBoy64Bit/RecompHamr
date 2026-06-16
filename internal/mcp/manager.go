@@ -228,14 +228,18 @@ func (m *Manager) AllTools() []ToolDef {
 }
 
 func (m *Manager) ToolsForSkills(activeSkills []string) []ToolDef {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	allowed := map[string]bool{}
 	for _, s := range activeSkills {
 		if server, ok := SkillServers[s]; ok {
 			allowed[server] = true
 		}
+		if _, ok := m.servers[s]; ok {
+			allowed[s] = true
+		}
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	var out []ToolDef
 	for _, entry := range m.servers {
 		if entry.state != StateConnected || entry.client == nil {
