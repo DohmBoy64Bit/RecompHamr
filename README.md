@@ -9,10 +9,11 @@ LLMs, also runs on OpenAI-compatible endpoints.
 ## RE-first, local-first
 
 recomphamr extends upstream CodeHAMR with RE-specific tooling: embedded skills
-for reversing workflows, MCP servers for Ghidra and N64 debugging, project
-handoff docs, and a system prompt tuned for unfamiliar codebases. Ghidra
-extensions (MCP bridge, XEX loader, N64 loader) are available pre-built at
-**[REPlugins](https://github.com/DohmBoy64Bit/REPlugins)** for Ghidra 12.1.2.
+for reversing workflows, MCP servers for Ghidra, N64 debugging, and PC
+recompilation, project handoff docs, and a system prompt tuned for unfamiliar
+codebases. Ghidra extensions (MCP bridge, XEX loader, N64 loader) are
+available pre-built at **[REPlugins](https://github.com/DohmBoy64Bit/REPlugins)**
+for Ghidra 12.1.2.
 
 **Slash commands:** `/help`, `/clear`, `/models`, `/rehampass`, `/skills`,
 `/skill`, `/init-re`, `/status-re`, `/doctor`, `/mcp`. Skills and MCP tools
@@ -81,12 +82,12 @@ project needs; it cannot install them itself. If a check can't run, it reports
 
 Five tools are always available to the LLM:
 
-| Tool | Purpose |
-|---|---|
-| `bash` | Run shell commands |
-| `read_file` | Read a file from disk |
-| `write_file` | Write a file to disk |
-| `edit_file` | Surgical string replacements |
+| Tool | Purpose | |
+|---|---|---|---|
+| `bash` | Run shell commands | |
+| `read_file` | Read a file from disk | |
+| `write_file` | Write a file to disk | |
+| `edit_file` | Surgical string replacements | |
 | `repomixr` | Clone + pack a GitHub repo into a single XML file for analysis | [doc](docs/tool-repomixr.md) |
 
 Output from `repomixr` lands in `.rehamr/repos/<owner>-<repo>/` — use
@@ -115,7 +116,7 @@ reachability, and workspace state. Full output reference in
 recomphamr connects to MCP (Model Context Protocol) servers over stdio via
 JSON-RPC 2.0, exposing their tools to the LLM.
 
-Two servers ship with built-in configs: `ghidra` (20 tools by default),
+Three servers ship with built-in configs: `ghidra` (20 tools by default),
 `n64-debug-mcp` (all tools), and `pcrecomp` (8 PC recompilation tools).
 MCP tools are skill-gated to keep the token budget lean — zero MCP tools are
 sent unless a matching skill is loaded.
