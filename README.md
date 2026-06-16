@@ -125,7 +125,9 @@ Eight servers ship with built-in configs: `ghidra` (20 tools by default),
 `pcsx2` (PCSX2 debug bridge), `bizhawk` (multi-system emulator debug),
 and `sega2asm` (Genesis ROM disassembler).
 MCP tools are skill-gated to keep the token budget lean — zero MCP tools are
-sent unless a matching skill is loaded.
+sent unless a matching skill is loaded. Servers are registered on startup but
+not auto-connected by default; use `/mcp connect <name>` or set
+`RECOMPHAMR_MCP_AUTOSTART=1` to auto-connect.
 
 ```
 /mcp                         show server status + tool counts

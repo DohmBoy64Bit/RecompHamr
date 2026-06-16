@@ -63,7 +63,7 @@ out of version-controlled config files.
 
 | Var | Purpose |
 |---|---|
-| `RECOMPHAMR_MCP_AUTOSTART` | Set to `0` to skip auto-connect on startup |
+| `RECOMPHAMR_MCP_AUTOSTART` | Set to `1` to enable auto-connect on startup |
 | `RECOMPHAMR_MCP_GHIDRA_COMMAND` | Override ghidra MCP server command/path |
 | `RECOMPHAMR_MCP_GHIDRA_TOOLS` | Ghidra tool list or `*` for all |
 | `RECOMPHAMR_MCP_N64_COMMAND` | Override n64-debug-mcp server command/path |

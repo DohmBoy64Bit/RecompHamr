@@ -20,8 +20,9 @@ Model (TUI)
 ## Connection lifecycle
 
 1. **Startup** — `BuiltinServers()` reads env vars for command paths and
-   registers all servers. `ConnectAll()` runs in a background goroutine so
-   the TUI isn't blocked. Set `RECOMPHAMR_MCP_AUTOSTART=0` to skip.
+   registers all servers. Set `RECOMPHAMR_MCP_AUTOSTART=1` to enable
+   `ConnectAll()` on startup. By default, servers are registered but not
+   auto-connected — use `/mcp connect <name>` to connect manually.
 
 2. **Connect** — launches the server as a child process, speaks JSON-RPC 2.0
    over stdin/stdout. Handshake: `initialize` → `notifications/initialized` →
