@@ -23,7 +23,7 @@ Markdown text appended under `## Active RE Skills` in the system message —
 the LLM reads them as instructions, not as callable functions. Skills don't
 appear in the tools array.
 
-**Built-in skills** (see [docs/skills.md](skills.md)):
+**Built-in skills** (see [docs/skills.md](skills.md) for per-skill details):
 `core-re`, `evidence-mode`, `build-fix-loop`, `file-format-reversing`, `function-discovery`, `ghidra-mcp`, `n64-debug-mcp`, `pcrecomp`, `project-handoff`
 
 ## The overlap: MCP skills

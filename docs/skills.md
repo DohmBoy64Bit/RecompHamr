@@ -21,17 +21,17 @@ injecting `ghidra.*` tools.
 
 Nine skills are compiled into the binary:
 
-| `/skill <name>` | Purpose |
-|---|---|
-| `core-re` | General RE workflow |
-| `evidence-mode` | Evidence-first methodology |
-| `build-fix-loop` | Iterate on build failures |
-| `file-format-reversing` | Binary format analysis |
-| `function-discovery` | Find and classify functions |
-| `ghidra-mcp` | Ghidra MCP integration (gates `ghidra.*` tools) |
-| `n64-debug-mcp` | N64 runtime debugging via Mupen64Plus MCP (gates `n64-debug-mcp.*` tools) |
-| `pcrecomp` | PC static recompilation pipeline (gates `pcrecomp.*` tools) |
-| `project-handoff` | Generate project docs for handoff |
+| `/skill <name>` | Purpose | Details |
+|---|---|---|
+| `core-re` | General RE workflow | [doc](skill-core-re.md) |
+| `evidence-mode` | Evidence-first methodology | [doc](skill-evidence-mode.md) |
+| `build-fix-loop` | Iterate on build failures | [doc](skill-build-fix-loop.md) |
+| `file-format-reversing` | Binary format analysis | [doc](skill-file-format-reversing.md) |
+| `function-discovery` | Find and classify functions | [doc](skill-function-discovery.md) |
+| `ghidra-mcp` | Ghidra integration (gates `ghidra.*`) | [doc](skill-ghidra-mcp.md) |
+| `n64-debug-mcp` | N64 runtime debugging (gates `n64-debug-mcp.*`) | [doc](skill-n64-debug-mcp.md) |
+| `pcrecomp` | PC recomp pipeline (gates `pcrecomp.*`) | [doc](skill-pcrecomp.md) |
+| `project-handoff` | Generate project docs | [doc](skill-project-handoff.md) |
 
 List them with `/skills`; active skills are marked `*`.
 
