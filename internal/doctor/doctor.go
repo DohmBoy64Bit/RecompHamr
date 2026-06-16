@@ -57,6 +57,7 @@ func Run(projectDir string, cfg config.Config, cfgPath string) string {
 	for _, ev := range []string{
 		"RECOMPHAMR_MCP_GHIDRA_COMMAND", "RECOMPHAMR_MCP_N64_COMMAND",
 		"RECOMPHAMR_MCP_PCRECOMP_COMMAND", "RECOMPHAMR_MCP_PINE_COMMAND",
+		"RECOMPHAMR_MCP_GHIDRA_TOOLS", "RECOMPHAMR_MCP_PCRECOMP_TOOLS",
 		"RECOMPHAMR_MCP_AUTOSTART",
 	} {
 		if v := os.Getenv(ev); v != "" {
