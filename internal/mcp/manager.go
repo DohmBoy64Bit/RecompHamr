@@ -38,9 +38,10 @@ func (s ServerState) String() string {
 }
 
 type ServerConfig struct {
-	Name    string
-	Command string
-	Args    []string
+	Name         string
+	Command      string
+	Args         []string
+	AllowedTools []string // nil or empty = allow all
 }
 
 type ServerStatus struct {
@@ -57,10 +58,11 @@ type Manager struct {
 }
 
 type serverEntry struct {
-	config ServerConfig
-	client *Client
-	state  ServerState
-	err    string
+	config       ServerConfig
+	client       *Client
+	state        ServerState
+	err          string
+	allowedTools map[string]bool // nil = allow all
 }
 
 func NewManager() *Manager {
@@ -73,10 +75,17 @@ func (m *Manager) Register(config ServerConfig) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.servers[config.Name]; !ok {
-		m.servers[config.Name] = &serverEntry{
+		entry := &serverEntry{
 			config: config,
 			state:  StateDisconnected,
 		}
+		if len(config.AllowedTools) > 0 {
+			entry.allowedTools = make(map[string]bool, len(config.AllowedTools))
+			for _, t := range config.AllowedTools {
+				entry.allowedTools[t] = true
+			}
+		}
+		m.servers[config.Name] = entry
 	}
 }
 
@@ -161,7 +170,7 @@ func (m *Manager) Status(name string) ServerStatus {
 	toolCount := 0
 	version := ""
 	if entry.client != nil && entry.state == StateConnected {
-		toolCount = len(entry.client.Tools())
+		toolCount = m.toolCount(entry)
 		if entry.client.serverInfo.Name != "" {
 			version = entry.client.serverInfo.Version
 		}
@@ -200,9 +209,13 @@ func (m *Manager) AllTools() []ToolDef {
 		if entry.state != StateConnected || entry.client == nil {
 			continue
 		}
+		prefix := entry.config.Name + "."
 		for _, t := range entry.client.Tools() {
+			if !entry.toolAllowed(t.Name) {
+				continue
+			}
 			all = append(all, ToolDef{
-				Name:        entry.config.Name + "." + t.Name,
+				Name:        prefix + t.Name,
 				Description: t.Description,
 				InputSchema: t.InputSchema,
 			})
@@ -228,15 +241,39 @@ func (m *Manager) ToolsForSkills(activeSkills []string) []ToolDef {
 		if !allowed[entry.config.Name] || entry.state != StateConnected || entry.client == nil {
 			continue
 		}
+		prefix := entry.config.Name + "."
 		for _, t := range entry.client.Tools() {
+			if !entry.toolAllowed(t.Name) {
+				continue
+			}
 			out = append(out, ToolDef{
-				Name:        entry.config.Name + "." + t.Name,
+				Name:        prefix + t.Name,
 				Description: t.Description,
 				InputSchema: t.InputSchema,
 			})
 		}
 	}
 	return out
+}
+
+func (e *serverEntry) toolAllowed(name string) bool {
+	if e.allowedTools == nil {
+		return true
+	}
+	return e.allowedTools[name]
+}
+
+func (m *Manager) toolCount(entry *serverEntry) int {
+	if entry.client == nil {
+		return 0
+	}
+	n := 0
+	for _, t := range entry.client.Tools() {
+		if entry.toolAllowed(t.Name) {
+			n++
+		}
+	}
+	return n
 }
 
 func (m *Manager) ConnectedNames() []string {
@@ -273,6 +310,84 @@ func (m *Manager) CallTool(ctx context.Context, fullName string, args map[string
 	m.mu.Unlock()
 
 	return client.CallTool(ctx, toolName, args)
+}
+
+func (m *Manager) SetToolEnabled(serverName, toolName string, enabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entry, ok := m.servers[serverName]
+	if !ok {
+		return fmt.Errorf("mcp: unknown server %q", serverName)
+	}
+	if enabled {
+		if entry.allowedTools == nil {
+			entry.allowedTools = make(map[string]bool)
+		}
+		entry.allowedTools[toolName] = true
+	} else {
+		if entry.allowedTools == nil {
+			entry.allowedTools = make(map[string]bool)
+			if entry.client != nil {
+				for _, t := range entry.client.Tools() {
+					entry.allowedTools[t.Name] = true
+				}
+			}
+		}
+		delete(entry.allowedTools, toolName)
+	}
+	return nil
+}
+
+func (m *Manager) SetAllToolsEnabled(serverName string, enabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entry, ok := m.servers[serverName]
+	if !ok {
+		return fmt.Errorf("mcp: unknown server %q", serverName)
+	}
+	if enabled {
+		entry.allowedTools = nil
+	} else {
+		entry.allowedTools = map[string]bool{}
+	}
+	return nil
+}
+
+func (m *Manager) FormatTools(serverName string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "MCP tools for %s:\n", serverName)
+
+	m.mu.Lock()
+	entry, ok := m.servers[serverName]
+	if !ok {
+		m.mu.Unlock()
+		return fmt.Sprintf("unknown server %q", serverName)
+	}
+	client := entry.client
+	allowed := entry.allowedTools
+	m.mu.Unlock()
+
+	if client == nil {
+		return fmt.Sprintf("server %q is not connected", serverName)
+	}
+
+	for _, t := range client.Tools() {
+		mark := "  "
+		if allowed == nil || allowed[t.Name] {
+			mark = " *"
+		}
+		fmt.Fprintf(&b, "%s %s - %s\n", mark, t.Name, firstSentence(t.Description))
+	}
+	return b.String()
+}
+
+func firstSentence(s string) string {
+	for i := 0; i < len(s); i++ {
+		if s[i] == '.' && (i+1 >= len(s) || s[i+1] == ' ') {
+			return s[:i+1]
+		}
+	}
+	return s
 }
 
 func (m *Manager) FormatStatus() string {

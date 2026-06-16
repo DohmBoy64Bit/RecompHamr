@@ -116,7 +116,7 @@ var commands = []command{
 	},
 	{
 		name:        "/mcp",
-		description: "show MCP server status, connect or disconnect",
+		description: "show or manage MCP servers and tools",
 		handler:     (Model).cmdMcp,
 	},
 	{
@@ -460,23 +460,77 @@ func (m Model) cmdMcp(args []string) (tea.Model, tea.Cmd) {
 	if len(args) == 0 {
 		m.appendLine(m.mcpManager.FormatStatus())
 		m.appendLine("")
-		m.appendLine(styleDim.Render("/mcp connect <name> · /mcp disconnect <name>"))
+		m.appendLine(styleDim.Render("/mcp connect|disconnect|tools|enable|disable <server> [tool]"))
 		return m, nil
 	}
-	if args[0] == "connect" && len(args) >= 2 {
+	switch args[0] {
+	case "connect":
+		if len(args) < 2 {
+			m.appendLine(styleWarn.Render("usage: /mcp connect <name>"))
+			return m, nil
+		}
 		m.appendLine(fmt.Sprintf("mcp: connecting to %s...", args[1]))
 		return m, func() tea.Msg {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			return mcpConnectMsg{name: args[1], err: m.mcpManager.Connect(ctx, args[1])}
 		}
-	}
-	if args[0] == "disconnect" && len(args) >= 2 {
+	case "disconnect":
+		if len(args) < 2 {
+			m.appendLine(styleWarn.Render("usage: /mcp disconnect <name>"))
+			return m, nil
+		}
 		m.mcpManager.Disconnect(args[1])
 		m.appendLine(fmt.Sprintf("mcp %s: disconnected", args[1]))
-		return m, nil
+	case "tools":
+		if len(args) < 2 {
+			m.appendLine(styleWarn.Render("usage: /mcp tools <server>"))
+			return m, nil
+		}
+		m.appendLine(m.mcpManager.FormatTools(args[1]))
+	case "enable":
+		if len(args) < 2 {
+			m.appendLine(styleWarn.Render("usage: /mcp enable <server> <tool | *>"))
+			return m, nil
+		}
+		if len(args) >= 3 && args[2] == "*" {
+			if err := m.mcpManager.SetAllToolsEnabled(args[1], true); err != nil {
+				m.appendLine(styleError.Render(err.Error()))
+			} else {
+				m.appendLine(styleOK.Render(fmt.Sprintf("mcp %s: all tools enabled", args[1])))
+			}
+		} else if len(args) >= 3 {
+			if err := m.mcpManager.SetToolEnabled(args[1], args[2], true); err != nil {
+				m.appendLine(styleError.Render(err.Error()))
+			} else {
+				m.appendLine(styleOK.Render(fmt.Sprintf("mcp %s: enabled %s", args[1], args[2])))
+			}
+		} else {
+			m.appendLine(styleWarn.Render("usage: /mcp enable <server> <tool | *>"))
+		}
+	case "disable":
+		if len(args) < 2 {
+			m.appendLine(styleWarn.Render("usage: /mcp disable <server> <tool | *>"))
+			return m, nil
+		}
+		if len(args) >= 3 && args[2] == "*" {
+			if err := m.mcpManager.SetAllToolsEnabled(args[1], false); err != nil {
+				m.appendLine(styleError.Render(err.Error()))
+			} else {
+				m.appendLine(styleOK.Render(fmt.Sprintf("mcp %s: all tools disabled", args[1])))
+			}
+		} else if len(args) >= 3 {
+			if err := m.mcpManager.SetToolEnabled(args[1], args[2], false); err != nil {
+				m.appendLine(styleError.Render(err.Error()))
+			} else {
+				m.appendLine(styleOK.Render(fmt.Sprintf("mcp %s: disabled %s", args[1], args[2])))
+			}
+		} else {
+			m.appendLine(styleWarn.Render("usage: /mcp disable <server> <tool | *>"))
+		}
+	default:
+		m.appendLine(styleWarn.Render("usage: /mcp [connect|disconnect|tools|enable|disable] <server> [tool]"))
 	}
-	m.appendLine(styleWarn.Render("usage: /mcp [connect|disconnect] <name>"))
 	return m, nil
 }
 
@@ -493,7 +547,7 @@ func (m Model) cmdHelp(_ []string) (tea.Model, tea.Cmd) {
 		{"/init-re", "create .rehamr/ evidence workspace"},
 		{"/status-re", "summarize RE project state"},
 		{"/doctor", "run environment diagnostics"},
-		{"/mcp", "show MCP server status"},
+		{"/mcp", "show or manage MCP servers and tools"},
 		{"/help", "show this help"},
 	} {
 		m.appendLine(fmt.Sprintf("  %-14s %s", c.name, c.desc))

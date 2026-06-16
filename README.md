@@ -99,13 +99,20 @@ MCP tools are **scoped to active skills** — `ghidra.*` tools only inject when
 `/skill n64-debug-mcp`. Without active MCP skills, zero extra tools are sent
 to the LLM, keeping context lean.
 
+**Tool filtering:** ghidra ships with only the top 20 most-used tools enabled
+by default. Set `RECOMPHAMR_MCP_GHIDRA_TOOLS=*` to enable all, or specify a
+comma-separated list. n64-debug-mcp tools are all enabled by default.
+
 ```
 /mcp                         show server status
 /mcp connect <name>          connect to a server
 /mcp disconnect <name>       disconnect from a server
+/mcp tools <server>          list tools (* = enabled)
+/mcp enable <server> <t|*>   enable one tool or all
+/mcp disable <server> <t|*>  disable one tool or all
 ```
 
-Server status appears on the startup splash — `* Connected (45 tools)` or
+Server status appears on the startup splash — `* Connected (20 tools)` or
 `  Disconnected`.
 
 ## Skills
