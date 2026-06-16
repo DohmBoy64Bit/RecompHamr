@@ -12,7 +12,7 @@ calls, without restarting. Active skills, conversation history, and MCP
 connections survive the switch.
 
 All built-in profiles set `context_size: 32768` (32k tokens) — enough for the
-system prompt, nineteen loaded skills, conversation history, and tool results
+system prompt, twenty loaded skills, conversation history, and tool results
 before packing kicks in. Raise it for larger models or longer sessions.
 
 ## Built-in profiles
