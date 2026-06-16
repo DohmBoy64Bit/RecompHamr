@@ -12,6 +12,53 @@ when a matching skill is loaded.
 
 Full architecture details in **[mcp.md](mcp.md)**.
 
+## How to configure a server
+
+MCP servers are launched as child processes. Two ways to tell recomphamr where
+the binary is:
+
+1. **Put it on PATH** — the binary name (e.g. `ghidra-mcp`) must be
+   findable by your OS when recomphamr starts.
+2. **Set the env var** — point to the full path when the binary isn't on
+   PATH or you want to override the default name.
+
+**Verify with `/doctor`** — it shows every MCP env var and whether it's set.
+Run it after configuring to confirm your settings.
+
+### Setting env vars
+
+**Windows (PowerShell — per-session):**
+```
+$env:RECOMPHAMR_MCP_GHIDRA_COMMAND = "C:\Tools\ghidra-mcp.exe"
+```
+
+**Windows (persistent — survives terminal restarts):**
+```
+[System.Environment]::SetEnvironmentVariable("RECOMPHAMR_MCP_GHIDRA_COMMAND", "C:\Tools\ghidra-mcp.exe", "User")
+```
+Then restart your terminal for the change to take effect.
+
+**Linux / macOS (per-session):**
+```bash
+export RECOMPHAMR_MCP_GHIDRA_COMMAND=/opt/ghidra-mcp/bridge.py
+```
+
+**Linux / macOS (persistent — add to `~/.bashrc` or `~/.zshrc`):**
+```bash
+echo 'export RECOMPHAMR_MCP_GHIDRA_COMMAND=/opt/ghidra-mcp/bridge.py' >> ~/.bashrc
+```
+
+### Why PATH first?
+
+If a server binary is on PATH (e.g. installed via `pip install ghidra-mcp`,
+`npm install -g mcp-bizhawk`, or `go install`), recomphamr finds it
+automatically — no env var needed. Env vars exist as overrides for custom
+install locations or renamed binaries.
+
+Note: MCP server paths are **never** stored in `.rehamr/config.yaml`. They
+are strictly environment variables — this keeps credentials and local paths
+out of version-controlled config files.
+
 ## Env vars
 
 | Var | Purpose |

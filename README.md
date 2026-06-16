@@ -135,8 +135,9 @@ sent unless a matching skill is loaded.
 ```
 
 Full architecture, two-gate filtering, custom servers, and tool execution flow
-are documented in **[docs/mcp.md](docs/mcp.md)**. For server dependencies and
-setup, see **[docs/mcp-setup.md](docs/mcp-setup.md)**.
+are documented in **[docs/mcp.md](docs/mcp.md)**. For server dependencies,
+setup instructions, and env var configuration, see
+**[docs/mcp-setup.md](docs/mcp-setup.md)** and **[docs/mcp-common.md](docs/mcp-common.md)**.
 
 ## Skills
 
