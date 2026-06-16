@@ -4,7 +4,7 @@ A terminal coding agent forked from [CodeHAMR](https://github.com/codehamr/codeh
 specialized for reverse-engineering and native-code projects. Built for local
 LLMs, also runs on OpenAI-compatible endpoints.
 
-![recomphamr demo](recomphamr.gif)
+<img src="recomphamr.gif" width="640" alt="RecompHAMR demo">
 
 ## RE-first, local-first
 
