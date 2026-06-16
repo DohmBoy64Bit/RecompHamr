@@ -25,9 +25,10 @@ All configured profiles with model and URL. The active profile is marked `*`.
 `make`, `ghidraRun`, `java`. Reports path if found, `missing` if not.
 
 ### MCP servers
-- `which ghidra-mcp` and `which n64-debug-mcp`
+- `which ghidra-mcp`, `which n64-debug-mcp`, `which pcrecomp-mcp`
 - All MCP env vars: `RECOMPHAMR_MCP_GHIDRA_COMMAND`,
-  `RECOMPHAMR_MCP_N64_COMMAND`, `RECOMPHAMR_MCP_GHIDRA_TOOLS`,
+  `RECOMPHAMR_MCP_N64_COMMAND`, `RECOMPHAMR_MCP_PCRECOMP_COMMAND`,
+  `RECOMPHAMR_MCP_GHIDRA_TOOLS`, `RECOMPHAMR_MCP_PCRECOMP_TOOLS`,
   `RECOMPHAMR_MCP_AUTOSTART`
 
 ### Endpoint check
@@ -41,3 +42,7 @@ Each workspace file shows `present (size)` or `missing`:
 
 Also reports custom skill count (`.rehamr/skills/`) and cached repo count
 (`.rehamr/repos/`).
+
+### PCRECOMP-Next
+- `RECOMPHAMR_PCRECOMP_PATH` — path to PCRECOMP-Next clone (or unset)
+- `which python` — Python availability for PCRECOMP scripts

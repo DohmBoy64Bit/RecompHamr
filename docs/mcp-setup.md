@@ -7,7 +7,7 @@ commands.
 | Server | Setup guide | Default tools |
 |---|---|---|
 | `ghidra` | [mcp-ghidra.md](mcp-ghidra.md) | 20 RE tools |
-| `n64-debug-mcp` | [mcp-n64.md](mcp-n64.md) | All 47+ debugging tools |
+| `n64-debug-mcp` | [mcp-n64.md](mcp-n64.md) | All debugging tools |
 | `pcrecomp` | [mcp-pcrecomp.md](mcp-pcrecomp.md) | 8 recomp pipeline tools |
 
 For MCP architecture and how tools reach the LLM, see **[mcp.md](mcp.md)**.
