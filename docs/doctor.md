@@ -25,7 +25,7 @@ All configured profiles with model and URL. The active profile is marked `*`.
 `make`, `ghidraRun`, `java`. Reports path if found, `missing` if not.
 
 ### MCP servers
-- `which ghidra-mcp`, `which n64-debug-mcp`, `which pcrecomp-mcp`, `which mcp-pine`, `which objdiff-mcp`, `which pcsx2-mcp`, `which bizhawk-mcp`
+- `which ghidra-mcp`, `which n64-debug-mcp`, `which pcrecomp-mcp`, `which mcp-pine`, `which objdiff-mcp`, `which pcsx2-mcp`, `which bizhawk-mcp`, `which sega2asm-mcp`
 - All MCP env vars: `RECOMPHAMR_MCP_GHIDRA_COMMAND`,
   `RECOMPHAMR_MCP_N64_COMMAND`, `RECOMPHAMR_MCP_PCRECOMP_COMMAND`,
   `RECOMPHAMR_MCP_GHIDRA_TOOLS`, `RECOMPHAMR_MCP_PCRECOMP_TOOLS`,

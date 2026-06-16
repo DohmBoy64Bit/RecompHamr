@@ -90,6 +90,11 @@ func BuiltinServers() []ServerConfig {
 		bizhawkCmd = "mcp-bizhawk"
 	}
 
+	sega2asmCmd := os.Getenv("RECOMPHAMR_MCP_SEGA2ASM_COMMAND")
+	if sega2asmCmd == "" {
+		sega2asmCmd = "sega2asm-mcp"
+	}
+
 	ghidraTools := ghidraDefaultTools
 	if env := os.Getenv("RECOMPHAMR_MCP_GHIDRA_TOOLS"); env == "*" {
 		ghidraTools = nil
@@ -146,6 +151,12 @@ func BuiltinServers() []ServerConfig {
 		{
 			Name:         "bizhawk",
 			Command:      bizhawkCmd,
+			Args:         []string{},
+			RequireSkill: true,
+		},
+		{
+			Name:         "sega2asm",
+			Command:      sega2asmCmd,
 			Args:         []string{},
 			RequireSkill: true,
 		},

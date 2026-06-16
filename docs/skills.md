@@ -19,7 +19,7 @@ injecting `ghidra.*` tools.
 
 ## Built-in skills
 
-Twenty-one skills are compiled into the binary:
+Twenty-two skills are compiled into the binary:
 
 | `/skill <name>` | Purpose | Details |
 |---|---|---|
@@ -42,6 +42,7 @@ Twenty-one skills are compiled into the binary:
 | `xboxrecomp` | OG Xbox static recompilation (XBE→C, kernel, D3D, ICALL) | [doc](skill-xboxrecomp.md) |
 | `pcsx2` | PCSX2 debug bridge (gates `pcsx2.*` tools) | [doc](skill-pcsx2.md) |
 | `ps2recomp` | PS2 static recomp (MIPS→C++, syscalls, PCSX2) | [doc](skill-ps2recomp.md) |
+| `sega2asm` | Genesis ROM disassembler (gates `sega2asm.*`) | [doc](skill-sega2asm.md) |
 | `snesrecomp` | SNES static recomp (65816→C, LakeSnes HW) | [doc](skill-snesrecomp.md) |
 | `project-handoff` | Generate project docs | [doc](skill-project-handoff.md) |
 
@@ -69,6 +70,6 @@ for details.
 ## Token cost
 
 Each skill `.md` file averages ~10-15 lines (~200-400 tokens). Loading all
-twenty-one adds ~5,700-8,400 tokens to the system prompt. Loading none adds zero —
+twenty-two adds ~6,000-8,800 tokens to the system prompt. Loading none adds zero —
 `buildSystem()` skips the `## Active RE Skills` block entirely when
 `activeSkills` is empty.

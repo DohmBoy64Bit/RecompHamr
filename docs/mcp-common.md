@@ -26,6 +26,7 @@ Full architecture details in **[mcp.md](mcp.md)**.
 | `RECOMPHAMR_MCP_OBJDIFF_COMMAND` | Override objdiff MCP server command/path |
 | `RECOMPHAMR_MCP_PCSX2_COMMAND` | Override pcsx2 MCP server command/path |
 | `RECOMPHAMR_MCP_BIZHAWK_COMMAND` | Override bizhawk MCP server command/path |
+| `RECOMPHAMR_MCP_SEGA2ASM_COMMAND` | Override sega2asm MCP server command/path |
 | `RECOMPHAMR_PCRECOMP_PATH` | Path to PCRECOMP-Next clone directory |
 
 ## Runtime management
@@ -53,3 +54,4 @@ or `  Disconnected` if not running.
 | `objdiff` | [mcp-objdiff.md](mcp-objdiff.md) |
 | `pcsx2` | [mcp-pcsx2.md](mcp-pcsx2.md) |
 | `bizhawk` | [mcp-bizhawk.md](mcp-bizhawk.md) |
+| `sega2asm` | [mcp-sega2asm.md](mcp-sega2asm.md) |

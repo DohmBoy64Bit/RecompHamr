@@ -16,6 +16,7 @@ var SkillServers = map[string]string{
 	"objdiff":         "objdiff",
 	"pcsx2":           "pcsx2",
 	"bizhawk":          "bizhawk",
+	"sega2asm":         "sega2asm",
 }
 
 type ServerState int
