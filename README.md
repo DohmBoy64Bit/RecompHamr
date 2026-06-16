@@ -9,8 +9,9 @@ LLMs, also runs on OpenAI-compatible endpoints.
 ## RE-first, local-first
 
 recomphamr extends upstream CodeHAMR with RE-specific tooling: embedded skills
-for reversing workflows, MCP servers for Ghidra, N64 debugging, and PC
-recompilation, project handoff docs, and a system prompt tuned for unfamiliar
+covering N64, PS2, PS3, Xbox, Xbox 360, SNES, Game Boy, Windows, and PC
+recompilation, MCP servers for Ghidra, emulator debugging, and match
+validation, project handoff docs, and a system prompt tuned for unfamiliar
 codebases. Ghidra extensions (MCP bridge, XEX loader, N64 loader) are
 available pre-built at **[REPlugins](https://github.com/DohmBoy64Bit/REPlugins)**
 for Ghidra 12.1.2.
@@ -82,17 +83,18 @@ project needs; it cannot install them itself. If a check can't run, it reports
 
 Five tools are always available to the LLM:
 
-| Tool | Purpose | |
-|---|---|---|---|
-| `bash` | Run shell commands | |
-| `read_file` | Read a file from disk | |
-| `write_file` | Write a file to disk | |
-| `edit_file` | Surgical string replacements | |
-| `repomixr` | Clone + pack a GitHub repo into a single XML file for analysis | [doc](docs/tool-repomixr.md) |
+| Tool | Purpose |
+|---|---|
+| `bash` | Run shell commands |
+| `read_file` | Read a file from disk |
+| `write_file` | Write a file to disk |
+| `edit_file` | Surgical string replacements |
+| `repomixr` | Clone + pack a GitHub repo into XML for analysis |
 
 Output from `repomixr` lands in `.rehamr/repos/<owner>-<repo>/` — use
 `read_file` to ingest the packed XML. Drop a `.rehamr/repomix-instruction.md`
-file to inject a custom prompt into every packed repository.
+file to inject a custom prompt. See **[docs/tool-repomixr.md](docs/tool-repomixr.md)**
+for output format and flags.
 
 ## Doctor
 
