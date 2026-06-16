@@ -253,6 +253,7 @@ Also available in the clone: `docs/glossary.md`, `docs/tool-setup.md`,
 | Re-Cherry | Xbox 360 | `https://github.com/MaxDeadBear/Re-Cherry` |
 | reDAHM | Xbox 360 | `https://github.com/masterspike52/reDAHM` |
 | reblue | Xbox 360 | `https://github.com/zolaware/reblue` |
+| TheOutFit | Xbox 360 | `https://github.com/DohmBoy64Bit/TheOutFit` |
 
 ## Source quality key
 
