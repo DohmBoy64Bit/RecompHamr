@@ -41,7 +41,8 @@ type ServerConfig struct {
 	Name         string
 	Command      string
 	Args         []string
-	AllowedTools []string // nil or empty = allow all
+	AllowedTools []string // nil = allow all, slice = whitelist
+	RequireSkill bool     // true = tools only injected when matching skill is active
 }
 
 type ServerStatus struct {
@@ -203,10 +204,12 @@ func (m *Manager) AllStatus() []ServerStatus {
 func (m *Manager) AllTools() []ToolDef {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
 	var all []ToolDef
 	for _, entry := range m.servers {
 		if entry.state != StateConnected || entry.client == nil {
+			continue
+		}
+		if entry.config.RequireSkill {
 			continue
 		}
 		prefix := entry.config.Name + "."
@@ -231,15 +234,17 @@ func (m *Manager) ToolsForSkills(activeSkills []string) []ToolDef {
 			allowed[server] = true
 		}
 	}
-	if len(allowed) == 0 {
-		return nil
-	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []ToolDef
 	for _, entry := range m.servers {
-		if !allowed[entry.config.Name] || entry.state != StateConnected || entry.client == nil {
+		if entry.state != StateConnected || entry.client == nil {
 			continue
+		}
+		if entry.config.RequireSkill {
+			if !allowed[entry.config.Name] {
+				continue
+			}
 		}
 		prefix := entry.config.Name + "."
 		for _, t := range entry.client.Tools() {

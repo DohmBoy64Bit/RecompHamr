@@ -65,11 +65,13 @@ func BuiltinServers() []ServerConfig {
 			Command:      ghidraCmd,
 			Args:         []string{},
 			AllowedTools: ghidraTools,
+			RequireSkill: true,
 		},
 		{
-			Name:    "n64-debug-mcp",
-			Command: n64Cmd,
-			Args:    []string{},
+			Name:         "n64-debug-mcp",
+			Command:      n64Cmd,
+			Args:         []string{},
+			RequireSkill: true,
 		},
 	}
 }
