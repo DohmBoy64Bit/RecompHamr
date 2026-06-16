@@ -245,6 +245,14 @@ Also available in the clone: `docs/glossary.md`, `docs/tool-setup.md`,
 | MK (Super Mario Kart) | SNES | `https://github.com/sp00nznet/mk` |
 | Mario Paint | SNES | `https://github.com/sp00nznet/mariopaint` |
 | UnleashedRecomp | Xbox 360 | `https://github.com/hedge-dev/UnleashedRecomp` |
+| Daytona-XBLA-Recomp | Xbox 360 | `https://github.com/Subarasheese/daytona-xbla-recomp` |
+| TiP-Recomp (Time is Priceless) | Xbox 360 | `https://github.com/SolarCookies/TiP-Recomp` |
+| KameoRePowered | Xbox 360 | `https://github.com/birabittoh/KameoRePowered` |
+| reNut | Xbox 360 | `https://github.com/masterspike52/reNut` |
+| NaughtyBear_ReStuff | Xbox 360 | `https://github.com/MaxDeadBear/NaughtyBear_ReStuff` |
+| Re-Cherry | Xbox 360 | `https://github.com/MaxDeadBear/Re-Cherry` |
+| reDAHM | Xbox 360 | `https://github.com/masterspike52/reDAHM` |
+| reblue | Xbox 360 | `https://github.com/zolaware/reblue` |
 
 ## Source quality key
 
