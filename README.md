@@ -87,7 +87,7 @@ Five tools are always available to the LLM:
 | `read_file` | Read a file from disk |
 | `write_file` | Write a file to disk |
 | `edit_file` | Surgical string replacements |
-| `repomixr` | Clone + pack a GitHub repo into a single XML file for analysis |
+| `repomixr` | Clone + pack a GitHub repo into a single XML file for analysis | [doc](docs/tool-repomixr.md) |
 
 Output from `repomixr` lands in `.rehamr/repos/<owner>-<repo>/` — use
 `read_file` to ingest the packed XML. Drop a `.rehamr/repomix-instruction.md`
