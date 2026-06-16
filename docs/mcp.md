@@ -53,8 +53,8 @@ MCP tools are NOT always sent to the LLM. Two per-server gates decide:
 |---|---|
 | (none) | 4 (bash, read, write, edit) |
 | `/skill ghidra-mcp` | 4 + 20 ghidra tools |
-| `/skill n64-debug-mcp` | 4 + 47 n64 tools |
-| both skills | 4 + 20 + 47 = 71 |
+| `/skill n64-debug-mcp` | 4 + all n64 tools |
+| both skills | 4 + 20 + all n64 tools |
 
 No MCP skills loaded = zero MCP tools = same token cost as upstream CodeHAMR.
 
@@ -77,7 +77,7 @@ When the LLM calls `ghidra.decompile_function`:
 | `n64-debug-mcp` | `n64-debug-mcp` | `RECOMPHAMR_MCP_N64_COMMAND` |
 
 Ghidra ships with the 20 most-used RE tools enabled by default
-(`RECOMPHAMR_MCP_GHIDRA_TOOLS=*` for all). n64-debug-mcp allows all 47 tools
+(`RECOMPHAMR_MCP_GHIDRA_TOOLS=*` for all). n64-debug-mcp allows all tools
 by default.
 
 ## Runtime management

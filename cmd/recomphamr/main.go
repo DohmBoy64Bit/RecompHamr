@@ -127,8 +127,13 @@ Config:
   .rehamr/config.yaml   per-project settings
 
 Env:
-  RECOMPHAMR_URL            override the active profile's url at runtime
-  RECOMPHAMR_IDLE_TIMEOUT   stream idle timeout, e.g. 90m or 1h (default 1h)`))
+  RECOMPHAMR_URL               override the active profile's url at runtime
+  RECOMPHAMR_IDLE_TIMEOUT      stream idle timeout, e.g. 90m or 1h (default 1h)
+  RECOMPHAMR_NO_UPDATE_CHECK   set to 1 to skip self-update on launch
+  RECOMPHAMR_MCP_AUTOSTART     set to 0 to disable MCP auto-connect
+  RECOMPHAMR_MCP_GHIDRA_COMMAND  override ghidra MCP server command
+  RECOMPHAMR_MCP_N64_COMMAND     override n64-debug-mcp server command
+  RECOMPHAMR_MCP_GHIDRA_TOOLS    comma-separated tool list or * for all`))
 }
 
 // isLocalBuild reports whether the binary came from a working tree rather

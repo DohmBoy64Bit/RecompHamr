@@ -73,7 +73,7 @@ var commands = []command{
 	},
 	{
 		name:        "/skills",
-		description: "list built-in RE skills",
+		description: "list built-in and custom RE skills",
 		handler:     (Model).cmdSkills,
 	},
 	{

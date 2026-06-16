@@ -12,9 +12,9 @@ recomphamr extends upstream CodeHAMR with RE-specific tooling: embedded skills
 for reversing workflows, MCP servers for Ghidra and N64 debugging, project
 handoff docs, and a system prompt tuned for unfamiliar codebases.
 
-**Slash commands:** `/help`, `/models`, `/skills`, `/skill`, `/init-re`,
-`/status-re`, `/doctor`, `/mcp`. Skills and MCP tools wire into the system
-prompt dynamically.
+**Slash commands:** `/help`, `/clear`, `/models`, `/rehampass`, `/skills`,
+`/skill`, `/init-re`, `/status-re`, `/doctor`, `/mcp`. Skills and MCP tools
+wire into the system prompt dynamically.
 
 ## Install
 
@@ -37,9 +37,9 @@ Then run `recomphamr` in your project.
 
 ## Config
 
-On first run recomphamr seeds `.rehamr/config.yaml` with AMD-priority profiles
-(`lmstudio-amd` default, `ollama-amd`). The system prompt and RE
-skills are embedded in the binary.
+On first run recomphamr seeds `.rehamr/config.yaml` with AMD-priority profiles:
+`lmstudio-amd` (default), `lmstudio-fast`, `ollama-amd`, and `llama-vulkan`.
+The system prompt and RE skills are embedded in the binary.
 
 Any OpenAI-compatible endpoint works. Example profiles:
 
@@ -89,7 +89,7 @@ JSON-RPC 2.0, exposing their tools to the LLM alongside `bash`, `read_file`,
 `write_file`, and `edit_file`.
 
 Two servers ship with built-in configs: `ghidra` (20 tools by default) and
-`n64-debug-mcp` (47 tools). MCP tools are skill-gated to keep the token budget
+`n64-debug-mcp` (all tools). MCP tools are skill-gated to keep the token budget
 lean — zero MCP tools are sent unless a matching skill is loaded.
 
 ```
