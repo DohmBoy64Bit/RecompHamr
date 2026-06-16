@@ -698,9 +698,10 @@ func (m *Model) buildMessages() []chmctx.Message {
 	return out
 }
 
-// buildTools exposes the four local tools every turn: bash, read_file,
-// write_file, edit_file. No loop/control tool; a turn ends when the model
-// stops emitting tool calls (see handleStreamClosed).
+// buildTools exposes the four local tools every turn plus any MCP tools whose
+// skill is currently loaded. MCP tools are scoped to active skills only: without
+// /skill ghidra-mcp or /skill n64-debug-mcp, no MCP tools are injected, keeping
+// the token budget lean.
 func (m *Model) buildTools() []llm.Tool {
 	local := []llm.Tool{
 		schemaToTool(tools.BashSchema()),
@@ -709,7 +710,7 @@ func (m *Model) buildTools() []llm.Tool {
 		schemaToTool(tools.EditFileSchema()),
 	}
 	if m.mcpManager != nil {
-		for _, t := range m.mcpManager.AllTools() {
+		for _, t := range m.mcpManager.ToolsForSkills(m.activeSkills) {
 			local = append(local, schemaToTool(tools.MCPSchema(t.Name, t.Description, t.InputSchema.Map())))
 		}
 	}

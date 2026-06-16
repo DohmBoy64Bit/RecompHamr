@@ -94,8 +94,10 @@ with built-in configs:
 | `n64-debug-mcp` | `n64-debug-mcp` | `RECOMPHAMR_MCP_N64_COMMAND` |
 
 Servers auto-connect on startup (set `RECOMPHAMR_MCP_AUTOSTART=0` to disable).
-When connected, the LLM sees prefixed tools like `ghidra.decompile_function`
-and `n64-debug-mcp.n64_read_memory`.
+MCP tools are **scoped to active skills** — `ghidra.*` tools only inject when
+`/skill ghidra-mcp` is loaded, `n64-debug-mcp.*` only with
+`/skill n64-debug-mcp`. Without active MCP skills, zero extra tools are sent
+to the LLM, keeping context lean.
 
 ```
 /mcp                         show server status
@@ -108,7 +110,7 @@ Server status appears on the startup splash — `* Connected (45 tools)` or
 
 ## Skills
 
-Seven embedded RE skills are loaded on demand via `/skill <name>`:
+Eight embedded RE skills are loaded on demand via `/skill <name>`:
 
 | Command | Effect |
 |---|---|
@@ -118,10 +120,11 @@ Seven embedded RE skills are loaded on demand via `/skill <name>`:
 | `/skill file-format-reversing` | Binary format analysis |
 | `/skill function-discovery` | Find and classify functions |
 | `/skill ghidra-mcp` | Ghidra MCP integration |
+| `/skill n64-debug-mcp` | N64 runtime debugging via Mupen64Plus MCP |
 | `/skill project-handoff` | Generate project docs for handoff |
 
-Skills inject targeted context into the system prompt when active, keeping the
-default prompt lean.
+Skills inject targeted context into the system prompt when active. MCP skills
+also gate which server tools the LLM sees.
 
 ## License
 

@@ -8,6 +8,11 @@ import (
 	"sync"
 )
 
+var SkillServers = map[string]string{
+	"ghidra-mcp":      "ghidra",
+	"n64-debug-mcp":   "n64-debug-mcp",
+}
+
 type ServerState int
 
 const (
@@ -204,6 +209,34 @@ func (m *Manager) AllTools() []ToolDef {
 		}
 	}
 	return all
+}
+
+func (m *Manager) ToolsForSkills(activeSkills []string) []ToolDef {
+	allowed := map[string]bool{}
+	for _, s := range activeSkills {
+		if server, ok := SkillServers[s]; ok {
+			allowed[server] = true
+		}
+	}
+	if len(allowed) == 0 {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []ToolDef
+	for _, entry := range m.servers {
+		if !allowed[entry.config.Name] || entry.state != StateConnected || entry.client == nil {
+			continue
+		}
+		for _, t := range entry.client.Tools() {
+			out = append(out, ToolDef{
+				Name:        entry.config.Name + "." + t.Name,
+				Description: t.Description,
+				InputSchema: t.InputSchema,
+			})
+		}
+	}
+	return out
 }
 
 func (m *Manager) ConnectedNames() []string {
