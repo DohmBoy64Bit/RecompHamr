@@ -173,13 +173,55 @@ after cloning via `repomixr` or `bash curl`.
 
 | Topic | Source | Quality | URL |
 |---|---|---|---|
-| Full recomp curriculum | recompclass (32 modules) | tutorial | `https://github.com/sp00nznet/recompclass` |
 | M68K disassembler/splitter | sega2asm | tooling | `https://github.com/hansbonini/sega2asm` |
 | Object diffing | objdiff | tooling | `https://github.com/encounter/objdiff` |
 | Ghidra | Ghidra (NSA) | tooling | `https://github.com/NationalSecurityAgency/ghidra` |
 | Decomp.me | decomp.me | tooling | `https://decomp.me/` |
 | RetroReversing | retroreversing.com | community-index | `https://www.retroreversing.com/` |
 | Copetti (all platforms) | Copetti.org | hardware-spec | `https://www.copetti.org/writings/consoles/` |
+
+## recompclass curriculum
+
+Structured course teaching static recompilation from theory to practice.
+Clone once via repomixr: `repo_url: https://github.com/sp00nznet/recompclass`
+Then read modules from `.rehamr/repos/sp00nznet-recompclass/repo/`.
+
+| # | Topic | Quality | Path |
+|---|---|---|---|
+| 1 | What is static recomp? | tutorial | `units/unit-1-foundations/module-01-what-is-static-recomp/` |
+| 2 | Binary formats (ELF, PE, ROM) | tutorial | `units/unit-1-foundations/module-02-binary-formats/` |
+| 3 | CPU architectures overview | tutorial | `units/unit-1-foundations/module-03-cpu-architectures/` |
+| 4 | Reading assembly (x86, MIPS, ARM, Z80, PPC) | tutorial | `units/unit-1-foundations/module-04-reading-assembly/` |
+| 5 | Tooling (Ghidra, Capstone) | tutorial | `units/unit-1-foundations/module-05-tooling-ghidra-capstone/` |
+| 6 | Control-flow recovery | tutorial | `units/unit-2-core-techniques/module-06-control-flow-recovery/` |
+| 7 | Lifting fundamentals | tutorial | `units/unit-2-core-techniques/module-07-lifting-fundamentals/` |
+| 8 | First lift (Z80 → C) | tutorial | `units/unit-2-core-techniques/module-08-first-lift-z80/` |
+| 9 | Game Boy recomp | tutorial | `units/unit-3-first-targets/module-09-game-boy/` |
+| 10 | NES / 6502 | tutorial | `units/unit-3-first-targets/module-10-nes-6502/` |
+| 11 | SNES / 65816 | tutorial | `units/unit-3-first-targets/module-11-snes/` |
+| 12 | GBA / ARM7 | tutorial | `units/unit-3-first-targets/module-12-gba-arm7/` |
+| 13 | DOS / x86 real-mode | tutorial | `units/unit-3-first-targets/module-13-dos/` |
+| 14 | Indirect calls + jump tables | tutorial | `units/unit-4-pipeline-essentials/module-14-indirect-calls/` |
+| 15 | Hardware shims + SDL2 | tutorial | `units/unit-4-pipeline-essentials/module-15-hardware-shims/` |
+| 17 | Build systems + CMake | tutorial | `units/unit-5-pipeline-mastery/module-17-build-systems/` |
+| 18 | Testing + validation | tutorial | `units/unit-5-pipeline-mastery/module-18-testing-validation/` |
+| 19 | Optimization | tutorial | `units/unit-5-pipeline-mastery/module-19-optimization/` |
+| 20 | N64 / MIPS | tutorial | `units/unit-6-console-architectures/module-20-n64-mips/` |
+| 21 | N64 RSP/RDP deep dive | tutorial | `units/unit-6-console-architectures/module-21-n64-rsp-rdp/` |
+| 22 | GameCube / PowerPC | tutorial | `units/unit-6-console-architectures/module-22-gamecube-ppc/` |
+| 23 | Wii / Broadway | tutorial | `units/unit-6-console-architectures/module-23-wii-broadway/` |
+| 24 | Dreamcast / SH-4 | tutorial | `units/unit-6-console-architectures/module-24-dreamcast-sh4/` |
+| 25 | PS2 / Emotion Engine | tutorial | `units/unit-6-console-architectures/module-25-ps2-ee/` |
+| 26 | Saturn / Dual SH-2 | tutorial | `units/unit-7-advanced-targets/module-26-saturn-sh2/` |
+| 27 | Xbox / Win32 | tutorial | `units/unit-7-advanced-targets/module-27-xbox-win32/` |
+| 28 | Xbox 360 / Xenon PPC | tutorial | `units/unit-7-advanced-targets/module-28-xbox360-xenon/` |
+| 29 | GPU pipeline translation | tutorial | `units/unit-7-advanced-targets/module-29-gpu-translation/` |
+| 30 | PS3 / Cell | tutorial | `units/unit-8-extreme-targets/module-30-ps3-cell/` |
+| 31 | Multi-threaded recomp | tutorial | `units/unit-8-extreme-targets/module-31-multithreaded-recomp/` |
+
+Also available in the clone: `docs/glossary.md`, `docs/tool-setup.md`,
+`docs/architecture-reference/` (12 CPU quickrefs), `docs/cheat-sheets/`,
+`docs/recommended-reading.md`, and `labs/` (50 hands-on exercises).
 
 ## Known recomp projects (reference layouts)
 
