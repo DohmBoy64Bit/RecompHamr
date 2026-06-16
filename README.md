@@ -73,6 +73,21 @@ recomphamr verifies by running things, so give its sandbox the toolchains your
 project needs; it cannot install them itself. If a check can't run, it reports
 `unverified:` instead of pretending.
 
+## Built-in Tools
+
+Five tools are always available to the LLM:
+
+| Tool | Purpose |
+|---|---|
+| `bash` | Run shell commands |
+| `read_file` | Read a file from disk |
+| `write_file` | Write a file to disk |
+| `edit_file` | Surgical string replacements |
+| `repomixr` | Clone + pack a GitHub repo into a single XML file for analysis |
+
+Output from `repomixr` lands in `.rehamr/repos/<owner>-<repo>/` — use
+`read_file` to ingest the packed XML.
+
 ## Compare
 
 | Tool | Pick if |
@@ -86,8 +101,8 @@ project needs; it cannot install them itself. If a check can't run, it reports
 ## MCP Servers
 
 recomphamr connects to MCP (Model Context Protocol) servers over stdio via
-JSON-RPC 2.0, exposing their tools to the LLM alongside `bash`, `read_file`,
-`write_file`, and `edit_file`.
+JSON-RPC 2.0, exposing their tools to the LLM alongside the built-in tools
+(`bash`, `read_file`, `write_file`, `edit_file`, `repomixr`).
 
 Two servers ship with built-in configs: `ghidra` (20 tools by default) and
 `n64-debug-mcp` (all tools). MCP tools are skill-gated to keep the token budget

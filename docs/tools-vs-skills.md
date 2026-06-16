@@ -17,6 +17,7 @@ as a `tool` message.
 | `read_file` | Read a file from disk |
 | `write_file` | Write a file to disk |
 | `edit_file` | Perform exact string replacements in a file |
+| `repomixr` | Clone a GitHub repo and pack all source files into XML |
 
 **MCP tools** (available when connected + skill loaded):
 | Server | Example tool |
