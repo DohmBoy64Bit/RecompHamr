@@ -96,6 +96,7 @@ by default. pcrecomp ships with 8 pipeline tools
 
 ```
 /mcp                         show all servers, connection state, tool counts
+/mcp path <server> [path]    set or show server binary path
 /mcp connect <name>          launch server + JSON-RPC handshake
 /mcp disconnect <name>       kill child process
 /mcp tools <server>          list every tool (* = enabled)

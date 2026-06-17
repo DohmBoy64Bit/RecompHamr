@@ -291,6 +291,27 @@ func (m *Manager) toolCount(entry *serverEntry) int {
 	return n
 }
 
+func (m *Manager) SetCommand(name, command string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entry, ok := m.servers[name]
+	if !ok {
+		return fmt.Errorf("mcp: unknown server %q", name)
+	}
+	entry.config.Command = command
+	return nil
+}
+
+func (m *Manager) GetCommand(name string) string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entry, ok := m.servers[name]
+	if !ok {
+		return ""
+	}
+	return entry.config.Command
+}
+
 func (m *Manager) ConnectedNames() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -460,7 +460,7 @@ func (m Model) cmdMcp(args []string) (tea.Model, tea.Cmd) {
 	if len(args) == 0 {
 		m.appendLine(m.mcpManager.FormatStatus())
 		m.appendLine("")
-		m.appendLine(styleDim.Render("/mcp connect|disconnect|tools|enable|disable <server> [tool]"))
+		m.appendLine(styleDim.Render("/mcp connect|disconnect|path|tools|enable|disable <server> [tool|path]"))
 		return m, nil
 	}
 	switch args[0] {
@@ -528,8 +528,33 @@ func (m Model) cmdMcp(args []string) (tea.Model, tea.Cmd) {
 		} else {
 			m.appendLine(styleWarn.Render("usage: /mcp disable <server> <tool | *>"))
 		}
+	case "path":
+		if len(args) < 2 {
+			m.appendLine(styleWarn.Render("usage: /mcp path <server> [path]"))
+			return m, nil
+		}
+		if len(args) >= 3 {
+			path := args[2]
+			if err := m.mcpManager.SetCommand(args[1], path); err != nil {
+				m.appendLine(styleError.Render(err.Error()))
+				return m, nil
+			}
+			m.mcpManager.Disconnect(args[1])
+			m.appendLine(styleOK.Render(fmt.Sprintf("mcp %s: path set to %s · connecting...", args[1], path)))
+			return m, func() tea.Msg {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				return mcpConnectMsg{name: args[1], err: m.mcpManager.Connect(ctx, args[1])}
+			}
+		}
+		cmd := m.mcpManager.GetCommand(args[1])
+		if cmd == "" {
+			m.appendLine(styleWarn.Render(fmt.Sprintf("mcp %s: unknown server", args[1])))
+		} else {
+			m.appendLine(styleDim.Render(fmt.Sprintf("mcp %s: %s", args[1], cmd)))
+		}
 	default:
-		m.appendLine(styleWarn.Render("usage: /mcp [connect|disconnect|tools|enable|disable] <server> [tool]"))
+			m.appendLine(styleWarn.Render("usage: /mcp [connect|disconnect|path|tools|enable|disable] <server> [tool|path]"))
 	}
 	return m, nil
 }

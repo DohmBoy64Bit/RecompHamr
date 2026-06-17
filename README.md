@@ -132,6 +132,7 @@ not auto-connected by default; use `/mcp connect <name>` or set
 ```
 /mcp                         show server status + tool counts
 /mcp connect|disconnect <n>  launch or kill a server
+/mcp path <server> [path]    set or show server binary path
 /mcp tools <server>          list tools (* = enabled)
 /mcp enable|disable <s> <t>  toggle individual or all tools
 ```
