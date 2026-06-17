@@ -3,6 +3,11 @@
 SNES static recompilation using sp00nznet/snesrecomp. 65816→C via
 RECOMP_PATCH + LakeSnes hardware library for real PPU/APU/DMA.
 
+
+## Kickoff
+
+`/skill snesrecomp` — then "I have an SFC at [PATH]. Start Phase 0 setup."
+
 ## What it teaches
 
 - Pipeline: disassemble 65816 → RECOMP_PATCH in C → link snesrecomp → native

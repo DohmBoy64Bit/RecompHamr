@@ -4,6 +4,11 @@ ImHex hex editor skill. Guides the LLM to use ImHex Pattern Language for
 binary format analysis, the Patterns database for format discovery, and the
 LLM-queryable documentation for syntax reference.
 
+
+## Kickoff
+
+`/skill imhex` — then "Search ImHex Patterns for this file format" and paste hexdump of first 64 bytes.
+
 ## What it teaches
 
 - Query ImHex docs on demand via LLM-queryable GitBook API

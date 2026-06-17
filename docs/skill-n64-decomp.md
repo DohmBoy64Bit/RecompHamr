@@ -22,6 +22,10 @@ This skill instructs the LLM to load supporting skills:
 
 State is maintained in `REPHAMR_STATE.md` (persistent memory).
 
+## Kickoff
+
+`/skill n64-decomp` — then "I have baserom.z64 at [PATH]. Start Track A, Phase 0."
+
 ## When to use
 
 Any N64 decompilation or recompilation project — from fresh ROM recon through

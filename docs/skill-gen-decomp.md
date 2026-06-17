@@ -4,6 +4,11 @@ Sega Genesis decompilation skill. ROM splitting via sega2asm + runtime
 validation via bizhawk. 68000/Z80 disassembly, 49 compression formats,
 VDP register hints.
 
+
+## Kickoff
+
+`/skill gen-decomp` — then "I have a Genesis ROM at [PATH]. Start Phase 0 recon."
+
 ## What it teaches
 
 - 6 operational phases: Recon → Config → Split → Symbols → Runtime → Matching

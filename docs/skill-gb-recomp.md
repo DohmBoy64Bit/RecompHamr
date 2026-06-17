@@ -3,6 +3,11 @@
 Game Boy static recompilation skill using arcanite24/gb-recompiled. Trace-guided
 coverage improvement with PyBoy ground truth.
 
+
+## Kickoff
+
+`/skill gb-recomp` — then "I have a ROM at [PATH]. Run baseline coverage and start Phase 0."
+
 ## What it teaches
 
 - Pipeline: ROM → gbrecomp → C code + metadata.json → CMake → native binary

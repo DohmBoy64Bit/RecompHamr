@@ -4,6 +4,11 @@ Virtual Boy static recompilation using sp00nznet/vbrecomp. V810→C recompiler
 + VIP video/VSU audio runtime. Corpus-driven — 76 ROMs, improvements benefit
 the whole library.
 
+
+## Kickoff
+
+`/skill vb-decomp` — then "I have a .vb ROM at [PATH]. Start Phase 0 setup."
+
 ## What it teaches
 
 - 6 phases: Setup → Recompile → Bringup → Render → Harden → Polish

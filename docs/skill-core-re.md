@@ -10,6 +10,10 @@ General reverse-engineering workflow skill. Load it for any RE task.
 - Update `.rehamr/CHANGELOG.md` or `.rehamr/EVIDENCE.md` when running `/init-re`
 - Never guess binary behavior — inspect or mark as HYPOTHESIS
 
+## Kickoff
+
+`/skill core-re` — then describe your project and goal.
+
 ## When to use
 
 Any unfamiliar codebase, binary analysis, or recompilation project. This is

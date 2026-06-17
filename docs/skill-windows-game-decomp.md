@@ -3,6 +3,11 @@
 Windows game matching decompilation and compiler-matrix research skill.
 Covers native PE, .NET, Unity (Mono + IL2CPP), and Unreal (UE4/UE5) targets.
 
+
+## Kickoff
+
+`/skill windows-game-decomp` — then "I have game.exe at [PATH]. Detect runtime family and start Phase 0."
+
 ## What it teaches
 
 - Five tracks: matching decomp (A), behavioral port (B), compat shims (C),

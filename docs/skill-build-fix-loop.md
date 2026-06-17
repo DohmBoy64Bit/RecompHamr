@@ -3,6 +3,11 @@
 Build failure iteration skill. Load when the project doesn't compile, tests
 fail, or generated code is broken.
 
+
+## Kickoff
+
+`/skill build-fix-loop` — then "The build is failing with [error]. Diagnose and fix."
+
 ## What it teaches
 
 - Capture the exact command and full error — not just the last line

@@ -3,6 +3,11 @@
 Sega Genesis ROM disassembler and splitter via hansbonini/sega2asm. 49
 compression formats, 68000/Z80 disassembly, graphics/audio extraction.
 
+
+## Kickoff
+
+`/skill sega2asm` — then "Plan a split config for this Genesis ROM — detect compression types first."
+
 ## What it enables
 
 - Full ROM split from YAML config (plan + execute)

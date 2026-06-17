@@ -3,6 +3,11 @@
 Xbox 360 static recompilation methodology skill. Covers 4 tracks from XEX
 extraction through runtime bringup to full game loop.
 
+
+## Kickoff
+
+`/skill xbox360-decomp` — then "I have default.xex at [PATH]. Start Track D Phase 0 extraction."
+
 ## What it teaches
 
 - Four tracks: A (ReXGlue), B (XenonRecomp), C (matching decomp), D (360toolsUpdated)

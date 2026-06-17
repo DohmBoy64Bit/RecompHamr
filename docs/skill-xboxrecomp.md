@@ -3,6 +3,11 @@
 OG Xbox static recompilation skill using sp00nznet/xboxrecomp. XBE extraction,
 x86→C lifting, kernel/D3D/audio shim bringup, ICALL crash debugging.
 
+
+## Kickoff
+
+`/skill xboxrecomp` — then "I have default.xbe at [PATH]. Start Phase 0 parse and record."
+
 ## What it teaches
 
 - Pipeline: parse XBE → disasm → classify → lift x86→C with global registers

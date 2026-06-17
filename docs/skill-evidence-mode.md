@@ -3,6 +3,11 @@
 Strict evidence classification skill. Forces the LLM to separate facts from
 guesses.
 
+
+## Kickoff
+
+`/skill evidence-mode` — then "Classify all findings in the current function ledger."
+
 ## What it teaches
 
 - Classify every finding as CONFIRMED, HYPOTHESIS, TODO, or BLOCKED

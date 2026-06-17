@@ -3,6 +3,11 @@
 PC static recompilation pipeline skill. Loads PCRECOMP-Next methodology AND
 unlocks `pcrecomp.*` tools for PE analysis, disassembly, and code lifting.
 
+
+## Kickoff
+
+`/skill pcrecomp` — then "Run pe_analyze on mystery.exe and classify the compiler."
+
 ## What it teaches
 
 - Follow the pipeline: Analyze → Disassemble → Classify → Graph → Lift →

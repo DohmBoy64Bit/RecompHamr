@@ -3,6 +3,11 @@
 Multi-system emulator debug bridge via dmang-dev/mcp-bizhawk. 16 tools for
 memory r/w, button input, frame advance, and save states across 12+ systems.
 
+
+## Kickoff
+
+`/skill bizhawk` — then "Connect to BizHawk and show me the memory domains for the loaded ROM."
+
 ## What it enables
 
 - Read/write memory by domain (WRAM, VRAM, RDRAM, etc.) at u8/u16/u32

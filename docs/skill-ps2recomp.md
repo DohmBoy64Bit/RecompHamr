@@ -3,6 +3,11 @@
 PS2 static recompilation skill. MIPS→C++ lifting, syscall stubbing, A/B
 comparison with PCSX2, and runtime bringup.
 
+
+## Kickoff
+
+`/skill ps2recomp` — then "I have an ISO at [PATH]. Start Phase 0 setup."
+
 ## What it teaches
 
 - 6 operational phases: Setup → First Build → Syscall Bringup → First Boot →

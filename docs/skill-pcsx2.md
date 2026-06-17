@@ -3,6 +3,11 @@
 PCSX2 emulator debug bridge via hkmodd/PCSX2-MCP. 30 tools for register
 inspection, MIPS disassembly, breakpoints, and A/B comparison.
 
+
+## Kickoff
+
+`/skill pcsx2` — then "Connect to PCSX2, set breakpoint at 0x00123456, step and compare registers."
+
 ## What it enables
 
 - Connect to PCSX2 DebugServer (port 21512)

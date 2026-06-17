@@ -4,6 +4,11 @@ Static recompilation theory router. Points the LLM to specific recompclass
 modules for foundational knowledge — binary formats, CFG recovery, lifting,
 indirect calls, CPU architecture references, GPU pipeline translation.
 
+
+## Kickoff
+
+`/skill recomp-foundations` — then "I need to understand indirect calls. Find the relevant recompclass module."
+
 ## What it teaches
 
 Nothing directly — it's a map. When the LLM encounters an unknown concept,

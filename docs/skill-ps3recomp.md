@@ -3,6 +3,11 @@
 PS3 static recompilation skill using sp00nznet/ps3recomp. PPU/SPU lifting,
 HLE stub implementation, NID resolution, RSX graphics bringup.
 
+
+## Kickoff
+
+`/skill ps3recomp` — then "I have an ELF at [PATH]. Start Phase 0 setup."
+
 ## What it teaches
 
 - Pipeline: ELF parse → find functions → disassemble PPU → lift to C++ → CMake

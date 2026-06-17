@@ -3,6 +3,11 @@
 Binary file format analysis skill. Load when reverse-engineering unknown file
 formats, archives, asset containers, or data structures.
 
+
+## Kickoff
+
+`/skill file-format-reversing` — then "Analyze this unknown binary file at [PATH]."
+
 ## What it teaches
 
 - Start from known offsets: magic bytes, headers, size fields

@@ -26,3 +26,7 @@ analysis directly rather than asking you to look things up.
 ## Setup
 
 See **[mcp-ghidra.md](mcp-ghidra.md)** for install and enable instructions.
+
+## Kickoff
+
+`/skill ghidra-mcp` — then "Decompile function at 0x80123456 and trace all callers."

@@ -4,6 +4,11 @@ Function identification and classification skill. Load when mapping unknown
 binaries — finding entry points, classifying code, and building a function
 ledger.
 
+
+## Kickoff
+
+`/skill function-discovery` — then "Build a function ledger for this binary."
+
 ## What it teaches
 
 - Classify code as: game logic, runtime/platform, middleware/library,

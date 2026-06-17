@@ -3,6 +3,11 @@
 GameCube static recompilation using sp00nznet/gcrecomp. PPC 750 → C
 recompiler, GX → D3D11 with TEV shader generation, Dolphin OS HLE.
 
+
+## Kickoff
+
+`/skill gc-decomp` — then "I have a DOL at [PATH]. Start Phase 0 recon."
+
 ## What it teaches
 
 - 6 phases: Setup → Recompile → OS HLE → GX Graphics → Audio+Input → Polish

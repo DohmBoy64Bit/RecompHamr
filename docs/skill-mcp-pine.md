@@ -3,6 +3,11 @@
 RPCS3 emulator debug bridge via PINE IPC. Connects to a running RPCS3
 instance for A/B comparison, dynamic memory probing, and savestate management.
 
+
+## Kickoff
+
+`/skill mcp-pine` — then "Connect to RPCS3 and compare register values at 0x00123456."
+
 ## What it enables
 
 - Read/write PS3 guest memory at runtime

@@ -3,6 +3,11 @@
 N64 runtime debugging skill. Loads Mupen64Plus MCP methodology AND unlocks
 `n64-debug-mcp.*` tools for live emulator debugging.
 
+
+## Kickoff
+
+`/skill n64-debug-mcp` — then "Set a breakpoint at 0x80123456 and capture registers on hit."
+
 ## What it teaches
 
 - Check whether the Mupen64MCP daemon is running and a ROM is loaded

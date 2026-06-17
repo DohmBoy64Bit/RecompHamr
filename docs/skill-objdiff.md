@@ -3,6 +3,11 @@
 Object file diffing via encounter/objdiff. Validates match claims for
 n64-decomp, windows-game-decomp, and xboxrecomp projects.
 
+
+## Kickoff
+
+`/skill objdiff` — then "Diff function main to check if it matches."
+
 ## What it enables
 
 - List units from `objdiff.json` with match status

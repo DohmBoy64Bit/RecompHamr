@@ -3,6 +3,11 @@
 Project documentation skill. Load when you need to generate or update project
 handoff docs, state summaries, or onboarding materials.
 
+
+## Kickoff
+
+`/skill project-handoff` — then "Generate handoff docs for the current project state."
+
 ## What it teaches
 
 - Generate structured project documentation for handoff or resume

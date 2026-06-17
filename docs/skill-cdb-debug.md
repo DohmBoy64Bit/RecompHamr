@@ -4,6 +4,11 @@ Windows CDB (Microsoft Console Debugger) skill. Teaches the LLM how to debug
 recompiled native EXEs using CDB, PowerShell wrappers, MAP files, and
 diagnostic logging.
 
+
+## Kickoff
+
+`/skill cdb-debug` — then "Build with /MAP, read the CDB wrapper, trace the entrypoint."
+
 ## What it teaches
 
 - CDB workflow: build with /MAP → read wrapper script → run CDB → classify
