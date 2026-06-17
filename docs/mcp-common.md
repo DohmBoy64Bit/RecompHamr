@@ -6,9 +6,10 @@ servers. For server-specific setup, see the per-server docs.
 ## How MCP servers work
 
 recomphamr launches MCP servers as child processes over stdio using JSON-RPC
-2.0. Each server registers on startup and auto-connects in a background
-goroutine. Tools are skill-gated — they only appear in the LLM's tool list
-when a matching skill is loaded.
+2.0. Each server registers on startup. Tools are skill-gated — they only
+appear in the LLM's tool list when a matching skill is loaded. Servers do
+not auto-connect by default; use `/mcp connect <name>` or set
+`RECOMPHAMR_MCP_AUTOSTART=1`.
 
 Full architecture details in **[mcp.md](mcp.md)**.
 
