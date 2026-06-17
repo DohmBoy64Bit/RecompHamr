@@ -20,7 +20,7 @@ and breakpoint debugging.
 
 ## Enable
 
-1. Start recomphamr — auto-connects at launch
+1. Start recomphamr — connect with `/mcp connect pcsx2`
 2. Run `/skill pcsx2` — unlocks `pcsx2.*` tools (30 debugging tools)
 3. Verify: `/mcp tools pcsx2`
 

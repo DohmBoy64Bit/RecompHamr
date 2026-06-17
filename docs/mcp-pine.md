@@ -19,7 +19,7 @@ management.
 
 ## Enable
 
-1. Start recomphamr — auto-connects at launch
+1. Start recomphamr — connect with `/mcp connect mcp-pine`
 2. Run `/skill mcp-pine` — unlocks `mcp-pine.*` tools
 3. Verify: `/mcp tools mcp-pine`
 

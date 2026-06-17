@@ -16,7 +16,7 @@ disassembly, 49 compression formats, graphics extraction, VDP register hints.
 
 ## Enable
 
-1. Start recomphamr — auto-connects at launch
+1. Start recomphamr — connect with `/mcp connect sega2asm`
 2. Run `/skill sega2asm` — unlocks `sega2asm.*` tools
 3. Verify: `/mcp tools sega2asm`
 

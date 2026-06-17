@@ -19,7 +19,7 @@ decompilation projects.
 
 ## Enable
 
-1. Start recomphamr — auto-connects at launch
+1. Start recomphamr — connect with `/mcp connect objdiff`
 2. Run `/skill objdiff` — unlocks `objdiff.*` tools
 3. Verify: `/mcp tools objdiff`
 
