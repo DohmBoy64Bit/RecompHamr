@@ -65,6 +65,26 @@ func TestParseRepoURL(t *testing.T) {
 	}
 }
 
+func TestRepomixrRejectsPathTraversal(t *testing.T) {
+	old := RepomixrDir
+	tmp := t.TempDir()
+	RepomixrDir = tmp
+	defer func() { RepomixrDir = old }()
+
+	// Crafted URLs that produce path-separator or .. in owner/name
+	traversalURLs := []string{
+		"https://github.com/user/../../../etc",
+		"https://github.com/../etc/passwd",
+		"https://github.com/user/repo/../secrets",
+	}
+	for _, url := range traversalURLs {
+		result := Repomixr(context.Background(), url, "main", false, false, false, false)
+		if !strings.Contains(result, "invalid owner/repo name") {
+			t.Errorf("expected rejection for traversal URL %q, got: %s", url, result)
+		}
+	}
+}
+
 func TestStripComments(t *testing.T) {
 	tests := []struct {
 		in, want string

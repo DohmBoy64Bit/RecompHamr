@@ -61,7 +61,6 @@ func parseToolsEnv(val string) []string {
 var legacyEnvSuffix = map[string]string{
 	"n64-debug-mcp": "N64",
 	"mcp-pine":      "PINE",
-	"pcrecomp":      "PCRECOMP",
 }
 
 // envKey returns the RECOMPHAMR_MCP_<KEY>_* suffix for a server name.

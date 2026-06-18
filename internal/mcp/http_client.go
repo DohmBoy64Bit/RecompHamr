@@ -33,9 +33,7 @@ func NewHTTPClient(name, version string) *HTTPClient {
 	return &HTTPClient{
 		name:    name,
 		version: version,
-		http: &http.Client{
-			Timeout: httpInitTimeout,
-		},
+		http: &http.Client{},
 	}
 }
 
@@ -43,9 +41,13 @@ func (c *HTTPClient) Name() string       { return c.name }
 func (c *HTTPClient) Version() string    { return c.version }
 func (c *HTTPClient) Connected() bool    { c.mu.Lock(); defer c.mu.Unlock(); return c.connected }
 func (c *HTTPClient) ServerName() string {
+	c.mu.Lock()
 	if c.serverInfo.Name != "" {
-		return c.serverInfo.Name
+		name := c.serverInfo.Name
+		c.mu.Unlock()
+		return name
 	}
+	c.mu.Unlock()
 	return c.name
 }
 
@@ -91,7 +93,10 @@ func (c *HTTPClient) Connect(ctx context.Context, baseURL string) error {
 	if err := json.Unmarshal(*initResult, &initRes); err != nil {
 		return fmt.Errorf("mcp %s: parse initialize: %w", c.name, err)
 	}
+
+	c.mu.Lock()
 	c.serverInfo = initRes.ServerInfo
+	c.mu.Unlock()
 
 	// Notify initialized
 	notif := Notification{
@@ -201,7 +206,9 @@ func (c *HTTPClient) sendNotification(ctx context.Context, notif Notification) {
 	body, _ := json.Marshal(notif)
 	httpReq, _ := http.NewRequestWithContext(ctx, http.MethodPost, base+"/mcp", bytes.NewReader(body))
 	httpReq.Header.Set("Content-Type", "application/json")
-	c.http.Do(httpReq) // best-effort, ignore errors
+	if resp, err := c.http.Do(httpReq); err == nil {
+		resp.Body.Close()
+	}
 }
 
 func stringsTrimRight(s, cutset string) string {

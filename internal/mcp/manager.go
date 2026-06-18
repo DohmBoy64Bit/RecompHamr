@@ -115,7 +115,7 @@ func (m *Manager) Connect(ctx context.Context, name string) error {
 		m.mu.Unlock()
 		return fmt.Errorf("mcp: unknown server %q", name)
 	}
-	if entry.state == StateConnected {
+	if entry.state == StateConnected || entry.state == StateConnecting {
 		m.mu.Unlock()
 		return nil
 	}
@@ -310,6 +310,19 @@ func (e *serverEntry) toolAllowed(name string) bool {
 	return e.allowedTools[name]
 }
 
+// syncAllowedTools rebuilds the runtime allowedTools map from config.AllowedTools.
+// Must be called under the manager lock after any mutation to config.AllowedTools.
+func (e *serverEntry) syncAllowedTools() {
+	if e.config.AllowedTools == nil {
+		e.allowedTools = nil // allow all
+	} else {
+		e.allowedTools = make(map[string]bool, len(e.config.AllowedTools))
+		for _, t := range e.config.AllowedTools {
+			e.allowedTools[t] = true
+		}
+	}
+}
+
 func (m *Manager) toolCount(entry *serverEntry) int {
 	if entry.client == nil {
 		return 0
@@ -353,7 +366,9 @@ func (m *Manager) ApplyUserConfig(cfg UserServerConfig) {
 				newCfg.AllowedTools = cfg.Tools.List
 			}
 		}
-		m.servers[cfg.Name] = &serverEntry{config: newCfg}
+		entry = &serverEntry{config: newCfg}
+		entry.syncAllowedTools()
+		m.servers[cfg.Name] = entry
 		return
 	}
 
@@ -379,6 +394,7 @@ func (m *Manager) ApplyUserConfig(cfg UserServerConfig) {
 		} else if cfg.Tools != nil {
 			entry.config.AllowedTools = cfg.Tools.List
 		}
+		entry.syncAllowedTools()
 	}
 }
 
@@ -390,6 +406,7 @@ func (m *Manager) ApplyEnvOverrides() {
 	defer m.mu.Unlock()
 	for _, entry := range m.servers {
 		applyEnvOverrides(entry.config.Name, &entry.config)
+		entry.syncAllowedTools()
 	}
 }
 

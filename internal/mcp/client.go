@@ -77,14 +77,17 @@ func (c *Client) Connect(ctx context.Context, command string, args ...string) er
 	var err error
 	c.stdin, err = c.cmd.StdinPipe()
 	if err != nil {
+		c.cmd = nil
 		return fmt.Errorf("mcp %s: stdin pipe: %w", c.name, err)
 	}
 	c.stdout, err = c.cmd.StdoutPipe()
 	if err != nil {
+		c.cmd = nil
 		return fmt.Errorf("mcp %s: stdout pipe: %w", c.name, err)
 	}
 
 	if err := c.cmd.Start(); err != nil {
+		c.cmd = nil
 		return fmt.Errorf("mcp %s: start: %w", c.name, err)
 	}
 
@@ -206,6 +209,9 @@ func (c *Client) call(ctx context.Context, method string, params interface{}) (*
 	case resp := <-ch:
 		if resp.Error != nil {
 			return nil, fmt.Errorf("mcp %s: rpc error %d: %s", c.name, resp.Error.Code, resp.Error.Message)
+		}
+		if resp.Result == nil {
+			return nil, fmt.Errorf("mcp %s: %q returned null result", c.name, method)
 		}
 		return resp.Result, nil
 	case <-ctx.Done():

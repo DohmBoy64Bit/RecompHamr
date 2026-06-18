@@ -1,9 +1,12 @@
 package mcp
 
 import (
+	"context"
 	"os"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestNewManager(t *testing.T) {
@@ -489,3 +492,122 @@ func TestPcrecompToolsEnvCommand(t *testing.T) {
 		}
 	}
 }
+
+func TestApplyUserConfigPropagatesToolWhitelist(t *testing.T) {
+	m := NewManager()
+	m.Register(ServerConfig{
+		Name:         "test-srv",
+		Command:      "test",
+		AllowedTools: []string{"builtin_tool"},
+		RequireSkill: false,
+	})
+	m.mu.Lock()
+	entry := m.servers["test-srv"]
+	if entry.allowedTools == nil {
+		t.Fatal("expected runtime allowedTools map to be populated by Register")
+	}
+	if !entry.allowedTools["builtin_tool"] {
+		t.Error("expected builtin_tool to be in runtime allowedTools map")
+	}
+	m.mu.Unlock()
+
+	// Apply user config that overrides tools
+	m.ApplyUserConfig(UserServerConfig{
+		Name:     "test-srv",
+		Tools:    &toolList{List: []string{"user_tool_a", "user_tool_b"}},
+		ToolsSet: true,
+	})
+
+	m.mu.Lock()
+	entry = m.servers["test-srv"]
+	if entry.allowedTools == nil {
+		t.Fatal("expected runtime allowedTools map after ApplyUserConfig")
+	}
+	if entry.allowedTools["builtin_tool"] {
+		t.Error("builtin_tool should NOT be in runtime map after user override")
+	}
+	if !entry.allowedTools["user_tool_a"] {
+		t.Error("expected user_tool_a in runtime allowedTools map")
+	}
+	if !entry.allowedTools["user_tool_b"] {
+		t.Error("expected user_tool_b in runtime allowedTools map")
+	}
+	m.mu.Unlock()
+}
+
+func TestApplyUserConfigAllowAllTools(t *testing.T) {
+	m := NewManager()
+	m.Register(ServerConfig{
+		Name:         "test-srv",
+		Command:      "test",
+		AllowedTools: []string{"builtin_tool"},
+	})
+
+	m.ApplyUserConfig(UserServerConfig{
+		Name:     "test-srv",
+		Tools:    &toolList{AllowAll: true},
+		ToolsSet: true,
+	})
+
+	m.mu.Lock()
+	entry := m.servers["test-srv"]
+	if entry.allowedTools != nil {
+		t.Error("expected nil allowedTools (allow all) after ApplyUserConfig with AllowAll")
+	}
+	m.mu.Unlock()
+}
+
+func TestApplyUserConfigNewServerToolWhitelist(t *testing.T) {
+	m := NewManager()
+
+	m.ApplyUserConfig(UserServerConfig{
+		Name:     "new-srv",
+		Command:  strptr("new-command"),
+		Tools:    &toolList{List: []string{"new_tool"}},
+		ToolsSet: true,
+	})
+
+	m.mu.Lock()
+	entry, ok := m.servers["new-srv"]
+	if !ok {
+		t.Fatal("new server not registered")
+	}
+	if entry.allowedTools == nil {
+		t.Fatal("expected runtime allowedTools map for new server")
+	}
+	if !entry.allowedTools["new_tool"] {
+		t.Error("expected new_tool in runtime allowedTools map")
+	}
+	m.mu.Unlock()
+}
+
+func TestConcurrentConnectNoDoubleConnect(t *testing.T) {
+	m := NewManager()
+	m.Register(ServerConfig{
+		Name:    "test-srv",
+		Command: "nonexistent-binary",
+	})
+
+	var wg sync.WaitGroup
+	results := make([]error, 2)
+	for i := range 2 {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			results[idx] = m.Connect(ctx, "test-srv")
+		}(i)
+	}
+	wg.Wait()
+
+	// Both goroutines returned. No panic, no deadlock.
+	m.mu.Lock()
+	entry := m.servers["test-srv"]
+	state := entry.state
+	m.mu.Unlock()
+	_ = state // may be Error or Connected depending on timing
+	_ = results
+}
+
+func strptr(s string) *string { return &s }

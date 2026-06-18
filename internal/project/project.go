@@ -37,7 +37,7 @@ TODO
 ## Toolchain
 TODO
 `,
-		"REPHAMR_STATE.md": repohamrStateTemplate,
+		"REPHAMR_STATE.md": rephamrStateTemplate,
 		"EVIDENCE.md": `# Evidence
 
 Add confirmed facts only. Each entry should include the source file, command output, log, symbol, offset, or other evidence.
@@ -110,14 +110,30 @@ func StatusRE(root string) (string, error) {
 		}
 		text := strings.TrimSpace(string(data))
 		if len(text) > 1800 {
-			text = text[:1800] + "\n...truncated..."
+			text = runeSafeTruncate(text, 1800) + "\n...truncated..."
 		}
 		fmt.Fprintf(&b, "\n## %s\n%s\n", rel, text)
 	}
 	return b.String(), nil
 }
 
-var repohamrStateTemplate = `# RecompHAMR Project State
+// runeSafeTruncate truncates s to at most maxLen bytes without splitting a
+// multi-byte UTF-8 rune. If the cut point lands in the middle of a rune, the
+// partial rune is dropped.
+func runeSafeTruncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	for maxLen > 0 && maxLen < len(s) {
+		if s[maxLen]&0xc0 != 0x80 {
+			return s[:maxLen]
+		}
+		maxLen--
+	}
+	return s[:0]
+}
+
+var rephamrStateTemplate = `# RecompHAMR Project State
 > Auto-maintained by agent. Read automatically at session start.
 
 ## Quick Rules

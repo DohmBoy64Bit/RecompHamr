@@ -36,6 +36,9 @@ const defaultContextSize = 32768
 // Bootstrap won't seed it, coercion won't default it, and the TUI reads the
 // live value per response. Local Ollama has no header channel, so config.yaml
 // stays canonical there.
+//
+// Currently empty: no cloud profiles are registered yet. Populate this map
+// when adding a profile whose backend reports X-Context-Window.
 var cloudProfileNames = map[string]struct{}{}
 
 // IsCloudProfile reports whether a profile's context_size is server-managed.

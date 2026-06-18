@@ -66,6 +66,11 @@ func Repomixr(ctx context.Context, repoURL, branch string, removeComments, remov
 	if owner == "" || name == "" {
 		return fmt.Sprintf("(repomixr: could not parse repo URL %q — expected https://github.com/owner/repo)", repoURL)
 	}
+	// Guard against path traversal via crafted repo names (e.g. ../../../etc).
+	if strings.Contains(owner, "..") || strings.Contains(name, "..") ||
+		strings.ContainsAny(owner, "/\\") || strings.ContainsAny(name, "/\\") {
+		return fmt.Sprintf("(repomixr: invalid owner/repo name %q/%q)", owner, name)
+	}
 
 	if branch == "" {
 		branch = "main"
@@ -78,6 +83,9 @@ func Repomixr(ctx context.Context, repoURL, branch string, removeComments, remov
 	if err := os.MkdirAll(repoDir, 0o755); err != nil {
 		return fmt.Sprintf("(repomixr: mkdir %s: %v)", repoDir, err)
 	}
+
+	// Remove any stale clone from a prior run with the same owner-repo name.
+	_ = os.RemoveAll(cloneDir)
 
 	cloneArgs := []string{"clone", "--depth", "1", "--branch", branch, repoURL, cloneDir}
 	cmd := exec.CommandContext(ctx, "git", cloneArgs...)

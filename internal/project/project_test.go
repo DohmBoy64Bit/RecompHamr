@@ -136,34 +136,34 @@ func TestStateTemplateHasQuickRules(t *testing.T) {
 		"Command outputs are evidence",
 	}
 	for _, rule := range expectedRules {
-		if !strings.Contains(repohamrStateTemplate, rule) {
+		if !strings.Contains(rephamrStateTemplate, rule) {
 			t.Errorf("state template missing rule: %s", rule)
 		}
 	}
 }
 
 func TestStateTemplateHasSessionLogDate(t *testing.T) {
-	if !strings.Contains(repohamrStateTemplate, time.Now().Format("2006-01-02")) {
-		t.Errorf("state template should contain today's date, got: %s", repohamrStateTemplate)
+	if !strings.Contains(rephamrStateTemplate, time.Now().Format("2006-01-02")) {
+		t.Errorf("state template should contain today's date, got: %s", rephamrStateTemplate)
 	}
 }
 
 func TestStateTemplateHasBlockersTable(t *testing.T) {
-	if !strings.Contains(repohamrStateTemplate, "| Issue | Status | Evidence |") {
-		t.Errorf("state template missing blockers table header: %s", repohamrStateTemplate)
+	if !strings.Contains(rephamrStateTemplate, "| Issue | Status | Evidence |") {
+		t.Errorf("state template missing blockers table header: %s", rephamrStateTemplate)
 	}
 }
 
 func TestStateTemplateHasFunctionLedgerTable(t *testing.T) {
-	if !strings.Contains(repohamrStateTemplate, "| Name | Address | Classification | Confidence | Source |") {
-		t.Errorf("state template missing function ledger table: %s", repohamrStateTemplate)
+	if !strings.Contains(rephamrStateTemplate, "| Name | Address | Classification | Confidence | Source |") {
+		t.Errorf("state template missing function ledger table: %s", rephamrStateTemplate)
 	}
 }
 
 func TestStateTemplateTokenBudget(t *testing.T) {
 	// State template should be under ~500 chars to keep token budget low
 	// (~4 chars per token on average, so 500 chars = ~125 tokens)
-	if len(repohamrStateTemplate) > 1500 {
-		t.Errorf("state template too large: %d chars (target <1500)", len(repohamrStateTemplate))
+	if len(rephamrStateTemplate) > 1500 {
+		t.Errorf("state template too large: %d chars (target <1500)", len(rephamrStateTemplate))
 	}
 }

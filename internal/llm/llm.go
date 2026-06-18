@@ -174,7 +174,7 @@ const (
 // looping model emits frames and resets the watchdog every time, so it slips
 // straight past; runaway/failure nudges and Ctrl+C own that. RECOMPHAMR_IDLE_TIMEOUT
 // overrides the default (Go duration like "90m", or a bare number = seconds).
-const streamIdleTimeout = time.Hour
+const streamIdleTimeout = 5 * time.Minute
 
 // idleTimeoutFromEnv resolves RECOMPHAMR_IDLE_TIMEOUT to a duration, falling back
 // to streamIdleTimeout when unset or unparseable. Accepts a Go duration string
