@@ -86,6 +86,7 @@ func Run(projectDir string, cfg config.Config, cfgPath string) string {
 		{"BLOCKERS.md", "BLOCKERS.md"},
 		{"CHANGELOG.md", "CHANGELOG.md"},
 		{"repomix-instruction.md", "repomix-instruction.md"},
+		{"mcp.json", "mcp.json (MCP server config)"},
 	}
 	for _, e := range workspaceEntries {
 		full := filepath.Join(rehamr, e.path)

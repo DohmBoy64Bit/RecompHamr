@@ -76,7 +76,8 @@ Record local model profiles, context settings, and known behavior.
 		"decomp/compiler_detection.md":  "# Compiler Detection\n\n",
 		"decomp/matching_status.md":     "# Matching Status\n\n",
 		"decomp/symbols.md":             "# Symbols\n\n",
-		"skills/active.md":              "# Active Skills\n\n",
+		"skills/active.md": "# Active Skills\n\n",
+		"mcp.json": mcpJSONTemplate,
 	}
 	for rel, body := range files {
 		full := filepath.Join(root, rel)
@@ -181,4 +182,38 @@ var rephamrStateTemplate = `# RecompHAMR Project State
 | Date | Summary |
 |------|---------|
 | ` + time.Now().Format("2006-01-02") + ` | Initialized by /init-re |`
+
+const mcpJSONTemplate = `{
+  // Built-in server names: ghidra, n64-debug-mcp, pcrecomp, mcp-pine,
+  // objdiff, pcsx2, bizhawk, sega2asm.  Each supports these fields:
+  //
+  //   "command"       — stdio transport (local process). Mutually exclusive
+  //                     with "url"; if both are set, "url" wins.
+  //   "args"          — command arguments (array of strings).
+  //   "url"           — HTTP transport (connect to running server).
+  //   "tools"         — tool whitelist.  "*" = allow all tools.  Omit to
+  //                     inherit the built-in tool list.
+  //   "requireSkill"  — if true, server activates only when the matching
+  //                     skill is loaded.  Default: false for custom servers.
+
+  // Example: override ghidra with a Python script
+  // "ghidra": {
+  //   "command": "python",
+  //   "args": ["C:/tools/ghidra-mcp/bridge_mcp_ghidra.py"],
+  //   "requireSkill": true
+  // }
+
+  // Example: connect n64-debug-mcp over HTTP
+  // "n64-debug-mcp": {
+  //   "url": "http://localhost:9876"
+  // }
+
+  // Example: custom server with tool whitelist
+  // "my-custom-tool": {
+  //   "command": "my-mcp-server",
+  //   "args": ["--port", "8080"],
+  //   "tools": ["tool_a", "tool_b"]
+  // }
+}
+`
 

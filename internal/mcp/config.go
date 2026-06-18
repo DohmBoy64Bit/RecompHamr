@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // UserServerConfig is one entry from .rehamr/mcp.json (Option B schema).
@@ -62,7 +63,7 @@ func LoadMCPConfig(dir string) (map[string]UserServerConfig, error) {
 	}
 
 	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
+	if err := json.Unmarshal(stripJSONComments(data), &raw); err != nil {
 		return nil, fmt.Errorf("mcp.json: %w", err)
 	}
 
@@ -91,4 +92,52 @@ func LoadMCPConfig(dir string) (map[string]UserServerConfig, error) {
 		out[name] = cfg
 	}
 	return out, nil
+}
+
+// stripJSONComments removes // and /* */ comments from JSON data so we can
+// use .rehamr/mcp.json with human-readable documentation.
+func stripJSONComments(data []byte) []byte {
+	var out []byte
+	text := string(data)
+	inStr := false
+	for i := 0; i < len(text); {
+		if !inStr && text[i] == '"' {
+			inStr = true
+			out = append(out, text[i])
+			i++
+			continue
+		}
+		if inStr {
+			if text[i] == '\\' && i+1 < len(text) {
+				out = append(out, text[i], text[i+1])
+				i += 2
+				continue
+			}
+			if text[i] == '"' {
+				inStr = false
+			}
+			out = append(out, text[i])
+			i++
+			continue
+		}
+		if text[i] == '/' && i+1 < len(text) && text[i+1] == '/' {
+			end := strings.IndexByte(text[i:], '\n')
+			if end < 0 {
+				break
+			}
+			i += end + 1
+			continue
+		}
+		if text[i] == '/' && i+1 < len(text) && text[i+1] == '*' {
+			end := strings.Index(text[i:], "*/")
+			if end < 0 {
+				break
+			}
+			i += end + 2
+			continue
+		}
+		out = append(out, text[i])
+		i++
+	}
+	return out
 }
