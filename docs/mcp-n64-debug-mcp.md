@@ -22,8 +22,9 @@ lists, and inspect RSP state.
 1. Start Mupen64Plus with a ROM loaded
 2. Start the n64-debug-daemon (see Mupen64MCP docs for startup command)
 3. Ensure `n64-debug-mcp` is on PATH (or set `RECOMPHAMR_MCP_N64_COMMAND`)
-4. Start recomphamr — connect with `/mcp connect n64-debug-mcp`
-5. Run `/skill n64-debug-mcp` — unlocks the skill text + `n64-debug-mcp.*` tools
-6. Verify: `/mcp tools n64-debug-mcp` — all tools available by default
+4. Or use HTTP: set `RECOMPHAMR_MCP_N64_URL` to a streamable-http endpoint
+5. Start recomphamr — connect with `/mcp connect n64-debug-mcp`
+6. Run `/skill n64-debug-mcp` — unlocks the skill text + `n64-debug-mcp.*` tools
+7. Verify: `/mcp tools n64-debug-mcp` — all tools available by default
 
 Refer to [common.md](mcp-common.md) for shared env vars and management commands.

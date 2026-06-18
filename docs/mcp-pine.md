@@ -20,7 +20,8 @@ management.
 ## Enable
 
 1. Start recomphamr — connect with `/mcp connect mcp-pine`
-2. Run `/skill mcp-pine` — unlocks `mcp-pine.*` tools
-3. Verify: `/mcp tools mcp-pine`
+2. Or use HTTP: set `RECOMPHAMR_MCP_PINE_URL` to a streamable-http endpoint
+3. Run `/skill mcp-pine` — unlocks `mcp-pine.*` tools
+4. Verify: `/mcp tools mcp-pine`
 
 Refer to [common.md](mcp-common.md) for shared env vars and management commands.

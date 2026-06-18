@@ -26,6 +26,6 @@ extraction through runtime bringup to full game loop.
 ## When to use
 
 Xbox 360 static recompilation projects — XBLA, LIVE, PIRS, CON, 360 ISO
-targets using ReXGlue or XenonRecomp toolchains. Merger of
-xbox360-decomp-skill (tracks A-D, operational phases) and 360tools-skill
-(build gate, extraction tools, run script conventions).
+targets using ReXGlue or XenonRecomp toolchains. Covers all four tracks
+(A-D) with operational phases, build gate discipline, and PPC guest-VA
+analysis via Ghidra MCP.

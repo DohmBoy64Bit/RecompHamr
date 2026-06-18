@@ -19,8 +19,8 @@ available pre-built at **[REPlugins](https://github.com/DohmBoy64Bit/REPlugins)*
 for Ghidra 12.1.2.
 
 **Slash commands:** `/help`, `/clear`, `/models`, `/rehampass`, `/skills`,
-`/skill`, `/init-re`, `/status-re`, `/doctor`, `/mcp`. Skills and MCP tools
-wire into the system prompt dynamically.
+`/skill`, `/skill-audit`, `/skill-new`, `/init-re`, `/status-re`, `/doctor`,
+`/mcp`. Skills and MCP tools wire into the system prompt dynamically.
 
 ## Install
 
@@ -118,14 +118,16 @@ reachability, and workspace state. Full output reference in
 
 ## MCP Servers
 
-recomphamr connects to MCP (Model Context Protocol) servers over stdio via
-JSON-RPC 2.0, exposing their tools to the LLM.
+recomphamr connects to MCP (Model Context Protocol) servers over stdio or
+streamable HTTP via JSON-RPC 2.0, exposing their tools to the LLM.
 
 Eight servers ship with built-in configs: `ghidra` (20 tools by default),
 `n64-debug-mcp` (all tools), `pcrecomp` (8 PC recompilation tools),
 `mcp-pine` (RPCS3 debug bridge), `objdiff` (object diffing),
 `pcsx2` (PCSX2 debug bridge), `bizhawk` (multi-system emulator debug),
 and `sega2asm` (Genesis ROM disassembler).
+Server connection details (command, args, URL, tools) are configured in
+`.rehamr/mcp.json` and/or overridden via `RECOMPHAMR_MCP_*` env vars.
 MCP tools are skill-gated to keep the token budget lean — zero MCP tools are
 sent unless a matching skill is loaded. Servers are registered on startup but
 not auto-connected by default; use `/mcp connect <name>` or set
@@ -134,7 +136,6 @@ not auto-connected by default; use `/mcp connect <name>` or set
 ```
 /mcp                         show server status + tool counts
 /mcp connect|disconnect <n>  launch or kill a server
-/mcp path <server> [path]    set or show server binary path
 /mcp tools <server>          list tools (* = enabled)
 /mcp enable|disable <s> <t>  toggle individual or all tools
 ```

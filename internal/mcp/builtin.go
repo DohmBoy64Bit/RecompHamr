@@ -54,111 +54,97 @@ func parseToolsEnv(val string) []string {
 	return out
 }
 
+// legacyEnvSuffix maps server names whose env var suffix doesn't match the
+// mechanical derivation (replace hyphens with underscores, uppercase). The
+// old code used explicit os.Getenv calls with these shorter names; this map
+// preserves backward compatibility so existing env var setups continue to work.
+var legacyEnvSuffix = map[string]string{
+	"n64-debug-mcp": "N64",
+	"mcp-pine":      "PINE",
+	"pcrecomp":      "PCRECOMP",
+}
+
+// envKey returns the RECOMPHAMR_MCP_<KEY>_* suffix for a server name.
+func envKey(name string) string {
+	if suffix, ok := legacyEnvSuffix[name]; ok {
+		return suffix
+	}
+	return strings.ToUpper(strings.ReplaceAll(name, "-", "_"))
+}
+
+// applyEnvOverrides mutates a server config from RECOMPHAMR_MCP_<NAME>_*
+// environment variables. Empty env vars leave the config unchanged.
+func applyEnvOverrides(name string, cfg *ServerConfig) {
+	key := envKey(name)
+	if v := os.Getenv("RECOMPHAMR_MCP_" + key + "_COMMAND"); v != "" {
+		cfg.Command = v
+		cfg.URL = ""
+	}
+	if v := os.Getenv("RECOMPHAMR_MCP_" + key + "_URL"); v != "" {
+		cfg.URL = v
+		cfg.Command = ""
+		cfg.Args = nil
+	}
+	if v := os.Getenv("RECOMPHAMR_MCP_" + key + "_TOOLS"); v != "" {
+		cfg.AllowedTools = parseToolsEnv(v)
+	}
+}
+
 func BuiltinServers() []ServerConfig {
-	ghidraCmd := os.Getenv("RECOMPHAMR_MCP_GHIDRA_COMMAND")
-	if ghidraCmd == "" {
-		ghidraCmd = "ghidra-mcp"
-	}
-
-	n64Cmd := os.Getenv("RECOMPHAMR_MCP_N64_COMMAND")
-	if n64Cmd == "" {
-		n64Cmd = "n64-debug-mcp"
-	}
-
-	pcrecompCmd := os.Getenv("RECOMPHAMR_MCP_PCRECOMP_COMMAND")
-	if pcrecompCmd == "" {
-		pcrecompCmd = "pcrecomp-mcp"
-	}
-
-	pineCmd := os.Getenv("RECOMPHAMR_MCP_PINE_COMMAND")
-	if pineCmd == "" {
-		pineCmd = "mcp-pine"
-	}
-
-	objdiffCmd := os.Getenv("RECOMPHAMR_MCP_OBJDIFF_COMMAND")
-	if objdiffCmd == "" {
-		objdiffCmd = "objdiff-mcp"
-	}
-
-	pcsx2Cmd := os.Getenv("RECOMPHAMR_MCP_PCSX2_COMMAND")
-	if pcsx2Cmd == "" {
-		pcsx2Cmd = "pcsx2-mcp"
-	}
-
-	bizhawkCmd := os.Getenv("RECOMPHAMR_MCP_BIZHAWK_COMMAND")
-	if bizhawkCmd == "" {
-		bizhawkCmd = "mcp-bizhawk"
-	}
-
-	sega2asmCmd := os.Getenv("RECOMPHAMR_MCP_SEGA2ASM_COMMAND")
-	if sega2asmCmd == "" {
-		sega2asmCmd = "sega2asm-mcp"
-	}
-
-	ghidraTools := ghidraDefaultTools
-	if env := os.Getenv("RECOMPHAMR_MCP_GHIDRA_TOOLS"); env == "*" {
-		ghidraTools = nil
-	} else if env != "" {
-		ghidraTools = parseToolsEnv(env)
-	}
-
-	pcrecompTools := pcrecompDefaultTools
-	if env := os.Getenv("RECOMPHAMR_MCP_PCRECOMP_TOOLS"); env == "*" {
-		pcrecompTools = nil
-	} else if env != "" {
-		pcrecompTools = parseToolsEnv(env)
-	}
-
-	return []ServerConfig{
+	servers := []ServerConfig{
 		{
 			Name:         "ghidra",
-			Command:      ghidraCmd,
+			Command:      "ghidra-mcp",
 			Args:         []string{},
-			AllowedTools: ghidraTools,
+			AllowedTools: ghidraDefaultTools,
 			RequireSkill: true,
 		},
 		{
 			Name:         "n64-debug-mcp",
-			Command:      n64Cmd,
+			Command:      "n64-debug-mcp",
 			Args:         []string{},
 			RequireSkill: true,
 		},
 		{
 			Name:         "pcrecomp",
-			Command:      pcrecompCmd,
+			Command:      "pcrecomp-mcp",
 			Args:         []string{},
-			AllowedTools: pcrecompTools,
+			AllowedTools: pcrecompDefaultTools,
 			RequireSkill: true,
 		},
 		{
 			Name:         "mcp-pine",
-			Command:      pineCmd,
+			Command:      "mcp-pine",
 			Args:         []string{},
 			RequireSkill: true,
 		},
 		{
 			Name:         "objdiff",
-			Command:      objdiffCmd,
+			Command:      "objdiff-mcp",
 			Args:         []string{},
 			RequireSkill: true,
 		},
 		{
 			Name:         "pcsx2",
-			Command:      pcsx2Cmd,
+			Command:      "pcsx2-mcp",
 			Args:         []string{},
 			RequireSkill: true,
 		},
 		{
 			Name:         "bizhawk",
-			Command:      bizhawkCmd,
+			Command:      "mcp-bizhawk",
 			Args:         []string{},
 			RequireSkill: true,
 		},
 		{
 			Name:         "sega2asm",
-			Command:      sega2asmCmd,
+			Command:      "sega2asm-mcp",
 			Args:         []string{},
 			RequireSkill: true,
 		},
 	}
+	for i := range servers {
+		applyEnvOverrides(servers[i].Name, &servers[i])
+	}
+	return servers
 }

@@ -75,7 +75,11 @@ for details.
 
 ## Token cost
 
-Each skill `.md` file averages ~10-15 lines (~200-400 tokens). Loading all
-twenty-eight adds ~6,600-9,600 tokens to the system prompt. Loading none adds zero —
-`buildSystem()` skips the `## Active RE Skills` block entirely when
-`activeSkills` is empty.
+Skills range 55–85 lines each (~1,500–6,000 tokens depending on the
+model's tokenizer). Loading all twenty-eight adds substantial prompt
+overhead — load only the skills you need. Loading none adds zero:
+`buildSystem()` skips the `## Active RE Skills` block when `activeSkills`
+is empty.
+
+See **[tools-vs-skills.md](tools-vs-skills.md)** for a cost comparison
+between tools and skills.

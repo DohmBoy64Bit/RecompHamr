@@ -21,7 +21,8 @@ and breakpoint debugging.
 ## Enable
 
 1. Start recomphamr — connect with `/mcp connect pcsx2`
-2. Run `/skill pcsx2` — unlocks `pcsx2.*` tools (30 debugging tools)
-3. Verify: `/mcp tools pcsx2`
+2. Or use HTTP: set `RECOMPHAMR_MCP_PCSX2_URL` to a streamable-http endpoint
+3. Run `/skill pcsx2` — unlocks `pcsx2.*` tools (30 debugging tools)
+4. Verify: `/mcp tools pcsx2`
 
 Refer to [common.md](mcp-common.md) for shared env vars and management commands.

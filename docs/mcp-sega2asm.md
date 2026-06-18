@@ -17,7 +17,8 @@ disassembly, 49 compression formats, graphics extraction, VDP register hints.
 ## Enable
 
 1. Start recomphamr — connect with `/mcp connect sega2asm`
-2. Run `/skill sega2asm` — unlocks `sega2asm.*` tools
-3. Verify: `/mcp tools sega2asm`
+2. Or use HTTP: set `RECOMPHAMR_MCP_SEGA2ASM_URL` to a streamable-http endpoint
+3. Run `/skill sega2asm` — unlocks `sega2asm.*` tools
+4. Verify: `/mcp tools sega2asm`
 
 Refer to [common.md](mcp-common.md) for shared env vars and management commands.

@@ -20,9 +20,10 @@ code lifting, and function classification. 8 of 30+ tools enabled by default.
 ## Enable
 
 1. Start recomphamr — connect with `/mcp connect pcrecomp`
-2. Run `/skill pcrecomp` — unlocks skill text + 8 default `pcrecomp.*` tools
-3. Verify: `/mcp tools pcrecomp` — shows 8 enabled tools
-4. Enable all: `RECOMPHAMR_MCP_PCRECOMP_TOOLS=*` or `/mcp enable pcrecomp *`
+2. Or use HTTP: set `RECOMPHAMR_MCP_PCREOMP_URL` to a streamable-http endpoint
+3. Run `/skill pcrecomp` — unlocks skill text + 8 default `pcrecomp.*` tools
+4. Verify: `/mcp tools pcrecomp` — shows 8 enabled tools
+5. Enable all: `RECOMPHAMR_MCP_PCREOMP_TOOLS=*` or `/mcp enable pcrecomp *`
 
 ## Default tools (8 of 30+)
 

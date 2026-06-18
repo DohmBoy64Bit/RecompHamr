@@ -30,10 +30,11 @@ pip install ghidra-mcp
 ## Enable
 
 1. Ensure `ghidra-mcp` is on PATH (or set `RECOMPHAMR_MCP_GHIDRA_COMMAND`)
-2. Start recomphamr — connect with `/mcp connect ghidra`
-3. Run `/skill ghidra-mcp` — unlocks the skill text + `ghidra.*` tools
-4. Verify: `/mcp tools ghidra` — shows 20 enabled tools by default
-5. For all tools: set `RECOMPHAMR_MCP_GHIDRA_TOOLS=*` or `/mcp enable ghidra *`
+2. Or use HTTP: set `RECOMPHAMR_MCP_GHIDRA_URL` to a streamable-http endpoint
+3. Start recomphamr — connect with `/mcp connect ghidra`
+4. Run `/skill ghidra-mcp` — unlocks the skill text + `ghidra.*` tools
+5. Verify: `/mcp tools ghidra` — shows 20 enabled tools by default
+6. For all tools: set `RECOMPHAMR_MCP_GHIDRA_TOOLS=*` or `/mcp enable ghidra *`
 
 ## Tool filtering
 

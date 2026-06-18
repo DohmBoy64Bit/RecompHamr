@@ -46,6 +46,6 @@ MCP tools unless explicitly activated.
 | Location | `tools[]` array in API request | System prompt |
 | Purpose | Execute actions | Provide knowledge + guardrails |
 | Invocation | LLM calls by name, returns result | LLM reads as instructions |
-| Token cost | Schema per tool (~200 tokens each) | Body per skill (~200-400 tokens each) |
+| Token cost | Schema per tool (~200 tokens each) | Body per skill (~1,500-6,000 tokens each) |
 | Lifetime | Always available (built-in), skill-gated (MCP) | Loaded until restart |
-| Addition | Add MCP servers via `Register()` | Drop `.md` files in `.rehamr/skills/` |
+| Addition | Add servers via `.rehamr/mcp.json` or `mcp.Register()` | Drop `.md` files in `.rehamr/skills/` |

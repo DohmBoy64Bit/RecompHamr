@@ -79,6 +79,14 @@ func main() {
 	for _, s := range mcp.BuiltinServers() {
 		mcpmgr.Register(s)
 	}
+	if userServers, err := mcp.LoadMCPConfig(cfg.Dir); err != nil {
+		log.Printf("recomphamr: mcp.json: %v", err)
+	} else {
+		for _, s := range userServers {
+			mcpmgr.ApplyUserConfig(s)
+		}
+	}
+	mcpmgr.ApplyEnvOverrides()
 
 	abs, _ := filepath.Abs(cwd)
 	m := tui.New(cfg, client, abs, version, mcpmgr)
@@ -124,16 +132,17 @@ Keys (inside TUI):
   ctrl+d   quit (on empty input)
 
 Config:
-  .rehamr/config.yaml   per-project settings
+  .rehamr/config.yaml   per-project settings (models, profiles, active)
+  .rehamr/mcp.json      MCP server configs (commands, URLs, tools)
 
 Env:
   RECOMPHAMR_URL               override the active profile's url at runtime
   RECOMPHAMR_IDLE_TIMEOUT      stream idle timeout, e.g. 90m or 1h (default 1h)
   RECOMPHAMR_NO_UPDATE_CHECK   set to 1 to skip self-update on launch
   RECOMPHAMR_MCP_AUTOSTART     set to 1 to enable MCP auto-connect on startup
-  RECOMPHAMR_MCP_GHIDRA_COMMAND  override ghidra MCP server command
-  RECOMPHAMR_MCP_N64_COMMAND     override n64-debug-mcp server command
-  RECOMPHAMR_MCP_GHIDRA_TOOLS    comma-separated tool list or * for all`))
+  RECOMPHAMR_MCP_<NAME>_COMMAND  override MCP server stdio command (e.g. GHIDRA, N64, PCRECOMP)
+  RECOMPHAMR_MCP_<NAME>_URL      override MCP server HTTP endpoint (streamable-http transport)
+  RECOMPHAMR_MCP_<NAME>_TOOLS    comma-separated tool list or * for all`))
 }
 
 // isLocalBuild reports whether the binary came from a working tree rather

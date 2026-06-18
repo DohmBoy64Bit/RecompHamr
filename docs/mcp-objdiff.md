@@ -20,7 +20,8 @@ decompilation projects.
 ## Enable
 
 1. Start recomphamr — connect with `/mcp connect objdiff`
-2. Run `/skill objdiff` — unlocks `objdiff.*` tools
-3. Verify: `/mcp tools objdiff`
+2. Or use HTTP: set `RECOMPHAMR_MCP_OBJDIFF_URL` to a streamable-http endpoint
+3. Run `/skill objdiff` — unlocks `objdiff.*` tools
+4. Verify: `/mcp tools objdiff`
 
 Refer to [common.md](mcp-common.md) for shared env vars and management commands.

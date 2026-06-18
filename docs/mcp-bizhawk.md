@@ -21,7 +21,8 @@ NES, SNES, GB/GBC/GBA, Genesis, N64, PS1, and 12+ more systems.
 ## Enable
 
 1. Start recomphamr — connect with `/mcp connect bizhawk`
-2. Load `/skill bizhawk` — unlocks `bizhawk.*` tools (16 tools)
-3. Verify: `/mcp tools bizhawk`
+2. Or use HTTP: set `RECOMPHAMR_MCP_BIZHAWK_URL` to a streamable-http endpoint
+3. Load `/skill bizhawk` — unlocks `bizhawk.*` tools (16 tools)
+4. Verify: `/mcp tools bizhawk`
 
 Refer to [common.md](mcp-common.md) for shared env vars and management commands.

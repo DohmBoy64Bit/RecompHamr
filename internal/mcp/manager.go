@@ -45,10 +45,22 @@ func (s ServerState) String() string {
 
 type ServerConfig struct {
 	Name         string
-	Command      string
-	Args         []string
+	Command      string   // command to launch (stdio transport)
+	Args         []string // arguments for Command
+	URL          string   // HTTP endpoint URL (streamable-http transport)
 	AllowedTools []string // nil = allow all, slice = whitelist
 	RequireSkill bool     // true = tools only injected when matching skill is active
+}
+
+// mcpClient is the common interface for both stdio and HTTP MCP clients.
+type mcpClient interface {
+	Connected() bool
+	Name() string
+	Version() string
+	ServerName() string
+	Tools() []ToolDef
+	CallTool(ctx context.Context, name string, args map[string]interface{}) (*CallToolResult, error)
+	Disconnect()
 }
 
 type ServerStatus struct {
@@ -66,7 +78,7 @@ type Manager struct {
 
 type serverEntry struct {
 	config       ServerConfig
-	client       *Client
+	client       mcpClient
 	state        ServerState
 	err          string
 	allowedTools map[string]bool // nil = allow all
@@ -109,12 +121,26 @@ func (m *Manager) Connect(ctx context.Context, name string) error {
 	}
 	entry.state = StateConnecting
 	entry.err = ""
-	entry.client = NewClient("recomphamr", "0.2.0")
+	config := entry.config // copy under lock
 	m.mu.Unlock()
 
-	err := entry.client.Connect(ctx, entry.config.Command, entry.config.Args...)
+	var err error
+	if config.URL != "" {
+		client := NewHTTPClient("recomphamr", "0.2.0")
+		err = client.Connect(ctx, config.URL)
+		m.mu.Lock()
+		if err == nil {
+			entry.client = client
+		}
+	} else {
+		client := NewClient("recomphamr", "0.2.0")
+		err = client.Connect(ctx, config.Command, config.Args...)
+		m.mu.Lock()
+		if err == nil {
+			entry.client = client
+		}
+	}
 
-	m.mu.Lock()
 	if err != nil {
 		entry.state = StateError
 		entry.err = err.Error()
@@ -178,8 +204,14 @@ func (m *Manager) Status(name string) ServerStatus {
 	version := ""
 	if entry.client != nil && entry.state == StateConnected {
 		toolCount = m.toolCount(entry)
-		if entry.client.serverInfo.Name != "" {
-			version = entry.client.serverInfo.Version
+		if entry.config.URL == "" {
+			if c, ok := entry.client.(*Client); ok && c.serverInfo.Name != "" {
+				version = c.serverInfo.Version
+			}
+		} else {
+			if c, ok := entry.client.(*HTTPClient); ok && c.serverInfo.Name != "" {
+				version = c.serverInfo.Version
+			}
 		}
 	}
 	return ServerStatus{
@@ -291,25 +323,74 @@ func (m *Manager) toolCount(entry *serverEntry) int {
 	return n
 }
 
-func (m *Manager) SetCommand(name, command string) error {
+// ApplyUserConfig merges a user-supplied config from .rehamr/mcp.json into an
+// existing server entry, or registers a new server if the name is unknown.
+// Only explicitly set fields are merged; omitted fields keep their current
+// values (built-in defaults for known servers, zero values for new ones).
+func (m *Manager) ApplyUserConfig(cfg UserServerConfig) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	entry, ok := m.servers[name]
+
+	entry, ok := m.servers[cfg.Name]
 	if !ok {
-		return fmt.Errorf("mcp: unknown server %q", name)
+		newCfg := ServerConfig{Name: cfg.Name}
+		if cfg.Command != nil {
+			newCfg.Command = *cfg.Command
+			if cfg.Args != nil {
+				newCfg.Args = *cfg.Args
+			}
+		}
+		if cfg.URL != nil {
+			newCfg.URL = *cfg.URL
+		}
+		if cfg.RequireSkill != nil {
+			newCfg.RequireSkill = *cfg.RequireSkill
+		}
+		if cfg.ToolsSet {
+			if cfg.Tools != nil && cfg.Tools.AllowAll {
+				newCfg.AllowedTools = nil
+			} else if cfg.Tools != nil {
+				newCfg.AllowedTools = cfg.Tools.List
+			}
+		}
+		m.servers[cfg.Name] = &serverEntry{config: newCfg}
+		return
 	}
-	entry.config.Command = command
-	return nil
+
+	if cfg.Command != nil {
+		entry.config.Command = *cfg.Command
+		entry.config.Args = nil
+		if cfg.Args != nil {
+			entry.config.Args = *cfg.Args
+		}
+		entry.config.URL = "" // stdio and HTTP are mutually exclusive
+	}
+	if cfg.URL != nil {
+		entry.config.URL = *cfg.URL
+		entry.config.Command = ""
+		entry.config.Args = nil
+	}
+	if cfg.RequireSkill != nil {
+		entry.config.RequireSkill = *cfg.RequireSkill
+	}
+	if cfg.ToolsSet {
+		if cfg.Tools != nil && cfg.Tools.AllowAll {
+			entry.config.AllowedTools = nil
+		} else if cfg.Tools != nil {
+			entry.config.AllowedTools = cfg.Tools.List
+		}
+	}
 }
 
-func (m *Manager) GetCommand(name string) string {
+// ApplyEnvOverrides re-applies RECOMPHAMR_MCP_<NAME>_* environment variables
+// to every registered server. This lets env vars override both built-in
+// defaults and .rehamr/mcp.json settings.
+func (m *Manager) ApplyEnvOverrides() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	entry, ok := m.servers[name]
-	if !ok {
-		return ""
+	for _, entry := range m.servers {
+		applyEnvOverrides(entry.config.Name, &entry.config)
 	}
-	return entry.config.Command
 }
 
 func (m *Manager) ConnectedNames() []string {

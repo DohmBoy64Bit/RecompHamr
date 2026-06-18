@@ -5,23 +5,38 @@ servers. For server-specific setup, see the per-server docs.
 
 ## How MCP servers work
 
-recomphamr launches MCP servers as child processes over stdio using JSON-RPC
-2.0. Each server registers on startup. Tools are skill-gated — they only
-appear in the LLM's tool list when a matching skill is loaded. Servers do
-not auto-connect by default; use `/mcp connect <name>` or set
-`RECOMPHAMR_MCP_AUTOSTART=1`.
+recomphamr connects to MCP servers over stdio (launched as child processes) or
+streamable HTTP (already-running endpoints), using JSON-RPC 2.0. Each server
+registers on startup. Tools are skill-gated — they only appear in the LLM's
+tool list when a matching skill is loaded. Servers do not auto-connect by
+default; use `/mcp connect <name>` or set `RECOMPHAMR_MCP_AUTOSTART=1`.
 
 Full architecture details in **[mcp.md](mcp.md)**.
 
 ## How to configure a server
 
-MCP servers are launched as child processes. Two ways to tell recomphamr where
-the binary is:
+Three ways to tell recomphamr how to reach each MCP server:
 
-1. **Put it on PATH** — the binary name (e.g. `ghidra-mcp`) must be
+1. **`.rehamr/mcp.json`** — the preferred persistent config. Define servers as
+   JSON with `command`/`args` (stdio) or `url` (HTTP), plus optional `tools`
+   whitelist and `requireSkill`. For example:
+   ```json
+   {
+     "ghidra": {
+       "command": "python",
+       "args": ["C:/Tools/ghidra-mcp/bridge_mcp_ghidra.py"],
+       "tools": ["*"]
+     }
+   }
+   ```
+   Omitted fields keep built-in defaults. Create this file in your project's
+   `.rehamr/` directory.
+
+2. **Put it on PATH** — the binary name (e.g. `ghidra-mcp`) must be
    findable by your OS when recomphamr starts.
-2. **Set the env var** — point to the full path when the binary isn't on
-   PATH or you want to override the default name.
+
+3. **Set the env var** — point to the full path when the binary isn't on
+   PATH or you want to override mcp.json at runtime.
 
 **Verify with `/doctor`** — it shows every MCP env var and whether it's set.
 Run it after configuring to confirm your settings.
@@ -57,33 +72,38 @@ automatically — no env var needed. Env vars exist as overrides for custom
 install locations or renamed binaries.
 
 Note: MCP server paths are **never** stored in `.rehamr/config.yaml`. They
-are strictly environment variables — this keeps credentials and local paths
-out of version-controlled config files.
+belong in `.rehamr/mcp.json` or environment variables — this keeps
+version-controlled project config (mcp.json, checked in) separate from
+secrets (env vars, never checked in).
 
 ## Env vars
+
+All MCP servers support the `RECOMPHAMR_MCP_<NAME>_*` pattern. The `<NAME>`
+suffix is the server key: `GHIDRA`, `N64`, `PCRECOMP`, `PINE`, `OBJDIFF`,
+`PCSX2`, `BIZHAWK`, `SEGA2ASM`. Three per-server vars are supported:
+
+| Var suffix | Purpose |
+|---|---|
+| `RECOMPHAMR_MCP_<NAME>_COMMAND` | Override MCP server stdio command/path |
+| `RECOMPHAMR_MCP_<NAME>_URL` | Override MCP server HTTP endpoint (streamable-http transport) |
+| `RECOMPHAMR_MCP_<NAME>_TOOLS` | Tool list or `*` for all |
+
+Global vars:
 
 | Var | Purpose |
 |---|---|
 | `RECOMPHAMR_MCP_AUTOSTART` | Set to `1` to enable auto-connect on startup |
-| `RECOMPHAMR_MCP_GHIDRA_COMMAND` | Override ghidra MCP server command/path |
-| `RECOMPHAMR_MCP_GHIDRA_TOOLS` | Ghidra tool list or `*` for all |
-| `RECOMPHAMR_MCP_N64_COMMAND` | Override n64-debug-mcp server command/path |
-| `RECOMPHAMR_MCP_PCRECOMP_COMMAND` | Override pcrecomp MCP server command/path |
-| `RECOMPHAMR_MCP_PCRECOMP_TOOLS` | PCRECOMP tool list or `*` for all |
-| `RECOMPHAMR_MCP_PINE_COMMAND` | Override mcp-pine server command/path |
-| `RECOMPHAMR_MCP_OBJDIFF_COMMAND` | Override objdiff MCP server command/path |
-| `RECOMPHAMR_MCP_PCSX2_COMMAND` | Override pcsx2 MCP server command/path |
-| `RECOMPHAMR_MCP_BIZHAWK_COMMAND` | Override bizhawk MCP server command/path |
-| `RECOMPHAMR_MCP_SEGA2ASM_COMMAND` | Override sega2asm MCP server command/path |
 | `RECOMPHAMR_PCRECOMP_PATH` | Path to PCRECOMP-Next clone directory |
+
+See the per-server docs for specific setup guides; see [mcp.md](mcp.md) for
+architecture details.
 
 ## Runtime management
 
 ```
 /mcp                         show all servers, connection state, tool counts
-/mcp path <server> [path]    set or show server binary path
-/mcp connect <name>          launch server + JSON-RPC handshake
-/mcp disconnect <name>       kill child process
+/mcp connect <name>          launch server (stdio) or connect (HTTP) + handshake
+/mcp disconnect <name>       kill child process or close HTTP connection
 /mcp tools <server>          list every tool (* = enabled)
 /mcp enable <server> <t|*>   allow one tool or all
 /mcp disable <server> <t|*>   block one tool or all

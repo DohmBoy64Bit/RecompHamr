@@ -1,7 +1,8 @@
 # MCP Servers
 
-recomphamr connects to MCP (Model Context Protocol) servers over stdio via
-JSON-RPC 2.0, exposing their tools to the LLM alongside the built-in tools.
+recomphamr connects to MCP (Model Context Protocol) servers over stdio or
+streamable HTTP via JSON-RPC 2.0, exposing their tools to the LLM alongside
+the built-in tools.
 
 ## Architecture
 
@@ -19,8 +20,9 @@ Model (TUI)
 
 ## Connection lifecycle
 
-1. **Startup** — `BuiltinServers()` reads env vars for command paths and
-   registers all servers. Set `RECOMPHAMR_MCP_AUTOSTART=1` to enable
+1. **Startup** — `BuiltinServers()` returns defaults; `.rehamr/mcp.json`
+   merges overrides and adds custom servers; `RECOMPHAMR_MCP_*` env vars
+   apply as final overrides. Set `RECOMPHAMR_MCP_AUTOSTART=1` to enable
    `ConnectAll()` on startup. By default, servers are registered but not
    auto-connected — use `/mcp connect <name>` to connect manually.
 
@@ -76,37 +78,42 @@ When the LLM calls `ghidra.decompile_function`:
 
 ## Built-in servers
 
-| Server | Default command | Env override |
+| Server | Default command | Env override prefix |
 |---|---|---|
-| `ghidra` | `ghidra-mcp` | `RECOMPHAMR_MCP_GHIDRA_COMMAND` |
-| `n64-debug-mcp` | `n64-debug-mcp` | `RECOMPHAMR_MCP_N64_COMMAND` |
-| `pcrecomp` | `pcrecomp-mcp` | `RECOMPHAMR_MCP_PCRECOMP_COMMAND` |
-| `mcp-pine` | `mcp-pine` | `RECOMPHAMR_MCP_PINE_COMMAND` |
-| `objdiff` | `objdiff-mcp` | `RECOMPHAMR_MCP_OBJDIFF_COMMAND` |
-| `pcsx2` | `pcsx2-mcp` | `RECOMPHAMR_MCP_PCSX2_COMMAND` |
-| `bizhawk` | `mcp-bizhawk` | `RECOMPHAMR_MCP_BIZHAWK_COMMAND` |
-| `sega2asm` | `sega2asm-mcp` | `RECOMPHAMR_MCP_SEGA2ASM_COMMAND` |
+| `ghidra` | `ghidra-mcp` | `RECOMPHAMR_MCP_GHIDRA_*` |
+| `n64-debug-mcp` | `n64-debug-mcp` | `RECOMPHAMR_MCP_N64_*` |
+| `pcrecomp` | `pcrecomp-mcp` | `RECOMPHAMR_MCP_PCREOMP_*` |
+| `mcp-pine` | `mcp-pine` | `RECOMPHAMR_MCP_PINE_*` |
+| `objdiff` | `objdiff-mcp` | `RECOMPHAMR_MCP_OBJDIFF_*` |
+| `pcsx2` | `pcsx2-mcp` | `RECOMPHAMR_MCP_PCSX2_*` |
+| `bizhawk` | `mcp-bizhawk` | `RECOMPHAMR_MCP_BIZHAWK_*` |
+| `sega2asm` | `sega2asm-mcp` | `RECOMPHAMR_MCP_SEGA2ASM_*` |
 
-Ghidra ships with the 20 most-used RE tools enabled by default
-(`RECOMPHAMR_MCP_GHIDRA_TOOLS=*` for all). All other servers allow all tools
-by default. pcrecomp ships with 8 pipeline tools
-(`RECOMPHAMR_MCP_PCRECOMP_TOOLS=*` for all).
+All servers support `_COMMAND` (stdio path), `_URL` (HTTP endpoint), and
+`_TOOLS` (comma-separated list or `*`). Ghidra ships with 20 default tools;
+pcrecomp ships with 8; all others allow all tools by default.
 
 ## Runtime management
 
-```
-/mcp                         show all servers, connection state, tool counts
-/mcp path <server> [path]    set or show server binary path
-/mcp connect <name>          launch server + JSON-RPC handshake
-/mcp disconnect <name>       kill child process
-/mcp tools <server>          list every tool (* = enabled)
-/mcp enable <server> <t|*>   allow one tool or all
-/mcp disable <server> <t|*>   block one tool or all
-```
+See **[mcp-common.md](mcp-common.md)** for the full `/mcp` command reference
+and env var configuration.
 
 ## Custom servers
 
-Any stdio MCP server can be registered at startup:
+Add servers in `.rehamr/mcp.json` — the preferred non-code approach.
+Servers defined there merge with built-in ones (omitted fields keep defaults)
+or register as new entries:
+
+```json
+{
+  "my-tools": {
+    "command": "my-mcp-server",
+    "tools": ["tool_a", "tool_b"]
+  }
+}
+```
+
+To register servers programmatically at startup, use the Go API:
 
 ```go
 mcp.Register(mcp.ServerConfig{

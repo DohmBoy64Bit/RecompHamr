@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
@@ -11,6 +14,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/DohmBoy64Bit/recomphamr/internal/classifier"
 	"github.com/DohmBoy64Bit/recomphamr/internal/cloud"
 	"github.com/DohmBoy64Bit/recomphamr/internal/config"
 	"github.com/DohmBoy64Bit/recomphamr/internal/doctor"
@@ -98,6 +102,24 @@ var commands = []command{
 			}
 			return out
 		},
+	},
+	{
+		name:        "/skill-audit",
+		description: "classify a skill and suggest a template",
+		handler:     (Model).cmdSkillAudit,
+		args: func(m Model) []argOption {
+			names := skills.Names()
+			out := make([]argOption, 0, len(names))
+			for _, n := range names {
+				out = append(out, argOption{value: n})
+			}
+			return out
+		},
+	},
+	{
+		name:        "/skill-new",
+		description: "fetch a URL and classify as a new skill",
+		handler:     (Model).cmdSkillNew,
 	},
 	{
 		name:        "/init-re",
@@ -445,6 +467,189 @@ func (m Model) cmdStatusRE(_ []string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) cmdSkillAudit(args []string) (tea.Model, tea.Cmd) {
+	if len(args) < 1 {
+		m.appendLine(styleWarn.Render("usage: /skill-audit <skill-name>"))
+		return m, nil
+	}
+	name, err := skills.Resolve(args[0])
+	if err != nil {
+		m.appendLine(styleError.Render("unknown skill: " + args[0]))
+		return m, nil
+	}
+	body, err := skills.Get(name)
+	if err != nil {
+		m.appendLine(styleError.Render("failed to read skill: " + err.Error()))
+		return m, nil
+	}
+	r := classifier.Classify(name, body)
+
+	m.appendLine(styleOK.Render(fmt.Sprintf("skill-audit: %s", name)))
+	m.appendLine(styleDim.Render(""))
+	m.appendLine(fmt.Sprintf("  Class:        %s", r.Class.TemplateName()))
+	m.appendLine(fmt.Sprintf("  Confidence:   %.0f%%", r.Confidence*100))
+	m.appendLine(styleDim.Render("  ── Feature Scores ──"))
+	m.appendLine(fmt.Sprintf("  Full Workflow: %3d", r.Scores[classifier.FullWorkflow]))
+	m.appendLine(fmt.Sprintf("  Micro-Skill:   %3d", r.Scores[classifier.MicroSkill]))
+	m.appendLine(fmt.Sprintf("  Tool Bridge:   %3d", r.Scores[classifier.ToolBridge]))
+	m.appendLine(styleDim.Render("  ── Reasoning ──"))
+	for _, re := range r.Reasoning {
+		m.appendLine(styleDim.Render(fmt.Sprintf("  · %s", re)))
+	}
+	if len(r.Alternatives) > 0 {
+		m.appendLine(styleDim.Render("  ── Alternatives ──"))
+		for _, a := range r.Alternatives {
+			m.appendLine(styleDim.Render(fmt.Sprintf("  · %s (score: %d)", a.TemplateName(), r.Scores[a])))
+		}
+	}
+	if r.Class == classifier.NoneClass {
+		m.appendLine("")
+		m.appendLine(styleWarn.Render("No matching template. Edit recomphamr_skill_audit_and_template.md to add a new template class, then re-run /skill-audit."))
+	}
+	return m, nil
+}
+
+func (m Model) cmdSkillNew(args []string) (tea.Model, tea.Cmd) {
+	usage := func() { m.appendLine(styleWarn.Render("usage: /skill-new <url>")) }
+
+	if len(args) < 1 || args[0] == "" {
+		usage()
+		return m, nil
+	}
+	rawURL := args[0]
+	parsed, err := url.ParseRequestURI(rawURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		m.appendLine(styleError.Render(fmt.Sprintf("invalid URL: %s", rawURL)))
+		return m, nil
+	}
+
+	// Fetch with timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		m.appendLine(styleError.Render("request failed: " + err.Error()))
+		return m, nil
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		m.appendLine(styleError.Render("fetch failed: " + err.Error()))
+		return m, nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		m.appendLine(styleError.Render(fmt.Sprintf("HTTP %d", resp.StatusCode)))
+		return m, nil
+	}
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 100_000))
+	if err != nil {
+		m.appendLine(styleError.Render("read failed: " + err.Error()))
+		return m, nil
+	}
+	content := string(raw)
+	if len(content) < 60 {
+		m.appendLine(styleWarn.Render("fetched content too short to classify"))
+		return m, nil
+	}
+
+	// Derive skill name.
+	name := skillNameFromURL(parsed)
+	m.appendLine(styleDim.Render(fmt.Sprintf("Fetched %d bytes → %s", len(content), name)))
+
+	// Classify.
+	r := classifier.Classify(name, content)
+
+	// Format output.
+	m.appendLine(styleOK.Render(fmt.Sprintf("skill-new: %s", name)))
+	m.appendLine(styleDim.Render(fmt.Sprintf("  URL: %s", rawURL)))
+	m.appendLine(styleDim.Render(""))
+	m.appendLine(fmt.Sprintf("  Class:        %s", r.Class.TemplateName()))
+	m.appendLine(fmt.Sprintf("  Confidence:   %.0f%%", r.Confidence*100))
+	m.appendLine(styleDim.Render("  ── Feature Scores ──"))
+	m.appendLine(fmt.Sprintf("  Full Workflow: %3d", r.Scores[classifier.FullWorkflow]))
+	m.appendLine(fmt.Sprintf("  Micro-Skill:   %3d", r.Scores[classifier.MicroSkill]))
+	m.appendLine(fmt.Sprintf("  Tool Bridge:   %3d", r.Scores[classifier.ToolBridge]))
+	m.appendLine(styleDim.Render("  ── Reasoning ──"))
+	for _, re := range r.Reasoning {
+		m.appendLine(styleDim.Render(fmt.Sprintf("  · %s", re)))
+	}
+	if len(r.Alternatives) > 0 {
+		m.appendLine(styleDim.Render("  ── Alternatives ──"))
+		for _, a := range r.Alternatives {
+			m.appendLine(styleDim.Render(fmt.Sprintf("  · %s (score: %d)", a.TemplateName(), r.Scores[a])))
+		}
+	}
+	if r.Class == classifier.NoneClass {
+		m.appendLine("")
+		m.appendLine(styleWarn.Render("No matching template. Reply to suggest a new template class, or choose one manually."))
+		return m, nil
+	}
+
+	// Save fetched content to .rehamr/fetched/<name>.md so the AI can read it
+	// back when creating the final skill file.
+	fetchedDir := filepath.Join(m.ProjectDir, ".rehamr", "fetched")
+	if err := os.MkdirAll(fetchedDir, 0o755); err != nil {
+		m.appendLine(styleWarn.Render("cache dir: " + err.Error()))
+	} else {
+		fetchedPath := filepath.Join(fetchedDir, name+".md")
+		if err := os.WriteFile(fetchedPath, raw, 0o644); err != nil {
+			m.appendLine(styleWarn.Render("cache save: " + err.Error()))
+		} else {
+			m.appendLine(styleDim.Render(fmt.Sprintf("  Cached: %s", fetchedPath)))
+		}
+	}
+	m.appendLine("")
+	m.appendLine(styleDim.Render("Ask the user to confirm the classification. If confirmed, read the"))
+	m.appendLine(styleDim.Render("correct template section from recomphamr_skill_audit_and_template.md,"))
+	m.appendLine(styleDim.Render(fmt.Sprintf("wrap the fetched content from .rehamr/fetched/%s.md, and", name)))
+	m.appendLine(styleDim.Render(fmt.Sprintf("write internal/skills/%s.md — then run go build ./... .", name)))
+
+	return m, nil
+}
+
+// skillNameFromURL derives a kebab-case skill name from the last path segment.
+func skillNameFromURL(u *url.URL) string {
+	// Use the last non-empty path segment.
+	seg := strings.TrimRight(u.Path, "/")
+	if idx := strings.LastIndexByte(seg, '/'); idx >= 0 {
+		seg = seg[idx+1:]
+	}
+	if seg == "" {
+		seg = u.Host
+	}
+	// Strip extension.
+	if ext := filepath.Ext(seg); ext != "" {
+		seg = strings.TrimSuffix(seg, ext)
+	}
+	// Lowercase, replace non-alnum with hyphens, collapse runs.
+	seg = strings.ToLower(seg)
+	var b strings.Builder
+	lastHyphen := false
+	for _, r := range seg {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			if r == '-' {
+				if !lastHyphen && b.Len() > 0 {
+					b.WriteByte('-')
+				}
+				lastHyphen = true
+				continue
+			}
+			b.WriteRune(r)
+			lastHyphen = false
+		} else if r == ' ' || r == '_' || r == '.' {
+			if !lastHyphen && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			lastHyphen = true
+		}
+	}
+	name := strings.Trim(b.String(), "-")
+	if len(name) < 2 {
+		name = "new-skill"
+	}
+	return name
+}
+
 func (m Model) cmdDoctor(_ []string) (tea.Model, tea.Cmd) {
 	m.appendLine("Running diagnostics...")
 	result := doctor.Run(m.ProjectDir, *m.cfg, "")
@@ -460,7 +665,8 @@ func (m Model) cmdMcp(args []string) (tea.Model, tea.Cmd) {
 	if len(args) == 0 {
 		m.appendLine(m.mcpManager.FormatStatus())
 		m.appendLine("")
-		m.appendLine(styleDim.Render("/mcp connect|disconnect|path|tools|enable|disable <server> [tool|path]"))
+		m.appendLine(styleDim.Render("/mcp connect|disconnect|tools|enable|disable <server> [tool]"))
+		m.appendLine(styleDim.Render("Servers are configured in .rehamr/mcp.json or via RECOMPHAMR_MCP_* env vars."))
 		return m, nil
 	}
 	switch args[0] {
@@ -528,33 +734,8 @@ func (m Model) cmdMcp(args []string) (tea.Model, tea.Cmd) {
 		} else {
 			m.appendLine(styleWarn.Render("usage: /mcp disable <server> <tool | *>"))
 		}
-	case "path":
-		if len(args) < 2 {
-			m.appendLine(styleWarn.Render("usage: /mcp path <server> [path]"))
-			return m, nil
-		}
-		if len(args) >= 3 {
-			path := args[2]
-			if err := m.mcpManager.SetCommand(args[1], path); err != nil {
-				m.appendLine(styleError.Render(err.Error()))
-				return m, nil
-			}
-			m.mcpManager.Disconnect(args[1])
-			m.appendLine(styleOK.Render(fmt.Sprintf("mcp %s: path set to %s · connecting...", args[1], path)))
-			return m, func() tea.Msg {
-				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer cancel()
-				return mcpConnectMsg{name: args[1], err: m.mcpManager.Connect(ctx, args[1])}
-			}
-		}
-		cmd := m.mcpManager.GetCommand(args[1])
-		if cmd == "" {
-			m.appendLine(styleWarn.Render(fmt.Sprintf("mcp %s: unknown server", args[1])))
-		} else {
-			m.appendLine(styleDim.Render(fmt.Sprintf("mcp %s: %s", args[1], cmd)))
-		}
 	default:
-			m.appendLine(styleWarn.Render("usage: /mcp [connect|disconnect|path|tools|enable|disable] <server> [tool|path]"))
+			m.appendLine(styleWarn.Render("usage: /mcp [connect|disconnect|tools|enable|disable] <server> [tool]"))
 	}
 	return m, nil
 }
@@ -569,10 +750,12 @@ func (m Model) cmdHelp(_ []string) (tea.Model, tea.Cmd) {
 		{"/models", "list · <name> set"},
 		{"/skills", "list built-in RE skills"},
 		{"/skill", "load a skill by name"},
+		{"/skill-audit", "classify a skill and suggest a template"},
+		{"/skill-new", "fetch URL and classify as new skill"},
 		{"/init-re", "create .rehamr/ evidence workspace"},
 		{"/status-re", "summarize RE project state"},
 		{"/doctor", "run environment diagnostics"},
-		{"/mcp", "show or manage MCP servers and tools"},
+		{"/mcp", "manage MCP servers"},
 		{"/help", "show this help"},
 	} {
 		m.appendLine(fmt.Sprintf("  %-14s %s", c.name, c.desc))

@@ -4,26 +4,26 @@
 
 This audit covers the 25 uploaded Markdown skill files:
 
-- `bizhawk(1).md`
-- `build-fix-loop(1).md`
-- `cdb-debug(1).md`
-- `core-re(1).md`
-- `evidence-mode(1).md`
-- `file-format-reversing(1).md`
-- `function-discovery(1).md`
-- `gb-recomp(1).md`
-- `gc-decomp(1).md`
-- `gen-decomp(1).md`
-- `ghidra-mcp(1).md`
-- `imhex(1).md`
-- `mcp-pine(1).md`
-- `n64-debug-mcp(1).md`
-- `n64-decomp(1).md`
-- `objdiff(1).md`
-- `pcrecomp(1).md`
-- `pcsx2(1).md`
-- `project-handoff(1).md`
-- `ps2recomp(1).md`
+- `bizhawk.md`
+- `build-fix-loop.md`
+- `cdb-debug.md`
+- `core-re.md`
+- `evidence-mode.md`
+- `file-format-reversing.md`
+- `function-discovery.md`
+- `gb-recomp.md`
+- `gc-decomp.md`
+- `gen-decomp.md`
+- `ghidra-mcp.md`
+- `imhex.md`
+- `mcp-pine.md`
+- `n64-debug-mcp.md`
+- `n64-decomp.md`
+- `objdiff.md`
+- `pcrecomp.md`
+- `pcsx2.md`
+- `project-handoff.md`
+- `ps2recomp.md`
 - `snesrecomp.md`
 - `vb-decomp.md`
 - `windows-game-decomp.md`
@@ -73,26 +73,26 @@ The weakest files are not bad; they are just incomplete as skills. Most of them 
 
 | File | Classification | Why | Refactor Recommendation |
 |---|---|---|---|
-| `bizhawk(1).md` | **Tool Bridge Card** | Good capability/setup summary for BizHawk bridge, but it mostly says what the bridge enables and how to install it. | Add boot checks, connection verification, common commands, evidence outputs, save-state policy, and session close. |
-| `build-fix-loop(1).md` | **Micro-Skill** | Strong compact loop and report format. Very skill-like despite being short. | Add trigger conditions, stop conditions, retry/circuit-breaker rule, and evidence file update behavior. |
-| `cdb-debug(1).md` | **Full Skill** | Has prerequisites, boot, workflow, patterns, crash classification, diagnostic logging, evidence archiving, and session close. | Add “when not to use,” destructive-command rules, and explicit output files for traces. |
-| `core-re(1).md` | **Micro-Skill** | Good general RE policy, but very short. | Expand into the base micro-template: trigger, boot, source-of-truth discovery, validation, output artifacts, session close. |
-| `evidence-mode(1).md` | **Micro-Skill / Policy Skill** | Excellent evidence taxonomy and anti-hallucination policy. | Add enforcement checklist, required output format, promotion rules from hypothesis to confirmed, and examples. |
-| `file-format-reversing(1).md` | **Micro-Skill / Method Skill** | Skill-like because it has evidence rules, preferred output structure, and workflow. | Add boot checklist, sample inventory command expectations, parser validation gate, and failure handling. |
-| `function-discovery(1).md` | **Micro-Skill / Method Skill** | Good goal, methodology, and output CSV schema. | Add phased workflow, confidence rubric, tool references, stopping conditions, and validation rules for jump tables/vtables. |
-| `gb-recomp(1).md` | **Full Skill** | Strong boot, prohibitions, pipeline, phases, commands, mental model, and close behavior. | Add explicit build gate and source-of-truth artifact list. |
-| `gc-decomp(1).md` | **Full Skill** | Strong role, boot, prohibitions, pipeline, phases, hardware model, tools, and close behavior. | Add validation gate for generated C build, frame proof, and Dolphin comparison outputs. |
-| `gen-decomp(1).md` | **Full Skill** | Good Genesis workflow, prohibitions, phases, hardware reference, and session close. | Add legal/asset boundary note and explicit generated-output policy. |
-| `ghidra-mcp(1).md` | **Tool Micro-Skill** | Useful checklist and guardrails, but short and tool-centered. | Add boot verification, export commands/targets, evidence output files, and session close. |
-| `imhex(1).md` | **Tool Guide / Micro-Skill** | Good explanation of ImHex and Pattern Language usage; more guide-like than operational. | Add trigger, boot, prohibited assumptions, pattern validation gate, output files, and session close. |
-| `mcp-pine(1).md` | **Tool Bridge Card** | Good setup/capability summary for RPCS3 PINE bridge. | Add connection boot checks, runtime capture protocol, A/B comparison output, failure handling, and session close. |
-| `n64-debug-mcp(1).md` | **Tool Micro-Skill** | Good checklist and guardrails for Mupen64Plus MCP, but very compact. | Add setup, common captures, exact output paths, reproducibility policy, and session close. |
-| `n64-decomp(1).md` | **Full Skill / Exemplary** | One of the strongest: role, boot, prohibitions, mental model, constants, build gate, tracks, phases, session close. | Use this as a model. Minor improvement: add standardized “outputs” section and function-discovery links. |
-| `objdiff(1).md` | **Tool Bridge Card** | Good capability/setup/when-to-use card. | Add boot check for `objdiff.json`, report format, validation gate, failed-diff handling, and session close. |
-| `pcrecomp(1).md` | **Pipeline Micro-Skill** | Has pipeline, checklist, and guardrails. More operational than a tool card, less complete than a full skill. | Add boot section, prohibitions, phases, evidence outputs, and session close. |
-| `pcsx2(1).md` | **Tool Bridge Card** | Good setup/capability summary for PCSX2 MCP. | Add connection checks, pause-before-read rule, A/B comparison workflow, output captures, and session close. |
-| `project-handoff(1).md` | **Micro-Skill** | Clear and useful compact handoff protocol. | Add a fixed handoff template and rules for evidence/hypothesis separation. |
-| `ps2recomp(1).md` | **Full Skill / Exemplary** | Very strong: boot, prohibitions, build gate, phases, fix tools, mental model, MCP reference, session close. | Use as a model. Minor improvement: add explicit source artifact paths and phase success criteria. |
+| `bizhawk.md` | **Tool Bridge Card** | Good capability/setup summary for BizHawk bridge, but it mostly says what the bridge enables and how to install it. | Add boot checks, connection verification, common commands, evidence outputs, save-state policy, and session close. |
+| `build-fix-loop.md` | **Micro-Skill** | Strong compact loop and report format. Very skill-like despite being short. | Add trigger conditions, stop conditions, retry/circuit-breaker rule, and evidence file update behavior. |
+| `cdb-debug.md` | **Full Skill** | Has prerequisites, boot, workflow, patterns, crash classification, diagnostic logging, evidence archiving, and session close. | Add “when not to use,” destructive-command rules, and explicit output files for traces. |
+| `core-re.md` | **Micro-Skill** | Good general RE policy, but very short. | Expand into the base micro-template: trigger, boot, source-of-truth discovery, validation, output artifacts, session close. |
+| `evidence-mode.md` | **Micro-Skill / Policy Skill** | Excellent evidence taxonomy and anti-hallucination policy. | Add enforcement checklist, required output format, promotion rules from hypothesis to confirmed, and examples. |
+| `file-format-reversing.md` | **Micro-Skill / Method Skill** | Skill-like because it has evidence rules, preferred output structure, and workflow. | Add boot checklist, sample inventory command expectations, parser validation gate, and failure handling. |
+| `function-discovery.md` | **Micro-Skill / Method Skill** | Good goal, methodology, and output CSV schema. | Add phased workflow, confidence rubric, tool references, stopping conditions, and validation rules for jump tables/vtables. |
+| `gb-recomp.md` | **Full Skill** | Strong boot, prohibitions, pipeline, phases, commands, mental model, and close behavior. | Add explicit build gate and source-of-truth artifact list. |
+| `gc-decomp.md` | **Full Skill** | Strong role, boot, prohibitions, pipeline, phases, hardware model, tools, and close behavior. | Add validation gate for generated C build, frame proof, and Dolphin comparison outputs. |
+| `gen-decomp.md` | **Full Skill** | Good Genesis workflow, prohibitions, phases, hardware reference, and session close. | Add legal/asset boundary note and explicit generated-output policy. |
+| `ghidra-mcp.md` | **Tool Micro-Skill** | Useful checklist and guardrails, but short and tool-centered. | Add boot verification, export commands/targets, evidence output files, and session close. |
+| `imhex.md` | **Tool Guide / Micro-Skill** | Good explanation of ImHex and Pattern Language usage; more guide-like than operational. | Add trigger, boot, prohibited assumptions, pattern validation gate, output files, and session close. |
+| `mcp-pine.md` | **Tool Bridge Card** | Good setup/capability summary for RPCS3 PINE bridge. | Add connection boot checks, runtime capture protocol, A/B comparison output, failure handling, and session close. |
+| `n64-debug-mcp.md` | **Tool Micro-Skill** | Good checklist and guardrails for Mupen64Plus MCP, but very compact. | Add setup, common captures, exact output paths, reproducibility policy, and session close. |
+| `n64-decomp.md` | **Full Skill / Exemplary** | One of the strongest: role, boot, prohibitions, mental model, constants, build gate, tracks, phases, session close. | Use this as a model. Minor improvement: add standardized “outputs” section and function-discovery links. |
+| `objdiff.md` | **Tool Bridge Card** | Good capability/setup/when-to-use card. | Add boot check for `objdiff.json`, report format, validation gate, failed-diff handling, and session close. |
+| `pcrecomp.md` | **Pipeline Micro-Skill** | Has pipeline, checklist, and guardrails. More operational than a tool card, less complete than a full skill. | Add boot section, prohibitions, phases, evidence outputs, and session close. |
+| `pcsx2.md` | **Tool Bridge Card** | Good setup/capability summary for PCSX2 MCP. | Add connection checks, pause-before-read rule, A/B comparison workflow, output captures, and session close. |
+| `project-handoff.md` | **Micro-Skill** | Clear and useful compact handoff protocol. | Add a fixed handoff template and rules for evidence/hypothesis separation. |
+| `ps2recomp.md` | **Full Skill / Exemplary** | Very strong: boot, prohibitions, build gate, phases, fix tools, mental model, MCP reference, session close. | Use as a model. Minor improvement: add explicit source artifact paths and phase success criteria. |
 | `snesrecomp.md` | **Near-Full Skill** | Has role, boot, pipeline, mental model, phases, hardware reference, and session close. | Add prohibitions, build gate, validation proof, emulator comparison, and generated-code policy. |
 | `vb-decomp.md` | **Full Skill** | Strong boot, prohibitions, pipeline, mental model, phases, hardware reference, and close behavior. | Add explicit build/validation gate and corpus report output format. |
 | `windows-game-decomp.md` | **Full Skill / Exemplary** | Strong layer model, runtime-family detection, prohibitions, tracks, phases, Ghidra references, engine-specific guidance, and session close. | Use as a model. Add standard output artifact list and exact report file names. |
@@ -748,12 +748,12 @@ Recommended order for full skills:
 
 Highest-priority refactor targets:
 
-- `bizhawk(1).md`
-- `mcp-pine(1).md`
-- `pcsx2(1).md`
-- `objdiff(1).md`
-- `ghidra-mcp(1).md`
-- `n64-debug-mcp(1).md`
+- `bizhawk.md`
+- `mcp-pine.md`
+- `pcsx2.md`
+- `objdiff.md`
+- `ghidra-mcp.md`
+- `n64-debug-mcp.md`
 
 These are useful, but they should define active behavior: connection checks, evidence capture, failure handling, and session close.
 
@@ -761,13 +761,13 @@ These are useful, but they should define active behavior: connection checks, evi
 
 Targets:
 
-- `core-re(1).md`
-- `evidence-mode(1).md`
-- `function-discovery(1).md`
-- `file-format-reversing(1).md`
-- `build-fix-loop(1).md`
-- `project-handoff(1).md`
-- `pcrecomp(1).md`
+- `core-re.md`
+- `evidence-mode.md`
+- `function-discovery.md`
+- `file-format-reversing.md`
+- `build-fix-loop.md`
+- `project-handoff.md`
+- `pcrecomp.md`
 
 These mostly need standardized output and stop conditions.
 
@@ -775,14 +775,14 @@ These mostly need standardized output and stop conditions.
 
 Targets:
 
-- `n64-decomp(1).md`
-- `ps2recomp(1).md`
+- `n64-decomp.md`
+- `ps2recomp.md`
 - `windows-game-decomp.md`
 - `xbox360-decomp.md`
 - `xboxrecomp.md`
-- `gc-decomp(1).md`
-- `gb-recomp(1).md`
-- `gen-decomp(1).md`
+- `gc-decomp.md`
+- `gb-recomp.md`
+- `gen-decomp.md`
 - `vb-decomp.md`
 - `snesrecomp.md`
 
@@ -830,11 +830,11 @@ Avoid:
 
 - `N64 Decomp Guide.md`
 - `xboxrecomp notes final.md`
-- duplicated upload names like `n64-decomp(1).md` inside the embedded skill directory
+- duplicated upload names like `n64-decomp.md` inside the embedded skill directory
 
 Recommended cleanup before embedding:
 
-- rename `*(1).md` files to their clean names
+- rename `*.md` files to their clean names
 - keep one canonical file per skill
 - let custom skills override embedded ones intentionally
 - keep tests for custom override behavior

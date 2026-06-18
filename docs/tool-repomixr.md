@@ -82,7 +82,7 @@ The LLM calls it when it needs a reference codebase. Example parameters:
 
 ```json
 {
-  "repo_url": "https://github.com/KuromeSan/RecompHamr",
+  "repo_url": "https://github.com/DohmBoy64Bit/RecompHamr",
   "branch": "main",
   "remove_comments": false,
   "remove_empty_lines": false,
