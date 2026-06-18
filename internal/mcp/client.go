@@ -68,7 +68,9 @@ func (c *Client) Connect(ctx context.Context, command string, args ...string) er
 		c.mu.Unlock()
 		return fmt.Errorf("mcp %s: already connected", c.name)
 	}
-	c.cmd = exec.CommandContext(ctx, command, args...)
+	// Use context.Background() for the process lifespan; the caller's ctx
+	// (e.g. a slash-command timeout) must not kill the long-running bridge.
+	c.cmd = exec.CommandContext(context.Background(), command, args...)
 	c.cmd.Stderr = nil
 	c.pending = make(map[int64]chan *Response)
 	c.readerDone = make(chan struct{})
