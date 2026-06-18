@@ -119,11 +119,11 @@ func TestListMarkdownWithActive(t *testing.T) {
 }
 
 func TestCustomDirMergesNames(t *testing.T) {
-	old := customDir
-	customDir = t.TempDir()
-	defer func() { customDir = old }()
+	dir := t.TempDir()
+	SetCustomDir(dir)
+	defer SetCustomDir("")
 
-	os.WriteFile(filepath.Join(customDir, "my-skill.md"), []byte("# My Skill\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "my-skill.md"), []byte("# My Skill\n"), 0o644)
 
 	names := Names()
 	found := false
@@ -139,11 +139,11 @@ func TestCustomDirMergesNames(t *testing.T) {
 }
 
 func TestCustomDirGetDiskFirst(t *testing.T) {
-	old := customDir
-	customDir = t.TempDir()
-	defer func() { customDir = old }()
+	dir := t.TempDir()
+	SetCustomDir(dir)
+	defer SetCustomDir("")
 
-	os.WriteFile(filepath.Join(customDir, "core-re.md"), []byte("# Custom Override\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "core-re.md"), []byte("# Custom Override\n"), 0o644)
 
 	body, err := Get("core-re")
 	if err != nil {
@@ -155,11 +155,11 @@ func TestCustomDirGetDiskFirst(t *testing.T) {
 }
 
 func TestListMarkdownLabelsCustom(t *testing.T) {
-	old := customDir
-	customDir = t.TempDir()
-	defer func() { customDir = old }()
+	dir := t.TempDir()
+	SetCustomDir(dir)
+	defer SetCustomDir("")
 
-	os.WriteFile(filepath.Join(customDir, "my-skill.md"), []byte("# My Skill\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "my-skill.md"), []byte("# My Skill\n"), 0o644)
 
 	out := ListMarkdown(nil)
 	if !strings.Contains(out, "my-skill (custom)") {
@@ -168,9 +168,8 @@ func TestListMarkdownLabelsCustom(t *testing.T) {
 }
 
 func TestSetCustomDirEmpty(t *testing.T) {
-	old := customDir
 	SetCustomDir("")
-	customDir = old
+	defer SetCustomDir("")
 	names := Names()
 	foundEmbedded := false
 	for _, n := range names {
@@ -185,11 +184,11 @@ func TestSetCustomDirEmpty(t *testing.T) {
 }
 
 func TestResolveCustomSkill(t *testing.T) {
-	old := customDir
-	customDir = t.TempDir()
-	defer func() { customDir = old }()
+	dir := t.TempDir()
+	SetCustomDir(dir)
+	defer SetCustomDir("")
 
-	os.WriteFile(filepath.Join(customDir, "my-skill.md"), []byte("# My Skill\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "my-skill.md"), []byte("# My Skill\n"), 0o644)
 
 	name, err := Resolve("my-skill")
 	if err != nil {
@@ -201,9 +200,8 @@ func TestResolveCustomSkill(t *testing.T) {
 }
 
 func TestResolveSucceedsWhenCustomDirIsMissing(t *testing.T) {
-	old := customDir
 	SetCustomDir(filepath.Join(t.TempDir(), "nonexistent"))
-	defer func() { customDir = old }()
+	defer SetCustomDir("")
 
 	name, err := Resolve("core-re")
 	if err != nil {
@@ -212,4 +210,58 @@ func TestResolveSucceedsWhenCustomDirIsMissing(t *testing.T) {
 	if name != "core-re" {
 		t.Errorf("expected core-re, got %q", name)
 	}
+}
+
+func TestIsEmbeddedTrue(t *testing.T) {
+	if !IsEmbedded("core-re") {
+		t.Error("core-re should be embedded")
+	}
+	if !IsEmbedded("n64-decomp") {
+		t.Error("n64-decomp should be embedded")
+	}
+}
+
+func TestIsEmbeddedFalseForCustom(t *testing.T) {
+	dir := t.TempDir()
+	SetCustomDir(dir)
+	defer SetCustomDir("")
+
+	os.WriteFile(filepath.Join(dir, "my-custom.md"), []byte("# custom\n"), 0o644)
+
+	if IsEmbedded("my-custom") {
+		t.Error("custom skill should not be reported as embedded")
+	}
+}
+
+func TestIsEmbeddedFalseForUnknown(t *testing.T) {
+	if IsEmbedded("nonexistent-skill") {
+		t.Error("unknown skill should not be embedded")
+	}
+}
+
+func TestConcurrentSetCustomDirAndNames(t *testing.T) {
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < 100; i++ {
+			SetCustomDir(t.TempDir())
+			Names()
+		}
+		close(done)
+	}()
+	SetCustomDir("")
+	<-done
+	SetCustomDir("")
+}
+
+func TestConcurrentGetAndSetCustomDir(t *testing.T) {
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < 50; i++ {
+			SetCustomDir(t.TempDir())
+			Get("core-re")
+		}
+		close(done)
+	}()
+	<-done
+	SetCustomDir("")
 }

@@ -7,18 +7,28 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 )
 
 //go:embed *.md
 var fsys embed.FS
 
-var customDir string
+var (
+	mu        sync.RWMutex
+	customDir string
+)
 
 func SetCustomDir(dir string) {
+	mu.Lock()
+	defer mu.Unlock()
 	customDir = dir
 }
 
 func Names() []string {
+	mu.RLock()
+	dir := customDir
+	mu.RUnlock()
+
 	set := map[string]bool{}
 
 	entries, _ := fsys.ReadDir(".")
@@ -29,8 +39,8 @@ func Names() []string {
 		set[strings.TrimSuffix(e.Name(), ".md")] = true
 	}
 
-	if customDir != "" {
-		if de, err := os.ReadDir(customDir); err == nil {
+	if dir != "" {
+		if de, err := os.ReadDir(dir); err == nil {
 			for _, e := range de {
 				if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
 					continue
@@ -64,8 +74,12 @@ func Get(name string) (string, error) {
 		return "", err
 	}
 
-	if customDir != "" {
-		path := filepath.Join(customDir, n+".md")
+	mu.RLock()
+	dir := customDir
+	mu.RUnlock()
+
+	if dir != "" {
+		path := filepath.Join(dir, n+".md")
 		if b, err := os.ReadFile(path); err == nil {
 			return string(b), nil
 		}
@@ -73,7 +87,7 @@ func Get(name string) (string, error) {
 
 	b, err := fsys.ReadFile(filepath.ToSlash(n + ".md"))
 	if err != nil {
-		return "", fmt.Errorf("skill %q not found", name)
+		return "", fmt.Errorf("skill %q: %w", n, err)
 	}
 	return string(b), nil
 }
@@ -83,13 +97,6 @@ func ListMarkdown(active []string) string {
 	for _, a := range active {
 		activeSet[a] = true
 	}
-	embedded := map[string]bool{}
-	entries, _ := fsys.ReadDir(".")
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
-			embedded[strings.TrimSuffix(e.Name(), ".md")] = true
-		}
-	}
 	var b strings.Builder
 	b.WriteString("Built-in RE skills:\n")
 	for _, n := range Names() {
@@ -98,11 +105,23 @@ func ListMarkdown(active []string) string {
 			mark = "*"
 		}
 		label := n
-		if !embedded[n] {
+		if !IsEmbedded(n) {
 			label = n + " (custom)"
 		}
 		fmt.Fprintf(&b, "%s %s\n", mark, label)
 	}
 	b.WriteString("\nLoad one with /skill <name>.\n")
 	return b.String()
+}
+
+func IsEmbedded(name string) bool {
+	entries, _ := fsys.ReadDir(".")
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
+			if strings.TrimSuffix(e.Name(), ".md") == name {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -477,7 +477,7 @@ func (m Model) cmdSkillNew(args []string) (tea.Model, tea.Cmd) {
 	m.appendLine(styleDim.Render("Ask the user to confirm the classification. If confirmed, read the"))
 	m.appendLine(styleDim.Render("correct template section from recomphamr_skill_audit_and_template.md,"))
 	m.appendLine(styleDim.Render(fmt.Sprintf("wrap the fetched content from .rehamr/fetched/%s.md, and", name)))
-	m.appendLine(styleDim.Render(fmt.Sprintf("write internal/skills/%s.md — then run go build ./... .", name)))
+	m.appendLine(styleDim.Render(fmt.Sprintf("write .rehamr/skills/%s.md — then reload with /skills .", name)))
 
 	return m, nil
 }

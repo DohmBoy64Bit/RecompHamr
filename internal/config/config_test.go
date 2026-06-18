@@ -155,7 +155,7 @@ func TestConfigFilePermissionsAreOwnerOnly(t *testing.T) {
 
 	// Save() must keep 0o600; set a key on the active profile to exercise
 	// the same key-bearing code path.
-	cfg.Models["local"].Key = "sk-12345678"
+	cfg.Models["lmstudio-amd"].Key = "sk-12345678"
 	if err := cfg.Save(); err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +235,7 @@ func TestSaveIsAtomicAndLeavesNoTemp(t *testing.T) {
 		t.Fatalf("config.yaml not decodable after atomic Save: %v", err)
 	}
 	if reloaded.Models["lmstudio-amd"].URL != "http://llm-2:11434" {
-		t.Fatalf("last Save not durable: URL = %q", reloaded.Models["local"].URL)
+		t.Fatalf("last Save not durable: URL = %q", reloaded.Models["lmstudio-amd"].URL)
 	}
 }
 
