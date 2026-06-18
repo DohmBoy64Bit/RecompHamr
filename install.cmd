@@ -1,17 +1,17 @@
 @echo off
-REM codehamr Windows installer: fetch the latest release binary and install it
+REM RecompHAMR Windows installer: fetch the latest release binary and install it
 REM into a user-writable prefix so admin elevation is never needed.
 REM
 REM Usage (cmd.exe):
-REM   curl -fsSL https://raw.githubusercontent.com/codehamr/codehamr/main/install.cmd -o install.cmd ^&^& install.cmd
+REM   curl -fsSL https://raw.githubusercontent.com/DohmBoy64Bit/RecompHamr/main/install.cmd -o install.cmd ^&^& install.cmd
 REM
 REM Usage (PowerShell):
-REM   iwr -useb https://raw.githubusercontent.com/codehamr/codehamr/main/install.cmd -outfile install.cmd; .\install.cmd
+REM   iwr -useb https://raw.githubusercontent.com/DohmBoy64Bit/RecompHamr/main/install.cmd -outfile install.cmd; .\install.cmd
 
 setlocal enabledelayedexpansion
 cls
 
-set "REPO=codehamr/codehamr"
+set "REPO=DohmBoy64Bit/RecompHamr"
 
 REM --- Detect arch. PROCESSOR_ARCHITEW6432 catches the 32-bit-cmd-on-64-bit-OS case.
 set "arch="
@@ -19,7 +19,7 @@ if /I "%PROCESSOR_ARCHITECTURE%"=="AMD64" set "arch=amd64"
 if /I "%PROCESSOR_ARCHITECTURE%"=="ARM64" set "arch=arm64"
 if /I "%PROCESSOR_ARCHITEW6432%"=="AMD64" set "arch=amd64"
 if not defined arch (
-  echo codehamr: unsupported arch: %PROCESSOR_ARCHITECTURE% ^(need amd64 or arm64^) 1>&2
+  echo recomphamr: unsupported arch: %PROCESSOR_ARCHITECTURE% ^(need amd64 or arm64^) 1>&2
   exit /b 1
 )
 
@@ -28,17 +28,17 @@ REM     the conventional per-user install root that never needs admin rights.
 if defined PREFIX (
   set "bindir=%PREFIX%\bin"
 ) else (
-  set "bindir=%LOCALAPPDATA%\Programs\codehamr\bin"
+  set "bindir=%LOCALAPPDATA%\Programs\recomphamr\bin"
 )
 
-set "binary=codehamr-windows-%arch%.exe"
+set "binary=recomphamr-windows-%arch%.exe"
 set "url=https://github.com/%REPO%/releases/latest/download/%binary%"
 
-echo [codehamr] windows/%arch%
+echo [recomphamr] windows/%arch%
 
 if not exist "%bindir%" mkdir "%bindir%" 2>nul
 if not exist "%bindir%" (
-  echo codehamr: cannot create %bindir% 1>&2
+  echo recomphamr: cannot create %bindir% 1>&2
   exit /b 1
 )
 
@@ -46,16 +46,16 @@ REM --- Download. curl.exe ships with Windows 10 1803+ / 11; fall back to PowerS
 REM     (Invoke-WebRequest) on older boxes so a single script covers both.
 where curl >nul 2>&1
 if %errorlevel%==0 (
-  curl -fsSL "%url%" -o "%bindir%\codehamr.exe"
+  curl -fsSL "%url%" -o "%bindir%\recomphamr.exe"
 ) else (
-  powershell -NoProfile -Command "$ProgressPreference='SilentlyContinue'; try { Invoke-WebRequest -UseBasicParsing -Uri '%url%' -OutFile '%bindir%\codehamr.exe' } catch { exit 1 }"
+  powershell -NoProfile -Command "$ProgressPreference='SilentlyContinue'; try { Invoke-WebRequest -UseBasicParsing -Uri '%url%' -OutFile '%bindir%\recomphamr.exe' } catch { exit 1 }"
 )
 if errorlevel 1 (
-  echo codehamr: download failed 1>&2
+  echo recomphamr: download failed 1>&2
   exit /b 1
 )
 
-echo [ok] installed -^> %bindir%\codehamr.exe
+echo [ok] installed -^> %bindir%\recomphamr.exe
 
 REM --- Ensure bindir is on the user's persistent PATH.
 REM     Read HKCU\Environment\Path directly. Using %PATH% here would be wrong:
@@ -89,8 +89,8 @@ echo ;%PATH%; | findstr /I /C:";%bindir%;" >nul
 if errorlevel 1 set "PATH=%bindir%;%PATH%"
 
 echo.
-echo   type 'codehamr' to start hammering
-echo   ^(open a new terminal first if 'codehamr' isn't found^)
+echo   type 'recomphamr' to start hammering
+echo   ^(open a new terminal first if 'recomphamr' isn't found^)
 echo.
 
 endlocal & set "PATH=%PATH%"

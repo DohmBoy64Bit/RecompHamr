@@ -83,3 +83,14 @@ The switch rebuilds the LLM client in-place. No restart needed.
 Edit `.rehamr/config.yaml` directly — any OpenAI-compatible endpoint works
 (cloud, self-hosted, or local). The `key` field is optional for local
 backends. See the **[Config section](../README.md#config)** for an example.
+
+## Debug logging
+
+Set `logging: true` in `.rehamr/config.yaml` to enable session logging.
+Every exchange (prompts, responses, tool calls) is written to
+`.rehamr/log.txt`, truncated on each start. The log file is created with
+`0600` permissions and sensitive values (API keys) are redacted.
+
+```yaml
+logging: true
+```

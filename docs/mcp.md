@@ -82,7 +82,7 @@ When the LLM calls `ghidra.decompile_function`:
 |---|---|---|
 | `ghidra` | `ghidra-mcp` | `RECOMPHAMR_MCP_GHIDRA_*` |
 | `n64-debug-mcp` | `n64-debug-mcp` | `RECOMPHAMR_MCP_N64_*` |
-| `pcrecomp` | `pcrecomp-mcp` | `RECOMPHAMR_MCP_PCREOMP_*` |
+| `pcrecomp` | `pcrecomp-mcp` | `RECOMPHAMR_MCP_PCRECOMP_*` |
 | `mcp-pine` | `mcp-pine` | `RECOMPHAMR_MCP_PINE_*` |
 | `objdiff` | `objdiff-mcp` | `RECOMPHAMR_MCP_OBJDIFF_*` |
 | `pcsx2` | `pcsx2-mcp` | `RECOMPHAMR_MCP_PCSX2_*` |

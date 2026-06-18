@@ -76,6 +76,22 @@ belong in `.rehamr/mcp.json` or environment variables — this keeps
 version-controlled project config (mcp.json, checked in) separate from
 secrets (env vars, never checked in).
 
+### Legacy env var suffixes
+
+Most server env vars are derived mechanically: the server name is
+uppercased with hyphens replaced by underscores (e.g. `ghidra` →
+`GHIDRA`, `objdiff` → `OBJDIFF`). Two servers use legacy shorter
+suffixes for backward compatibility:
+
+| Server | Env var suffix |
+|---|---|
+| `n64-debug-mcp` | `N64` |
+| `mcp-pine` | `PINE` |
+
+So `n64-debug-mcp`'s command override is `RECOMPHAMR_MCP_N64_COMMAND`
+rather than `RECOMPHAMR_MCP_N64_DEBUG_MCP_COMMAND`. The shortcut is
+transparent: set either form and it works.
+
 ## Env vars
 
 All MCP servers support the `RECOMPHAMR_MCP_<NAME>_*` pattern. The `<NAME>`

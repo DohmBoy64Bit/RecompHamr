@@ -17,6 +17,19 @@ to it via the built-in `SkillServers` table) exposes that server's tools to
 the LLM. For example, `/skill ghidra-mcp` maps to the `ghidra` server,
 injecting `ghidra.*` tools.
 
+The built-in `SkillServers` mapping is:
+
+| Skill | Gates server |
+|---|---|
+| `ghidra-mcp` | `ghidra` |
+| `n64-debug-mcp` | `n64-debug-mcp` |
+| `pcrecomp` | `pcrecomp` |
+| `mcp-pine` | `mcp-pine` |
+| `objdiff` | `objdiff` |
+| `pcsx2` | `pcsx2` |
+| `bizhawk` | `bizhawk` |
+| `sega2asm` | `sega2asm` |
+
 ## Built-in skills
 
 Twenty-eight skills are compiled into the binary:

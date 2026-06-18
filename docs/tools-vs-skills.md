@@ -10,7 +10,7 @@ request — the LLM sees each tool's name, description, and parameter schema,
 then chooses which to invoke by name. The result returns to the conversation
 as a `tool` message.
 
-**Built-in tools** (see [README.md](../README.md#built-in-tools), [tool-repomixr.md](tool-repomixr.md)):
+**Built-in tools** (see [README.md](../README.md#built-in-tools), [tool-repomixr.md](tool-repomixr.md), [tool-recomp-reference.md](tool-recomp-reference.md)):
 `bash`, `read_file`, `write_file`, `edit_file`, `repomixr`, `recomp_reference`
 
 **MCP tools** (available when connected + skill loaded):

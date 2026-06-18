@@ -137,7 +137,7 @@ Config:
 
 Env:
   RECOMPHAMR_URL               override the active profile's url at runtime
-  RECOMPHAMR_IDLE_TIMEOUT      stream idle timeout, e.g. 90m or 1h (default 1h)
+  RECOMPHAMR_IDLE_TIMEOUT      stream idle timeout, e.g. 90m or 1h (default 5m)
   RECOMPHAMR_NO_UPDATE_CHECK   set to 1 to skip self-update on launch
   RECOMPHAMR_MCP_AUTOSTART     set to 1 to enable MCP auto-connect on startup
   RECOMPHAMR_MCP_<NAME>_COMMAND  override MCP server stdio command (e.g. GHIDRA, N64, PCRECOMP)
