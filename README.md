@@ -18,7 +18,7 @@ codebases. Ghidra extensions (MCP bridge, XEX loader, N64 loader) are
 available pre-built at **[REPlugins](https://github.com/DohmBoy64Bit/REPlugins)**
 for Ghidra 12.1.2.
 
-**Slash commands:** `/help`, `/clear`, `/models`, `/rehampass`, `/skills`,
+**Slash commands:** `/help`, `/clear`, `/models`, `/skills`,
 `/skill`, `/skill-audit`, `/skill-new`, `/init-re`, `/status-re`, `/doctor`,
 `/mcp`. Skills and MCP tools wire into the system prompt dynamically.
 

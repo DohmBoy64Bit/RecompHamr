@@ -508,7 +508,7 @@ func TestChatOtherHTTPError(t *testing.T) {
 	}
 }
 
-// TestChatStructuredErrorPrefersProviderHint: the hamrpass proxy wraps upstream
+// TestChatStructuredErrorPrefersProviderHint: the cloud proxy wraps upstream
 // errors as `{"error":{"message":...,"provider_hint":...}}`. The client must
 // surface provider_hint over message, so users see the useful "retry shortly"
 // text, not "upstream rate limited".

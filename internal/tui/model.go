@@ -599,13 +599,9 @@ func (m Model) handleResizeSettle(msg resizeSettleMsg) (tea.Model, tea.Cmd) {
 // pasted log every turn; entry is the history snapshot replayed by ↑/↓,
 // including chip state.
 func (m Model) submit(sendText, echoText string, entry promptEntry) (tea.Model, tea.Cmd) {
-	// Redact secret-bearing slash commands (/rehampass <key>) before they reach
-	// any sink that persists or replays them: the scrollback echo (kept in
-	// m.scroll, re-emitted verbatim on every resize), the ↑/↓ recall ring, and
-	// the on-disk .rehamr/history file. Without this, submit leaks the bearer
-	// token into a second on-disk copy and into UI recall, undermining the
-	// 0o600 + symlink defences on the key in config.yaml. Raw sendText still
-	// flows to runSlash so activation works. No-op for non-secret input.
+	// redactSlash is a no-op for now. If a future slash command carries
+	// secrets in its arguments, this seam prevents them from reaching
+	// scrollback, recall ring, or on-disk history.
 	safeText := redactSlash(sendText)
 	if safeText != sendText {
 		echoText = safeText

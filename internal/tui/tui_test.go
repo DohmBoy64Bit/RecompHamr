@@ -553,9 +553,6 @@ func TestPopoverEnterSubmitsNoArgCommand(t *testing.T) {
 // "next", Tab cycles instead) with the active profile preselected.
 func TestArgPopoverOpensForModels(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	// Bootstrap seeds local + hamrpass; drop the latter so this asserts popover
-	// content, not config defaults.
-	delete(m.cfg.Models, "hamrpass")
 	m.cfg.Models["remote"] = &config.Profile{
 		LLM: "cloud-model", URL: "http://r", Key: "sk-r", ContextSize: 200000,
 	}
@@ -674,7 +671,7 @@ func TestBackendLabelShowsActiveProfile(t *testing.T) {
 func TestPrintHelpListsAllCommands(t *testing.T) {
 	var buf bytes.Buffer
 	PrintHelp(&buf)
-	for _, want := range []string{"/clear", "/models", "/rehampass"} {
+	for _, want := range []string{"/clear", "/models", "/help"} {
 		if !strings.Contains(buf.String(), want) {
 			t.Fatalf("PrintHelp missing %q:\n%s", want, buf.String())
 		}
@@ -704,67 +701,6 @@ func TestSlashModelSwitchesActive(t *testing.T) {
 	}
 	if final.cli.Token != "sk-r" {
 		t.Fatalf("client.Token not rebuilt: %q", final.cli.Token)
-	}
-}
-
-// TestRedactSlashHidesHamrpassKey: with `logging: true`, every prompt (including
-// `/rehampass <key>`) is written to .rehamr/log.txt. The log is meant to be
-// easy to share for bug reports, so a key in there is a quiet leak even at 0o600.
-// redactSlash is the seam every dbgWritef on a slash payload routes through.
-func TestRedactSlashHidesHamrpassKey(t *testing.T) {
-	cases := map[string]string{
-		"/rehampass hp_secret_1234567890abcdef": "/rehampass <redacted>",
-		"/rehampass":                            "/rehampass",  // no arg, nothing to redact
-		"/rehampass ":                           "/rehampass ", // trailing space, no key to redact
-		"/clear":                               "/clear",     // unrelated commands pass through
-		"/models hamrpass":                     "/models hamrpass",
-		"hello /rehampass key":                  "hello /rehampass key", // not at line start = not a hamrpass invocation
-		// Multi-line / tab-separated: Alt+Enter inserts a literal newline, and
-		// runSlash's strings.Fields splits on any whitespace, so the key activates.
-		// redactSlash must tokenise the same way or the key survives in log.txt.
-		"/rehampass\nhp_secret_1234567890abcdef":  "/rehampass <redacted>",
-		"/rehampass\thp_secret_1234567890abcdef":  "/rehampass <redacted>",
-		"  /rehampass hp_secret_1234567890abcdef": "/rehampass <redacted>",
-		// Case-folded name: /Rehampass doesn't activate the key (dispatch is
-		// case-sensitive) but submit still routes through redactSlash, so the
-		// token must not survive into scrollback, recall, history, or log.txt.
-		"/Rehampass hp_secret_1234567890abcdef": "/rehampass <redacted>",
-		"/REHAMPASS hp_secret_1234567890abcdef": "/rehampass <redacted>",
-	}
-	for in, want := range cases {
-		if got := redactSlash(in); got != want {
-			t.Errorf("redactSlash(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// TestSubmitRedactsHamrpassKeyFromHistoryAndScroll: redactSlash keeps the bearer
-// token out of the debug log, but submit must also keep it out of scrollback
-// (re-emitted verbatim on every resize), the ↑/↓ recall ring, and the on-disk
-// .rehamr/history. The redacted marker is what lands in recall and on disk.
-func TestSubmitRedactsHamrpassKeyFromHistoryAndScroll(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	dir := m.cfg.Dir
-	const key = "hp_secret_1234567890abcdef"
-	line := "/rehampass " + key
-	mm, _ := m.submit(line, line, promptEntry{display: line})
-	final := mm.(Model)
-
-	// Scrollback echo (also the buffer replayed on every resize).
-	if scroll := final.scroll.String(); strings.Contains(scroll, key) {
-		t.Fatalf("scrollback leaked hamrpass key:\n%s", scroll)
-	}
-	if scroll := stripANSI(final.scroll.String()); !strings.Contains(scroll, "/rehampass <redacted>") {
-		t.Fatalf("scrollback echo should show the redacted marker, got:\n%s", scroll)
-	}
-	// In-memory ↑/↓ recall ring.
-	if len(final.promptHistory) != 1 || final.promptHistory[0].display != "/rehampass <redacted>" {
-		t.Fatalf("recall ring should carry the redacted marker, got %+v", final.promptHistory)
-	}
-	// On-disk .rehamr/history.
-	disk := loadPromptHistory(dir)
-	if len(disk) != 1 || disk[0].display != "/rehampass <redacted>" {
-		t.Fatalf("on-disk history should carry the redacted marker, got %+v", disk)
 	}
 }
 
@@ -900,9 +836,10 @@ func TestSlashModelSwitchDropsStickyFallbackState(t *testing.T) {
 	}
 }
 
-// TestSlashModelSwitchClearsStaleBudget: after a hamrpass turn leaves m.budget
-// set, switching to a profile that emits no X-Budget-* headers (local Ollama)
-// would keep rendering the old percentage forever; StatusSuffix only checks
+// TestSlashModelSwitchClearsStaleBudget: after a keyed-profile turn leaves
+// m.budget set, switching to a profile that emits no X-Budget-* headers
+// (local Ollama) would keep rendering the old percentage forever;
+// StatusSuffix only checks
 // .Set, not which profile produced it. rebuildClient must drop the cached
 // snapshot so the segment disappears until a new backend reports its own.
 func TestSlashModelSwitchClearsStaleBudget(t *testing.T) {
@@ -1313,18 +1250,21 @@ func budgetResponseHandler(w http.ResponseWriter, _ *http.Request) {
 // the deferred "✓ active: ..." line with a "ctx: ..." suffix from that window.
 func TestHandleProbeSuccessUpdatesLiveCtxAndPrintsActivation(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.EnsureHamrpass() // hamrpass is not seeded, create it lazily
-	m.cfg.Active = "hamrpass"
-	out, _ := m.handleProbe(probeMsg{profile: "hamrpass", contextWindow: 262144})
+	// Set up a cloud-style profile with a key so the probe path is taken.
+	m.cfg.Models["cloud-proxy"] = &config.Profile{
+		LLM: "cloud-model", URL: "http://proxy:8080", Key: "sk-test", ContextSize: 0,
+	}
+	m.cfg.Active = "cloud-proxy"
+	out, _ := m.handleProbe(probeMsg{profile: "cloud-proxy", contextWindow: 262144})
 	final := out.(Model)
-	if got := final.liveContextSize["hamrpass"]; got != 262144 {
-		t.Fatalf("liveContextSize[hamrpass] = %d, want 262144", got)
+	if got := final.liveContextSize["cloud-proxy"]; got != 262144 {
+		t.Fatalf("liveContextSize[cloud-proxy] = %d, want 262144", got)
 	}
 	if !final.connected {
 		t.Fatal("successful probe must set connected=true")
 	}
 	scroll := stripANSI(final.scroll.String())
-	if !strings.Contains(scroll, "✓ active: hamrpass") {
+	if !strings.Contains(scroll, "✓ active: cloud-proxy") {
 		t.Fatalf("expected activation line, got:\n%s", scroll)
 	}
 	if !strings.Contains(scroll, "ctx: 262,144") {
@@ -1379,16 +1319,21 @@ func TestStaleProbeForOldProfileDoesNotOverwriteConnectedFlag(t *testing.T) {
 	m.cfg.Active = "local"
 	m.connected = true
 
+	// Set up a second profile to simulate a stale probe.
+	m.cfg.Models["stale-profile"] = &config.Profile{
+		LLM: "stale-model", URL: "http://stale:8080", Key: "", ContextSize: 32000,
+	}
+
 	// Stale success probe for a profile other than the active one must not
 	// confirm "connected" on behalf of the live backend.
-	out, _ := m.handleProbe(probeMsg{profile: "hamrpass", contextWindow: 262144})
+	out, _ := m.handleProbe(probeMsg{profile: "stale-profile", contextWindow: 262144})
 	if !out.(Model).connected {
 		t.Fatal("stale success probe overwrote live connected=true")
 	}
 
 	// Stale failure probe must not flip the live backend to disconnected.
 	m.connected = true
-	out, _ = m.handleProbe(probeMsg{profile: "hamrpass", err: cloud.ErrUnauthorized, silent: true})
+	out, _ = m.handleProbe(probeMsg{profile: "stale-profile", err: cloud.ErrUnauthorized, silent: true})
 	if !out.(Model).connected {
 		t.Fatal("stale failure probe overwrote live connected=true")
 	}
@@ -1405,9 +1350,12 @@ func TestStaleProbeForOldProfileDoesNotOverwriteConnectedFlag(t *testing.T) {
 // m.budget so the bar paints "0% pass" now, not after the first chat call 402s.
 func TestProbeBudgetExhaustedUpdatesStatusBar(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.Active = "hamrpass"
+	m.cfg.Models["cloud-proxy"] = &config.Profile{
+		LLM: "cloud-model", URL: "http://proxy:8080", Key: "sk-test", ContextSize: 0,
+	}
+	m.cfg.Active = "cloud-proxy"
 	out, _ := m.handleProbe(probeMsg{
-		profile: "hamrpass",
+		profile: "cloud-proxy",
 		budget:  cloud.BudgetStatus{Set: true, Remaining: 0},
 		silent:  true,
 		err:     cloud.ErrBudgetExhausted,
@@ -1427,10 +1375,13 @@ func TestProbeBudgetExhaustedUpdatesStatusBar(t *testing.T) {
 // connected flag already has.
 func TestProbeBudgetSnapshotIgnoredForStaleProfile(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+	m.cfg.Models["stale-profile"] = &config.Profile{
+		LLM: "stale-model", URL: "http://stale:8080", Key: "", ContextSize: 32000,
+	}
 	m.cfg.Active = "local"
 	m.budget = cloud.BudgetStatus{Set: true, Remaining: 0.88}
 	out, _ := m.handleProbe(probeMsg{
-		profile: "hamrpass",
+		profile: "stale-profile",
 		budget:  cloud.BudgetStatus{Set: true, Remaining: 0},
 		silent:  true,
 		err:     cloud.ErrBudgetExhausted,
@@ -1446,13 +1397,18 @@ func TestProbeBudgetSnapshotIgnoredForStaleProfile(t *testing.T) {
 // so without a live value the floor must apply.
 func TestActiveContextSizePrefersLiveValue(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.EnsureHamrpass() // lazy-create since hamrpass is no longer seeded
-	m.cfg.Active = "hamrpass" // ContextSize=0 by seed
+	m.cfg.Models["cloud-proxy"] = &config.Profile{
+		LLM: "cloud-model", URL: "http://proxy:8080", Key: "", ContextSize: 0,
+	}
+	m.cfg.Active = "cloud-proxy" // ContextSize=0 by seed
+	if err := m.cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
 	if got := m.activeContextSize(); got != defaultPackFallback {
 		t.Fatalf("cloud profile with no live value should use floor %d, got %d",
 			defaultPackFallback, got)
 	}
-	m.liveContextSize["hamrpass"] = 262144
+	m.liveContextSize["cloud-proxy"] = 262144
 	if got := m.activeContextSize(); got != 262144 {
 		t.Fatalf("live value must win, got %d", got)
 	}
@@ -2963,215 +2919,6 @@ func TestPopoverRenderRightAligns(t *testing.T) {
 	}
 }
 
-// TestHamrpassNoArgsShowsExplainerWhenUnset: `/rehampass` with no key set
-// prints the guided block, including the unset status line and the
-// purchase URL. No active-profile change.
-func TestHamrpassNoArgsShowsExplainerWhenUnset(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.EnsureHamrpass() // hamrpass is no longer seeded on first bootstrap
-	before := m.cfg.Active
-	// EnsureHamrpass seeds hamrpass with an empty key; assert the precondition
-	// so the test fails loud if the seed ever changes.
-	if hp, ok := m.cfg.Models["hamrpass"]; !ok || hp.Key != "" {
-		t.Fatalf("precondition: hamrpass profile with empty key, got %+v", hp)
-	}
-	m2, _ := m.runSlash("/rehampass")
-	final := m2.(Model)
-	out := stripANSI(final.scroll.String())
-	for _, want := range []string{
-		"hamrpass",
-		"status   : unset",
-		"endpoint : https://recomphamr.com",
-		"llm      : hamrpass",
-		"https://recomphamr.com",
-		"/rehampass <your key>",
-	} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("explainer missing %q in:\n%s", want, out)
-		}
-	}
-	if final.cfg.Active != before {
-		t.Fatalf("/rehampass without args must not change active profile, got %q", final.cfg.Active)
-	}
-}
-
-// TestHamrpassNoArgsShowsSetWhenKeyPresent: status line flips to `set`
-// when the hamrpass profile already has a key.
-func TestHamrpassNoArgsShowsSetWhenKeyPresent(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.EnsureHamrpass()
-	m.cfg.Models["hamrpass"].Key = "hp-already-1234567890abcdef"
-	if err := m.cfg.Save(); err != nil {
-		t.Fatal(err)
-	}
-	m2, _ := m.runSlash("/rehampass")
-	out := stripANSI(m2.(Model).scroll.String())
-	if !strings.Contains(out, "status   : set") {
-		t.Fatalf("explainer should report status:set when key present:\n%s", out)
-	}
-}
-
-// TestHamrpassSetsKeyAndActivates: a valid key is trimmed, saved on the hamrpass
-// profile, persisted, and active flips to hamrpass. The llm client is rebuilt so
-// future requests carry the new token.
-func TestHamrpassSetsKeyAndActivates(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	if m.cfg.Active == "hamrpass" {
-		t.Fatal("precondition: active should not be hamrpass on a fresh model")
-	}
-	const key = "hp-test-key-1234567890abcdef"
-	m2, cmd := m.runSlash("/rehampass " + key)
-	final := m2.(Model)
-	if final.cfg.Active != "hamrpass" {
-		t.Fatalf("active should switch to hamrpass, got %q", final.cfg.Active)
-	}
-	if got := final.cfg.Models["hamrpass"].Key; got != key {
-		t.Fatalf("key not stored: %q", got)
-	}
-	if final.cli.Token != key {
-		t.Fatalf("llm client token not rebuilt: %q", final.cli.Token)
-	}
-	if final.cli.Model != "hamrpass" {
-		t.Fatalf("llm client model not rebuilt: %q", final.cli.Model)
-	}
-	if cmd == nil {
-		t.Fatal("set should return a probeBackend command")
-	}
-	// Activation defers the success line until probeMsg arrives; synchronous
-	// scrollback shows the "▶ probing" placeholder. The "✓ active" line is
-	// exercised in TestHandleProbeSuccessUpdatesLiveCtxAndPrintsActivation.
-	out := stripANSI(final.scroll.String())
-	if !strings.Contains(out, "▶ probing hamrpass") {
-		t.Fatalf("expected probing placeholder in scrollback:\n%s", out)
-	}
-}
-
-// TestHamrpassLazyCreatesProfile: a user who hid hamrpass from config.yaml can
-// still activate it by pasting a key. /rehampass <key> creates the profile from
-// canonical seed values, stores the key, and flips active.
-func TestHamrpassLazyCreatesProfile(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	delete(m.cfg.Models, "hamrpass")
-	// Persist the deletion so runSlash's reload sees a hamrpass-less config,
-	// else the on-disk seed slips back in and the lazy-create path never fires.
-	if err := m.cfg.Save(); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := m.cfg.Models["hamrpass"]; ok {
-		t.Fatal("precondition: hamrpass should be absent")
-	}
-	const key = "hp-test-key-1234567890abcdef"
-	m2, cmd := m.runSlash("/rehampass " + key)
-	final := m2.(Model)
-	hp, ok := final.cfg.Models["hamrpass"]
-	if !ok {
-		t.Fatal("hamrpass profile should be lazy-created by /rehampass")
-	}
-	if hp.URL != "https://recomphamr.com" || hp.LLM != "hamrpass" {
-		t.Fatalf("lazy-created hamrpass has wrong canonical fields: %+v", hp)
-	}
-	if hp.Key != key {
-		t.Fatalf("key not stored on lazy-created profile: %q", hp.Key)
-	}
-	if final.cfg.Active != "hamrpass" {
-		t.Fatalf("active should switch to hamrpass, got %q", final.cfg.Active)
-	}
-	if cmd == nil {
-		t.Fatal("set should return a probeBackend command on lazy-create path too")
-	}
-}
-
-// TestHamrpassRejectsTooShort: a key under hamrpassMinKeyLen is refused
-// without touching the profile or the active selection.
-func TestHamrpassRejectsTooShort(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.EnsureHamrpass()
-	if err := m.cfg.Save(); err != nil {
-		t.Fatal(err)
-	}
-	beforeActive := m.cfg.Active
-	beforeKey := m.cfg.Models["hamrpass"].Key
-	m2, _ := m.runSlash("/rehampass abc")
-	final := m2.(Model)
-	if final.cfg.Active != beforeActive {
-		t.Fatalf("active changed on rejected key: %q", final.cfg.Active)
-	}
-	if final.cfg.Models["hamrpass"].Key != beforeKey {
-		t.Fatalf("rejected key was stored: %q", final.cfg.Models["hamrpass"].Key)
-	}
-	out := stripANSI(final.scroll.String())
-	// New wording stays consistent with the popover hint:
-	// "N/16 chars · keep typing".
-	if !strings.Contains(out, "/16 chars") || !strings.Contains(out, "keep typing") {
-		t.Fatalf("expected length hint in scrollback:\n%s", out)
-	}
-}
-
-// TestHamrpassRejectsControlChars: a key with an embedded escape / NUL / DEL must
-// be rejected by hamrpassValidate, not persisted, else every dial-out errors
-// with net/http's cryptic "invalid header field value for Authorization". Real
-// hamrpass keys are ASCII-printable.
-func TestHamrpassRejectsControlChars(t *testing.T) {
-	cases := map[string]string{
-		"NUL":         "hp_secret_key_with\x00null",
-		"ESC":         "hp_secret_key_with\x1bescape",
-		"DEL":         "hp_secret_key_with\x7fdel",
-		"non-ASCII":   "hp_secret_key_with_ümlaut123",
-		"raw newline": "hp_key_one\nhp_key_two_X12",
-	}
-	for name, badKey := range cases {
-		t.Run(name, func(t *testing.T) {
-			m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-			m.cfg.EnsureHamrpass()
-			if err := m.cfg.Save(); err != nil {
-				t.Fatal(err)
-			}
-			beforeActive := m.cfg.Active
-			beforeKey := m.cfg.Models["hamrpass"].Key
-
-			_, _, ok := hamrpassValidate(badKey)
-			if ok {
-				t.Fatalf("hamrpassValidate(%q) returned ok=true; control chars must be rejected", badKey)
-			}
-
-			// And the inline /rehampass <key> handler must not persist or activate.
-			out, _ := m.runSlash("/rehampass " + badKey)
-			final := out.(Model)
-			if final.cfg.Active != beforeActive {
-				t.Fatalf("active changed despite invalid key: %q", final.cfg.Active)
-			}
-			if final.cfg.Models["hamrpass"].Key != beforeKey {
-				t.Fatalf("invalid key persisted to config: %q", final.cfg.Models["hamrpass"].Key)
-			}
-		})
-	}
-}
-
-// TestHamrpassRejectsMultipleArgs: a paste with embedded whitespace splits
-// into multiple args via strings.Fields. The handler refuses with a
-// dedicated message rather than silently joining or accepting one half.
-func TestHamrpassRejectsMultipleArgs(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.EnsureHamrpass()
-	if err := m.cfg.Save(); err != nil {
-		t.Fatal(err)
-	}
-	beforeActive := m.cfg.Active
-	beforeKey := m.cfg.Models["hamrpass"].Key
-	m2, _ := m.runSlash("/rehampass hp-first-half hp-second-half")
-	final := m2.(Model)
-	if final.cfg.Active != beforeActive {
-		t.Fatalf("active changed on rejected multi-arg key: %q", final.cfg.Active)
-	}
-	if final.cfg.Models["hamrpass"].Key != beforeKey {
-		t.Fatalf("rejected key was stored: %q", final.cfg.Models["hamrpass"].Key)
-	}
-	out := stripANSI(final.scroll.String())
-	if !strings.Contains(out, "cannot contain spaces") {
-		t.Fatalf("expected space-rejection error in scrollback:\n%s", out)
-	}
-}
-
 // TestMultiToolCallRoundExecutesAllBeforeNextChat: when the model emits multiple
 // tool calls in one round, EVERY result must be appended to history BEFORE the
 // next chat round. OpenAI rejects an `assistant.tool_calls` message followed by
@@ -3251,13 +2998,15 @@ func TestEndTurnResetsPendingSoStaleCallsDoNotLeakIntoNextTurn(t *testing.T) {
 // TestStaleProbeForOldProfileDoesNotOverwriteConnectedFlag.
 func TestStaleProbeDoesNotPrintActivationBannerForNonActiveProfile(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.EnsureHamrpass() // need hamrpass in Models for the stale probe test
+	m.cfg.Models["stale-profile"] = &config.Profile{
+		LLM: "stale-model", URL: "http://stale:8080", Key: "sk-stale", ContextSize: 0,
+	}
 	m.cfg.Active = "local"
-	m.cfg.Models["local"] = &config.Profile{LLM: "m", URL: "http://x"} // need in Models for probe handler
+	m.cfg.Models["local"] = &config.Profile{LLM: "m", URL: "http://x"}
 
-	out, _ := m.handleProbe(probeMsg{profile: "hamrpass", contextWindow: 262144})
+	out, _ := m.handleProbe(probeMsg{profile: "stale-profile", contextWindow: 262144})
 	final := out.(Model)
-	if got := stripANSI(final.scroll.String()); strings.Contains(got, "✓ active: hamrpass") {
+	if got := stripANSI(final.scroll.String()); strings.Contains(got, "✓ active: stale-profile") {
 		t.Fatalf("stale probe must not print activation banner for non-active profile:\n%s", got)
 	}
 

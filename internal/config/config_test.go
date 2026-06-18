@@ -54,117 +54,11 @@ func TestBootstrapCreatesLayout(t *testing.T) {
 	if p.URL != "http://localhost:1234" || p.LLM != "qwen/qwen3.6-35b-a3b" || p.ContextSize != 32768 {
 		t.Fatalf("default lmstudio-amd profile mismatch: %+v", p)
 	}
-	if _, ok := cfg.Models["hamrpass"]; ok {
-		t.Fatal("hamrpass must not be seeded on first bootstrap")
-	}
-}
-
-// TestBootstrapHamrpassHasNoContextSizeOnDisk: a fresh config.yaml must carry
-// no context_size for hamrpass: that field is server-authoritative via
-// X-Context-Window. Guaranteed by the omitempty tag plus the IsCloudProfile
-// skip in the Coerce loop.
-func TestBootstrapHamrpassHasNoContextSizeOnDisk(t *testing.T) {
-	dir := t.TempDir()
-	cfg, _, err := Bootstrap(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// hamrpass is no longer seeded on first bootstrap; lazy-create it and
-	// persist so we can assert the on-disk representation.
-	cfg.EnsureHamrpass()
-	if err := cfg.Save(); err != nil {
-		t.Fatal(err)
-	}
-	raw, err := os.ReadFile(filepath.Join(dir, DirName, "config.yaml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Line scan, not a YAML re-decode: the question is whether the literal
-	// field is gone from disk, which is what omitempty controls. yaml.v3's
-	// 4-space indent puts a profile's children at 8 spaces, siblings at 4.
-	lines := strings.Split(string(raw), "\n")
-	in := false
-	for i, line := range lines {
-		if strings.HasPrefix(line, "    hamrpass:") {
-			in = true
-			continue
-		}
-		if in {
-			if strings.HasPrefix(line, "    ") && !strings.HasPrefix(line, "        ") {
-				break // next sibling profile
-			}
-			if strings.Contains(line, "context_size") {
-				t.Fatalf("hamrpass profile must not carry context_size on disk, found at line %d:\n%s", i, line)
-			}
-		}
-	}
-	if !in {
-		t.Fatal("hamrpass block not found in serialized config.yaml")
-	}
-}
-
-// TestBootstrapDoesNotRestoreDeletedHamrpass: once config.yaml exists the user
-// owns its profile list. A removed hamrpass stays gone across restarts
-// (re-created only via /rehampass), the file is not silently rewritten, and
-// other profiles' customisations round-trip untouched.
-func TestBootstrapDoesNotRestoreDeletedHamrpass(t *testing.T) {
-	dir := t.TempDir()
-	cdir := filepath.Join(dir, DirName)
-	if err := os.MkdirAll(cdir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	yaml := []byte(`active: local
-models:
-  local:
-    llm: local-model
-    url: http://host.docker.internal:11434
-    key: ""
-    context_size: 262144
-  custom:
-    llm: foo
-    url: http://x
-    key: sk-keep
-    context_size: 8000
-`)
-	cfgPath := filepath.Join(cdir, "config.yaml")
-	if err := os.WriteFile(cfgPath, yaml, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	beforeStat, err := os.Stat(cfgPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg, _, err := Bootstrap(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := cfg.Models["hamrpass"]; ok {
-		t.Fatal("hamrpass was deleted from config.yaml; Bootstrap must not restore it")
-	}
-	if len(cfg.Models) != 2 {
-		t.Fatalf("expected exactly the two user profiles, got %d: %+v", len(cfg.Models), cfg.Models)
-	}
-	// User customisations must survive intact.
-	if cfg.Models["local"].URL != "http://host.docker.internal:11434" || cfg.Models["local"].ContextSize != 262144 {
-		t.Fatalf("local profile was mutated: %+v", cfg.Models["local"])
-	}
-	if cfg.Models["custom"].Key != "sk-keep" {
-		t.Fatalf("custom profile was mutated: %+v", cfg.Models["custom"])
-	}
-	// No spurious rewrite, Bootstrap's job here is to read, not tidy.
-	// mtime is the cheapest signal.
-	afterStat, err := os.Stat(cfgPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !afterStat.ModTime().Equal(beforeStat.ModTime()) {
-		t.Fatal("config.yaml was rewritten by Bootstrap on a clean read path")
-	}
 }
 
 // TestBootstrapDoesNotRestoreRenamedLocal: renaming `local` (e.g. to `ollama`)
 // must not resurrect a duplicate `local` on next start. Same invariant as the
-// deleted-hamrpass case, for the other managed profile.
+// deleted-default-profile case, for the other managed profile.
 func TestBootstrapDoesNotRestoreRenamedLocal(t *testing.T) {
 	dir := t.TempDir()
 	cdir := filepath.Join(dir, DirName)
@@ -189,73 +83,12 @@ models:
 	if _, ok := cfg.Models["local"]; ok {
 		t.Fatal("renamed-away `local` must not be restored")
 	}
-	if _, ok := cfg.Models["hamrpass"]; ok {
-		t.Fatal("hamrpass not declared in config.yaml; must not appear")
-	}
 	if len(cfg.Models) != 1 || cfg.Active != "ollama" {
 		t.Fatalf("expected single 'ollama' profile active, got Active=%q models=%+v", cfg.Active, cfg.Models)
 	}
 }
 
-// TestEnsureHamrpassLazyCreates: with hamrpass hidden from config.yaml,
-// EnsureHamrpass returns a profile from the canonical seed values, and is
-// idempotent: twice returns the same pointer.
-func TestEnsureHamrpassLazyCreates(t *testing.T) {
-	cfg := &Config{
-		Active: "local",
-		Models: map[string]*Profile{
-			"local": {LLM: "m", URL: "http://x", Key: "", ContextSize: 65536},
-		},
-	}
-	hp := cfg.EnsureHamrpass()
-	if hp == nil {
-		t.Fatal("EnsureHamrpass returned nil")
-	}
-	if hp.URL != "https://recomphamr.com" || hp.LLM != "hamrpass" || hp.Key != "" {
-		t.Fatalf("lazy-created hamrpass has wrong fields: %+v", hp)
-	}
-	if got := cfg.Models["hamrpass"]; got != hp {
-		t.Fatal("EnsureHamrpass did not store the entry on cfg.Models")
-	}
-	hp2 := cfg.EnsureHamrpass()
-	if hp2 != hp {
-		t.Fatal("EnsureHamrpass should be idempotent: second call must return the same pointer")
-	}
-}
 
-// TestBootstrapPreservesExistingHamrpassKey: a user-supplied hamrpass key must
-// round-trip untouched. Guards against any future "tidy on read" that would
-// mutate existing entries.
-func TestBootstrapPreservesExistingHamrpassKey(t *testing.T) {
-	dir := t.TempDir()
-	cdir := filepath.Join(dir, DirName)
-	if err := os.MkdirAll(cdir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	yaml := []byte(`active: hamrpass
-models:
-  local:
-    llm: local-model
-    url: http://localhost:11434
-    key: ""
-    context_size: 65536
-  hamrpass:
-    llm: hamrpass
-    url: https://recomphamr.com
-    key: hp-secret-1234567890abcdef
-    context_size: 262144
-`)
-	if err := os.WriteFile(filepath.Join(cdir, "config.yaml"), yaml, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cfg, _, err := Bootstrap(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.Models["hamrpass"].Key != "hp-secret-1234567890abcdef" {
-		t.Fatalf("existing key was overwritten: %q", cfg.Models["hamrpass"].Key)
-	}
-}
 
 // TestBootstrapLoadsMultipleProfiles: a two-profile config round-trips and
 // Bootstrap picks the declared `active`.
@@ -288,7 +121,7 @@ models:
 	if cfg.Active != "work" {
 		t.Fatalf("Active = %q, want work", cfg.Active)
 	}
-	// Bootstrap must not inject local/rehampass on top of the declared profiles.
+	// Bootstrap must not inject local profile on top of the declared profiles.
 	if len(cfg.Models) != 2 {
 		t.Fatalf("expected exactly the two declared profiles, got %d: %+v", len(cfg.Models), cfg.Models)
 	}
@@ -303,9 +136,8 @@ models:
 	}
 }
 
-// TestConfigFilePermissionsAreOwnerOnly is the regression for a world-readable
-// hamrpass key: /rehampass stores the bearer token in plaintext, so any local
-// user could cat it. Fresh-bootstrap and post-Save paths must both write 0o600.
+// TestConfigFilePermissionsAreOwnerOnly: fresh-bootstrap and post-Save paths must
+// both write config.yaml at 0o600. No key-bearing file should be world-readable.
 func TestConfigFilePermissionsAreOwnerOnly(t *testing.T) {
 	dir := t.TempDir()
 	cfg, _, err := Bootstrap(dir)
@@ -321,10 +153,9 @@ func TestConfigFilePermissionsAreOwnerOnly(t *testing.T) {
 		t.Fatalf("fresh config.yaml perms = %v, want 0o600 (key may leak to other local users)", got)
 	}
 
-	// Save() must keep 0o600; otherwise a /rehampass write would widen perms
-	// right after the user pasted a key.
-	cfg.EnsureHamrpass()
-	cfg.Models["hamrpass"].Key = "hp-secret-12345678"
+	// Save() must keep 0o600; set a key on the active profile to exercise
+	// the same key-bearing code path.
+	cfg.Models["local"].Key = "sk-12345678"
 	if err := cfg.Save(); err != nil {
 		t.Fatal(err)
 	}
@@ -382,10 +213,9 @@ func TestSaveIsAtomicAndLeavesNoTemp(t *testing.T) {
 		t.Fatal(err)
 	}
 	cdir := filepath.Join(dir, DirName)
-	cfg.EnsureHamrpass() // lazy-create so Models["hamrpass"] is non-nil
 	// Save a few times, each must rename cleanly with no temp accumulation.
 	for i := range 3 {
-		cfg.Models["hamrpass"].Key = fmt.Sprintf("hp-key-%d-0000000000", i)
+		cfg.Models["lmstudio-amd"].URL = fmt.Sprintf("http://llm-%d:11434", i)
 		if err := cfg.Save(); err != nil {
 			t.Fatal(err)
 		}
@@ -404,8 +234,8 @@ func TestSaveIsAtomicAndLeavesNoTemp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config.yaml not decodable after atomic Save: %v", err)
 	}
-	if reloaded.Models["hamrpass"].Key != "hp-key-2-0000000000" {
-		t.Fatalf("last Save not durable: key = %q", reloaded.Models["hamrpass"].Key)
+	if reloaded.Models["lmstudio-amd"].URL != "http://llm-2:11434" {
+		t.Fatalf("last Save not durable: URL = %q", reloaded.Models["local"].URL)
 	}
 }
 
@@ -691,11 +521,10 @@ func TestURLOverrideDoesNotPersist(t *testing.T) {
 	}
 }
 
-// TestSaveTightensPreexistingLoosePerms covers the upgrade path fresh-bootstrap
-	// misses: a config.yaml from an older world-readable recomphamr (or a hand-edit)
-// starts at 0o644, and os.WriteFile preserves an existing file's mode, so Save
-// would rewrite the bytes (including a fresh hamrpass token) while leaving it
-// world-readable. Save must tighten a pre-existing loose file to 0o600.
+// TestSaveTightensPreexistingLoosePerms: a config.yaml from an older world-readable
+// recomphamr (or a hand-edit) starts at 0o644, and os.WriteFile preserves an existing
+// file's mode, so Save would rewrite the bytes while leaving it world-readable.
+// Save must tighten a pre-existing loose file to 0o600.
 func TestSaveTightensPreexistingLoosePerms(t *testing.T) {
 	dir := t.TempDir()
 	cdir := filepath.Join(dir, DirName)
@@ -712,8 +541,8 @@ func TestSaveTightensPreexistingLoosePerms(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A /rehampass write lands the bearer token in this very file.
-	cfg.EnsureHamrpass().Key = "hp-secret-1234567890abcdef"
+	// Set a key on the active profile to exercise the key-bearing code path.
+	cfg.Models["local"].Key = "sk-1234567890abcdef"
 	if err := cfg.Save(); err != nil {
 		t.Fatal(err)
 	}
@@ -722,7 +551,7 @@ func TestSaveTightensPreexistingLoosePerms(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := st.Mode().Perm(); got != 0o600 {
-		t.Fatalf("Save() must tighten a pre-existing 0o644 config.yaml to 0o600, got %v - hamrpass key stays world-readable across an upgrade", got)
+		t.Fatalf("Save() must tighten a pre-existing 0o644 config.yaml to 0o600, got %v - key stays world-readable across an upgrade", got)
 	}
 }
 

@@ -4,7 +4,7 @@
 //
 // One code path serves every backend:
 //   - local Ollama, via the OpenAI-compatible `/v1` shim Ollama itself ships
-//   - the recomphamr.com hosted endpoint, hamrpass-keyed (proxy over OpenRouter)
+//   - the recomphamr.com hosted endpoint (proxy over OpenRouter)
 //   - any other endpoint already speaking OpenAI's wire format
 //
 // Deliberately unsupported, to keep the client uniform:
@@ -430,9 +430,9 @@ func (c *Client) doPost(parent context.Context, body chatRequest) (*http.Respons
 }
 
 // errorMessageFromBody extracts the user-facing string from a non-2xx body.
-// hamrpass wraps errors as `{"error":{"message":...,"provider_hint":...}}`; we
+// The proxy wraps errors as `{"error":{"message":...,"provider_hint":...}}`; we
 // prefer provider_hint (providers stash the human diagnostic there), fall back
-// to message, then to the raw first line so non-hamrpass backends still surface
+// to message, then to the raw first line so other backends still surface
 // whatever they emit.
 func errorMessageFromBody(b []byte) string {
 	var env struct {

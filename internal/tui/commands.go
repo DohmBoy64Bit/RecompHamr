@@ -68,7 +68,7 @@ func (m Model) errorMessage(e llm.Event) string {
 	}
 	switch {
 	case errors.Is(e.Err, cloud.ErrBudgetExhausted):
-		return "⚠ hamrpass depleted · top up at recomphamr.com"
+		return "⚠ budget depleted · top up at recomphamr.com"
 	case errors.Is(e.Err, cloud.ErrUnauthorized):
 		return "⚠ key rejected · check models." + m.cfg.Active + ".key in .rehamr/config.yaml"
 	case isUnreachable(e.Err):

@@ -123,8 +123,7 @@ func Default() *Config {
 //
 // The directory check uses Lstat (not Stat) and refuses a pre-existing
 // .rehamr that isn't a real directory: a symlink there would let a co-tenant
-// redirect config.yaml to an attacker path, planting a models.<name>.url that
-// proxies the hamrpass key on the next dial-out.
+// redirect config.yaml to an attacker path.
 func Bootstrap(projectRoot string) (*Config, bool, error) {
 	dir := filepath.Join(projectRoot, DirName)
 	created := false
@@ -145,9 +144,7 @@ func Bootstrap(projectRoot string) (*Config, bool, error) {
 			_ = os.Chmod(dir, 0o700)
 		}
 	case errors.Is(err, os.ErrNotExist):
-		// 0o700: config.yaml may carry the hamrpass key (a long-lived bearer
-		// token). A world-listable dir lets other local users spot it and probe
-		// for the key. Only the project owner should read here.
+		// 0o700: only the project owner should read the config directory.
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return nil, false, err
 		}
@@ -216,30 +213,6 @@ func Bootstrap(projectRoot string) (*Config, bool, error) {
 	return cfg, created, nil
 }
 
-// EnsureHamrpass returns the hamrpass profile, re-creating it from the seed if
-// the user deleted it. Lets /rehampass activate by pasting a key without a
-// restart detour.
-// hamrpassSeed is the canonical hamrpass profile, stored separately from
-// managedProfiles so it stays out of first-bootstrap seeding but is still
-// available for lazy creation via /rehampass.
-var hamrpassSeed = Profile{
-	LLM: "hamrpass",
-	URL: "https://recomphamr.com",
-	Key: "",
-}
-
-func (c *Config) EnsureHamrpass() *Profile {
-	if hp, ok := c.Models["hamrpass"]; ok {
-		return hp
-	}
-	if c.Models == nil {
-		c.Models = map[string]*Profile{}
-	}
-	cp := hamrpassSeed // copy the value, not the pointer
-	c.Models["hamrpass"] = &cp
-	return c.Models["hamrpass"]
-}
-
 // Save rewrites config.yaml.
 func (c *Config) Save() error {
 	if c.Dir == "" {
@@ -274,10 +247,7 @@ func writeYAML(path string, v any) error {
 	// leave a truncated config.yaml, which Bootstrap's strict decode would fatal
 	// on, bricking the next launch until the file is hand-deleted. Mirrors
 	// internal/update's promote-by-rename. os.CreateTemp makes the temp 0o600 and
-	// rename installs that fresh inode in place, so this also closes the
-	// upgrade-path leak the old in-place write needed a trailing Chmod for:
-	// config.yaml carries the hamrpass key, and only the project owner should
-	// read it.
+	// rename installs that fresh inode in place.
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".config-*.yaml")
 	if err != nil {
 		return err

@@ -2,7 +2,7 @@
 // Client-side plumbing only; the server owns all accounting.
 //
 // Wire contract: one budget-fraction header (0.0..1.0), one context-window
-// header, plus standard 401/402. A hamrpass is a prepaid pot of budget, no
+// header, plus standard 401/402. Budget is a prepaid pot, no
 // cooldowns, rate limits, resets, or expiry.
 package cloud
 
@@ -97,7 +97,7 @@ func (b BudgetStatus) StatusSuffix() string {
 
 // ErrBudgetExhausted maps server 402: the pass is depleted and the user must
 // top up before any further request succeeds.
-var ErrBudgetExhausted = errors.New("hamrpass depleted")
+var ErrBudgetExhausted = errors.New("budget depleted")
 
 // ErrUnauthorized maps server 401.
 var ErrUnauthorized = errors.New("invalid or expired token")
