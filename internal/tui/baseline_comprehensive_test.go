@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
@@ -32,8 +33,15 @@ func TestCommandBoundariesAndErrorHints(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	msg := runToolCall(ctx, 7, chmctx.ToolCall{ID: "1", Name: tools.ReadFileName, Arguments: map[string]any{"path": path}})().(toolResultMsg)
-	if msg.Msg.Content != "hello" || msg.turnID != 7 {
+	turn := agent.NewTurnState(nil)
+	turn.Begin(ctx, time.Now())
+	turn.ID = 7
+	stream := agent.NewStreamState()
+	stream.Pending = []chmctx.ToolCall{{ID: "1", Name: tools.ReadFileName, Arguments: map[string]any{"path": path}}}
+	loop := agent.LoopState{}
+	work, _ := loop.NextTool(&turn, &stream, agent.LocalToolExecutor())
+	msg := runToolCall(work)().(toolResultMsg)
+	if msg.delivery.Message.Content != "hello" || msg.delivery.TurnID != 7 {
 		t.Fatalf("tool result = %#v", msg)
 	}
 	m := baselineModel(t)
@@ -107,53 +115,4 @@ func TestDebugLogLifecycleAndPayloads(t *testing.T) {
 	dbgWriteRequest("m", 1, 1, 0, nil)
 	dbgWriteMessage("off", chmctx.Message{})
 	OpenDebugLog(filepath.Join(dir, "missing", "child"))
-}
-
-func TestToolOutcomeAndNudgeContracts(t *testing.T) {
-	cases := []struct {
-		name, result string
-		failed       bool
-	}{
-		{tools.WriteFileName, "(write error: x)", true}, {tools.EditFileName, "edited x", false},
-		{tools.ReadFileName, "(read error: x)", true}, {tools.ReadFileName, "(valid lisp)", false},
-		{tools.PowerShellName, "x\n(exit: 1)", true}, {tools.PowerShellName, "(cancelled)", false},
-		{"future", "(unknown tool: future)", true}, {"future", "ok", false},
-	}
-	for _, tc := range cases {
-		if got := toolResultFailed(tc.name, tc.result); got != tc.failed {
-			t.Fatalf("%s %q = %v", tc.name, tc.result, got)
-		}
-	}
-	for _, call := range []chmctx.ToolCall{
-		{Name: tools.ReadFileName, Arguments: map[string]any{"path": "x"}},
-		{Name: tools.PowerShellName, Arguments: map[string]any{"script": " echo x \nnext"}},
-		{Name: "future"},
-	} {
-		if toolTargetKey(call) == "" {
-			t.Fatal("empty target key")
-		}
-	}
-	m := baselineModel(t)
-	m.lastToolKey = "read_file|x"
-	m.recordToolOutcome(tools.ReadFileName, "ok")
-	for range maxToolFailStreak {
-		m.recordToolOutcome(tools.ReadFileName, "(read error: x)")
-	}
-	m.maybeFailureNudge()
-	if m.failStreak != 0 || len(m.turn.History) == 0 {
-		t.Fatal("failure nudge missing")
-	}
-	m.maybeFailureNudge()
-	m.toolRounds = maxToolRounds
-	m.maybeRunawayNudge()
-	before := len(m.turn.History)
-	m.maybeRunawayNudge()
-	if !m.runawayNudged || len(m.turn.History) != before {
-		t.Fatal("runaway latch failed")
-	}
-	m.turn.History = append(m.turn.History, chmctx.Message{Role: chmctx.RoleAssistant, Content: "done"})
-	m.toolRounds = verifyNudgeMinRounds
-	if !m.maybeVerifyNudge() || m.maybeVerifyNudge() {
-		t.Fatal("verify latch failed")
-	}
 }

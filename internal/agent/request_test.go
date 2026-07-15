@@ -23,4 +23,9 @@ func TestBuildMessagesAndTools(t *testing.T) {
 			t.Fatalf("tool %d = %#v", i, definitions[i])
 		}
 	}
+	for i, name := range ToolNames() {
+		if name != want[i] {
+			t.Fatalf("tool name %d = %q", i, name)
+		}
+	}
 }

@@ -28,6 +28,11 @@ func Tools() []llm.Tool {
 	}
 }
 
+// ToolNames returns the four exposed local tool names in request order.
+func ToolNames() []string {
+	return []string{tools.PowerShellName, tools.ReadFileName, tools.WriteFileName, tools.EditFileName}
+}
+
 func schemaToTool(schema map[string]any) llm.Tool {
 	fn := schema["function"].(map[string]any)
 	return llm.Tool{

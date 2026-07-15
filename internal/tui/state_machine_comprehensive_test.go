@@ -108,13 +108,13 @@ func TestStreamEventStateMachine(t *testing.T) {
 	m.turn.Context = turnCtx
 	m.turn.ID = 1
 	toolMsg := chmctx.Message{Role: chmctx.RoleTool, ToolName: tools.ReadFileName, Content: "ok"}
-	next, _ = m.update(toolResultMsg{Msg: toolMsg, turnID: 1})
+	next, _ = m.update(toolResultMsg{delivery: agent.ToolDelivery{TurnID: 1, Message: toolMsg}})
 	m = next.(Model)
 	if m.runtime.Phase != phaseThinking {
 		t.Fatal("tool result did not resume")
 	}
 	before := len(m.turn.History)
-	next, _ = m.update(toolResultMsg{Msg: toolMsg, turnID: 2})
+	next, _ = m.update(toolResultMsg{delivery: agent.ToolDelivery{TurnID: 2, Message: toolMsg}})
 	m = next.(Model)
 	if len(m.turn.History) != before {
 		t.Fatal("stale tool result")
@@ -184,7 +184,7 @@ func TestUpdateTypedMessagesAndClosedOutcomes(t *testing.T) {
 	m.turn.History = []chmctx.Message{{Role: chmctx.RoleAssistant}}
 	next, cmd := m.handleStreamClosed()
 	m = next.(Model)
-	if cmd == nil || !m.emptyNudged {
+	if cmd == nil || !m.loop.EmptyNudged {
 		t.Fatal("empty nudge")
 	}
 	m.runtime.Phase = phaseThinking
@@ -258,7 +258,7 @@ func TestRemainingStateBranches(t *testing.T) {
 	cancel()
 	m.turn.Context = ctx
 	m.turn.ID = 1
-	next, cmd := m.update(toolResultMsg{Msg: chmctx.Message{Role: chmctx.RoleTool}, turnID: 1})
+	next, cmd := m.update(toolResultMsg{delivery: agent.ToolDelivery{TurnID: 1, Message: chmctx.Message{Role: chmctx.RoleTool}}})
 	m = next.(Model)
 	if cmd == nil || len(m.runtime.Pending) != 1 {
 		t.Fatal("pending tool chain")
@@ -286,16 +286,17 @@ func TestRemainingStateBranches(t *testing.T) {
 	if next.(Model).runtime.Phase != phaseIdle {
 		t.Fatal("idle close")
 	}
-	if _, ok := newestAssistant([]chmctx.Message{{Role: chmctx.RoleUser}}); ok {
+	if _, ok := agent.NewestAssistant([]chmctx.Message{{Role: chmctx.RoleUser}}); ok {
 		t.Fatal("found absent assistant")
 	}
 	if toolCallLeakWarning([]chmctx.Message{{Role: chmctx.RoleAssistant, Content: "<tool_call>", ToolCalls: []chmctx.ToolCall{{Name: "x"}}}}) != "" {
 		t.Fatal("structured call warned")
 	}
 	m.turn.History = []chmctx.Message{{Role: chmctx.RoleAssistant, Content: "UNVERIFIED: runtime"}}
-	m.toolRounds = verifyNudgeMinRounds
-	m.verifyNudged = false
-	if m.maybeVerifyNudge() {
+	m.loop.ToolRounds = verifyNudgeMinRounds
+	m.loop.VerifyNudged = false
+	m.runtime.Pending = nil
+	if decision := m.loop.DecideClose(&m.turn, &m.runtime); decision.Action != agent.CloseFinishDone {
 		t.Fatal("honest unverified finish nudged")
 	}
 	if _, ok := quitArmReset(time.Now()).(quitArmResetMsg); !ok {
@@ -303,5 +304,21 @@ func TestRemainingStateBranches(t *testing.T) {
 	}
 	if got := resizeSettled(7)(time.Now()).(resizeSettleMsg); got.gen != 7 {
 		t.Fatal("resize callback")
+	}
+}
+
+func TestToolResultAdapterEmitsPolicyLogs(t *testing.T) {
+	m := baselineModel(t)
+	m.turn.Begin(context.Background(), time.Now())
+	m.runtime.Phase = phaseRunning
+	m.loop.LastToolKey = tools.ReadFileName + "|x"
+	m.loop.FailKey = m.loop.LastToolKey
+	m.loop.FailStreak = agent.MaxToolFailStreak - 1
+	m.loop.ToolRounds = agent.MaxToolRounds
+	result := chmctx.Message{Role: chmctx.RoleTool, ToolName: tools.ReadFileName, Content: "(read error: x)"}
+	next, cmd := m.update(toolResultMsg{delivery: agent.ToolDelivery{TurnID: m.turn.ID, Message: result}})
+	m = next.(Model)
+	if cmd == nil || m.loop.FailStreak != 0 || !m.loop.RunawayNudged || m.runtime.Phase != phaseThinking {
+		t.Fatal("policy effect adapter")
 	}
 }

@@ -215,7 +215,7 @@ func TestQueueWaitsForVerifyNudge(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.installTurnContext()
 	m.runtime.Phase = phaseStreaming
-	m.toolRounds = verifyNudgeMinRounds // substantial → verify nudge fires
+	m.loop.ToolRounds = verifyNudgeMinRounds // substantial → verify nudge fires
 	m.runtime.BeginStream(m.turn.ID, make(chan llm.Event))
 	m.turn.History = []chmctx.Message{
 		{Role: chmctx.RoleUser, Content: "build it"},
@@ -226,7 +226,7 @@ func TestQueueWaitsForVerifyNudge(t *testing.T) {
 	out, cmd := m.handleStreamClosed()
 	om := out.(Model)
 
-	if cmd == nil || !om.verifyNudged {
+	if cmd == nil || !om.loop.VerifyNudged {
 		t.Fatal("a substantial clean finish must re-prompt via the verify nudge")
 	}
 	if om.queued == nil || om.queued.send != "now deploy" {

@@ -160,3 +160,13 @@ The TUI no longer opens model streams, executes tools, stores turn contexts, pac
 - Security: typed `StreamEffect` excludes contexts, credentials, and resolved tool arguments; presentation holds only an opaque stream reader and stable identifiers.
 - Evidence: production chat startup and event handling call `StreamState.StartRound`, `Stream.Read`, `StreamState.Apply`, and `StreamState.Finalize`.
 - Known limits: sequential tool execution, stream-close finish policy, policy latches, error diagnostic mapping, and app-composed frontend contracts remain open.
+
+#### Checkpoint 2D — sequential tools and close policy
+
+- Changed: moved pending-call popping, bounded inline status construction, actual local-tool execution, strict result pairing, same-target failure state, runaway/empty/verification latches, post-queue nudge injection, and stream-close decisions into `internal/agent`; TUI receives opaque tool work and typed result/close effects.
+- Documented: current architecture and this checkpoint record that production TUI code no longer imports or invokes `internal/tools`.
+- Verified: deterministic agent tests prove emission-order execution, complete sibling pairing before re-entry or nudges, cancellation through the root context, stale cancelled-result rejection after a fresh turn, failure and runaway thresholds, no nudge before queue drain, one-shot latches, empty rearm after tool progress, empty stall, leaked-call stop, verification re-prompt, honest `unverified` suppression, and clean finish.
+- Coverage: focused `internal/agent` and retained TUI tests pass at 100.0% agent statements; repository and runtime closure remain pending the final adapter checkpoint.
+- Security: presentation receives bounded inline status and tool result messages but no executable call arguments or process handle; cancellation retains the existing tool cleanup implementation.
+- Evidence: production dispatch/result/close paths call `LoopState.NextTool`, `ToolWork.Run`, `LoopState.ApplyToolResult`, and `LoopState.DecideClose`.
+- Known limits: app-composed typed frontend ownership, provider diagnostic mapping, agent logging, architecture enforcement, and new real-model tool-loop runtime evidence remain open.

@@ -1,16 +1,13 @@
 package tui
 
 import (
-	"context"
 	"errors"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
-	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/tools"
 )
 
 // streamEventMsg and streamClosedMsg tag their originating channel so the model
@@ -33,8 +30,7 @@ type streamClosedMsg struct {
 // Otherwise the orphan result appends to the new turn's history with no
 // preceding assistant.tool_calls and abandons that turn's live stream.
 type toolResultMsg struct {
-	Msg    chmctx.Message
-	turnID agent.TurnID
+	delivery agent.ToolDelivery
 }
 
 // readEvent drains one event from the LLM stream as a tea.Msg, re-scheduled
@@ -56,9 +52,9 @@ func readEvent(stream *agent.Stream) tea.Cmd {
 // No outer timeout: the PowerShell tool owns its model-set per-call timeout
 // (capped at 3600s by the schema), while write_file/edit_file are filesystem-fast. An outer cap would
 // silently override the model's PowerShell timeout: a 30-min build dying at 3 min.
-func runToolCall(parent context.Context, turnID agent.TurnID, call chmctx.ToolCall) tea.Cmd {
+func runToolCall(work *agent.ToolWork) tea.Cmd {
 	return func() tea.Msg {
-		return toolResultMsg{Msg: tools.Execute(parent, call), turnID: turnID}
+		return toolResultMsg{delivery: work.Run()}
 	}
 }
 

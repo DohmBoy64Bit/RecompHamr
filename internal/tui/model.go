@@ -17,7 +17,6 @@ import (
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/tools"
 )
 
 const (
@@ -79,9 +78,11 @@ type Model struct {
 	cfg *config.Config
 	cli *llm.Client
 
-	turn    agent.TurnState   // model-facing history, stable identity, and cancellation root
-	runtime agent.StreamState // stream, pending calls, phase, accounting, and connection facts
-	system  string            // embedded system prompt + working-directory anchor
+	turn     agent.TurnState   // model-facing history, stable identity, and cancellation root
+	runtime  agent.StreamState // stream, pending calls, phase, accounting, and connection facts
+	loop     agent.LoopState   // sequential tools and deterministic loop-policy latches
+	executor agent.ToolExecutor
+	system   string // embedded system prompt + working-directory anchor
 
 	// streaming is the live raw token buffer for the current content block,
 	// rendered above the prompt by View() while the model talks. On flush
@@ -172,53 +173,6 @@ type Model struct {
 
 	status string // transient status-bar hint; cleared by the event that obsoletes it (keypress, quit-arm timer, endTurn)
 
-	// Repeated-failure nudge, the first of the four deterministic backstops. A
-	// turn otherwise ends purely when the model stops calling tools; nothing
-	// forces a tool or yields. lastToolKey is the most recently dispatched tool's
-	// target identity (set in dispatchNextTool); failKey/failStreak track how
-	// often that SAME target failed the SAME way. At maxToolFailStreak we inject
-	// one system note to change approach: a nudge, never a hard yield. Keyed on
-	// tool+target (not full args) so cosmetic retry differences can't defeat it.
-	lastToolKey string
-	failKey     string
-	failStreak  int
-
-	// Runaway-iteration nudge, sibling to the failure nudge. A 30B model can
-	// loop on plausible *non-failing* calls (re-read, re-grep, re-list) forever;
-	// the failure streak only catches repeated *failures*, so that hole stayed
-	// open. toolRounds counts tool calls dispatched this turn (reset in endTurn);
-	// at maxToolRounds one soft system note asks the model to self-assess. A
-	// nudge, never a hard yield, same contract as maybeFailureNudge.
-	// runawayNudged latches the nudge to once per turn: a multi-tool-call round
-	// can step toolRounds past maxToolRounds between drain-time checks, so a bare
-	// equality test could skip the threshold entirely.
-	toolRounds    int
-	runawayNudged bool
-
-	// Empty-reply nudge, the third soft backstop. The two above catch doing-too-
-	// much; this catches a turn ending with nothing said and nothing called. A
-	// clean finish always carries a summary and a continuing turn always carries a
-	// tool call, so an empty newest assistant message is always an anomaly: the
-	// model stopped mid-task, or (on a thinking model) its tool call streamed into
-	// the reasoning channel and was dropped before reaching us, the dominant
-	// silent-death we'd otherwise end on with no warning. One re-prompt to re-issue
-	// or finish; emptyNudged bounds CONSECUTIVE empties to a single retry - a
-	// round that issues a tool call re-arms it (see handleStreamClosed), so a
-	// flaky stream earns a fresh re-prompt per stall while a server that
-	// deterministically swallows every call can't loop. Reset in endTurn.
-	emptyNudged bool
-
-	// Finish re-grounding nudge, the fourth soft backstop. The three above catch
-	// doing-too-much (failure, runaway) and stopping-with-nothing-said (empty).
-	// This catches the false-green finish: a turn that did real work ending with a
-	// confident summary for something it never actually ran. When a substantial
-	// turn (toolRounds >= verifyNudgeMinRounds) is about to finish with a clean,
-	// non-empty reply, one re-prompt makes the model re-walk the original request
-	// and run the check that proves each runnable part, or mark it unverified
-	// honestly, instead of dressing up a brace-count or an HTTP 200 as proof. A
-	// nudge, never a hard yield; verifyNudged latches it to once per turn. Reset in
-	// endTurn.
-	verifyNudged bool
 }
 
 func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model {
@@ -249,6 +203,7 @@ func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model 
 		histIdx:   -1,
 		turn:      agent.NewTurnState(nil),
 		runtime:   agent.NewStreamState(),
+		executor:  agent.LocalToolExecutor(),
 	}
 	// Record the active backend once, before any turn, so a shared log
 	// names exactly which model/endpoint/context window produced the behaviour.
@@ -257,7 +212,7 @@ func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model 
 	if dbgEnabled() {
 		dbgWriteSession(version, cfg.Active, cfg.ActiveProfile().LLM, cfg.ActiveURL(),
 			m.activeContextSize(), chmctx.Tokens(m.system),
-			[]string{tools.PowerShellName, tools.ReadFileName, tools.WriteFileName, tools.EditFileName})
+			agent.ToolNames())
 	}
 	// Seed prompt history from .rehamr/history so ↑ recalls prompts from
 	// earlier sessions. Loaded entries carry no chip metadata (the on-disk
@@ -425,25 +380,27 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// startChat would abandon the in-flight stream. The turnCtx tag was
 		// captured at runToolCall time; endTurn nils m.turn.Context and a fresh
 		// beginTurn installs a new one that can't match.
-		if msg.turnID != m.turn.ID {
+		effect := m.loop.ApplyToolResult(&m.turn, &m.runtime, msg.delivery)
+		if !effect.Accepted {
 			return m, nil
 		}
-		dbgWriteMessage("tool_result", msg.Msg)
-		m.turn.Append(msg.Msg)
-		m.recordToolOutcome(msg.Msg.ToolName, msg.Msg.Content)
+		dbgWriteMessage("tool_result", effect.Message)
+		if effect.Failed {
+			dbgWritef("tool_outcome", "tool=%s FAILED · same-target streak=%d/%d · key=%s", effect.Message.ToolName, effect.FailStreak, maxToolFailStreak, effect.FailKey)
+		}
+		if effect.FailureNudged {
+			dbgWritef("nudge", "repeated-failure nudge injected after %d same-target failures (key=%s)", effect.FailureCount, effect.FailureKey)
+		}
+		if effect.RunawayNudged {
+			dbgWritef("nudge", "runaway-iteration nudge injected at %d tool calls this turn", effect.ToolRounds)
+		}
 		// Drain every remaining call before re-entering chat: OpenAI rejects an
 		// assistant.tool_calls message followed by fewer tool messages than
 		// calls issued, so a partial dispatch 400s and loses the rest.
 		// Sequential dispatch in emit order keeps the pairing intact.
-		if len(m.runtime.Pending) > 0 {
+		if effect.ContinueTools {
 			return m.dispatchNextTool()
 		}
-		// Queue drained: only now is it safe to inject a system nudge. A
-		// system message wedged between assistant.tool_calls and its tool
-		// results would break that pairing and 400 the next request.
-		m.maybeFailureNudge()
-		m.maybeRunawayNudge()
-		m.runtime.Phase = phaseThinking
 		return m, m.startChat()
 
 	case quitArmResetMsg:
@@ -549,7 +506,7 @@ func (m Model) submit(sendText, echoText string, entry promptEntry) (tea.Model, 
 	// A new user message is a new goal: drop any in-progress failure streak so
 	// a stale count can't trip the nudge early. History persists; only the
 	// counter resets.
-	m.failKey, m.failStreak = "", 0
+	m.loop.ResetUserGoal()
 	dbgWritef("user", "%s", sendText)
 	return m, m.appendUserTurn(sendText)
 }
@@ -597,10 +554,7 @@ func (m *Model) endTurn() {
 	m.turn.End()
 	wasRetrying := m.runtime.Retrying
 	m.runtime.ResetTurn()
-	m.toolRounds = 0
-	m.runawayNudged = false
-	m.emptyNudged = false
-	m.verifyNudged = false
+	m.loop.ResetTurn()
 	// The queue-refusal hint says "send it when the turn ends"; that moment is
 	// now, so the advice would be stale from the next render on.
 	if m.status == queueSlashHint {
@@ -772,64 +726,33 @@ func (m *Model) finalizeTurn(outcome turnOutcome) {
 // hand control back. A turn ends precisely when the assistant emits no tool
 // calls; there is no loop tool to land on.
 func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
-	m.runtime.EndStream()
-	// Stale close from a cancelled turn (handleCtrlC / EventError reset phase
-	// to idle).
 	if !m.runtime.Phase.Active() {
 		return m, nil
 	}
-	if len(m.runtime.Pending) > 0 {
-		// The model issued a tool call, genuine progress. Re-arm the empty-reply
-		// latch so a LATER transient empty on this same (long) turn earns its own
-		// re-prompt instead of hitting the leak-and-die branch below. The latch
-		// exists to stop a server that deterministically swallows EVERY call, not
-		// to cap recoveries on a turn that keeps advancing: a flaky stream that
-		// drops the occasional call must not abandon a half-built file (the galaxy1
-		// failure: empty → nudge → recovered with a write → empty again → died).
-		// Two CONSECUTIVE empties still terminate: pending is 0 on that path, so
-		// this never re-arms there.
-		m.emptyNudged = false
+	decision := m.loop.DecideClose(&m.turn, &m.runtime)
+	switch decision.Action {
+	case agent.CloseRunTool:
 		return m.dispatchNextTool()
-	}
-	// The turn is ending with no tool calls. If the model said nothing and called
-	// nothing, it either stopped mid-task or its tool call was swallowed (a
-	// thinking model streams the call into the reasoning channel, which never
-	// reaches us as content or a structured call). Re-prompt once to re-issue or
-	// finish; the emptyNudged latch bounds it to a single retry so a server that
-	// deterministically swallows the call can't loop. If it persists, surface it
-	// rather than dying silently: the prior behaviour left a half-done artifact
-	// with no banner at all.
-	outcome := outcomeDone // a clean, non-empty finish; stall/leak below downgrade it
-	if newestAssistantEmpty(m.turn.History) {
-		if !m.emptyNudged {
-			m.emptyNudged = true
+	case agent.CloseRestartModel:
+		switch decision.Reason {
+		case agent.CloseEmptyNudge:
 			dbgWritef("nudge", "empty-reply nudge injected (turn ended with no content and no tool call)")
-			m.turn.Append(chmctx.Message{
-				Role:    chmctx.RoleSystem,
-				Content: agent.EmptyReplyNudge,
-			})
-			m.runtime.Phase = phaseThinking
-			return m, m.startChat()
+		case agent.CloseVerifyNudge:
+			dbgWritef("nudge", "finish re-grounding nudge injected at %d tool calls this turn", decision.ToolRounds)
 		}
-		m.appendLine(styleError.Render("⚠ the model ended its turn with no reply and no tool call - it stalled, or your server dropped the call. If thinking is on, its reasoning parser may be swallowing calls - enable one (e.g. vLLM `--reasoning-parser`) or disable thinking for tool turns."))
-		dbgWritef("leak", "turn ended with an empty assistant message after a re-prompt (model stalled or the call was swallowed server-side)")
-		outcome = outcomeStopped
-	} else if w := toolCallLeakWarning(m.turn.History); w != "" {
-		// The model meant to call a tool but its server's parser leaked the raw
-		// call into the reply text instead. The fix is server-side.
-		m.appendLine(w)
-		dbgWritef("leak", "turn ended with tool-call text leaked into the reply (server-side parser misconfigured)")
-		outcome = outcomeStopped
-	} else if m.maybeVerifyNudge() {
-		// A substantial turn is finishing with a clean, non-empty summary. Re-ground
-		// it once to the original request and let the model verify (or honestly mark
-		// unverified) before it hands control back. Mirrors the empty-reply re-prompt:
-		// applyDone already flushed this summary to scrollback and appended it to
-		// history, so the streaming buffer is clean and startChat resumes safely.
-		m.runtime.Phase = phaseThinking
 		return m, m.startChat()
+	case agent.CloseFinishStopped:
+		if decision.Reason == agent.CloseEmptyStall {
+			m.appendLine(styleError.Render("⚠ the model ended its turn with no reply and no tool call - it stalled, or your server dropped the call. If thinking is on, its reasoning parser may be swallowing calls - enable one (e.g. vLLM `--reasoning-parser`) or disable thinking for tool turns."))
+			dbgWritef("leak", "turn ended with an empty assistant message after a re-prompt (model stalled or the call was swallowed server-side)")
+		} else {
+			m.appendLine(toolCallLeakWarning(m.turn.History))
+			dbgWritef("leak", "turn ended with tool-call text leaked into the reply (server-side parser misconfigured)")
+		}
+		m.finalizeTurn(outcomeStopped)
+	default:
+		m.finalizeTurn(outcomeDone)
 	}
-	m.finalizeTurn(outcome)
 	m.endTurn()
 	return m.fireQueued()
 }
@@ -848,30 +771,6 @@ func (m Model) fireQueued() (tea.Model, tea.Cmd) {
 	q := m.queued
 	m.queued = nil
 	return m.submit(q.send, q.echo, promptEntry{display: q.send})
-}
-
-// newestAssistant returns the newest assistant-role message in history: the
-// turn's final reply, which all three finish checks below inspect.
-func newestAssistant(history []chmctx.Message) (chmctx.Message, bool) {
-	return agent.NewestAssistant(history)
-}
-
-// newestAssistantEmpty reports whether the turn's final assistant message
-// carried neither text nor a structured tool call. A clean finish always has a
-// summary and a continuing turn always has a tool call, so an empty newest
-// assistant message is always an anomaly: the model stopped mid-task, or its
-// call streamed into the reasoning channel and was dropped before reaching us.
-func newestAssistantEmpty(history []chmctx.Message) bool {
-	return agent.NewestAssistantEmpty(history)
-}
-
-// newestAssistantUnverified reports whether the turn's final assistant message
-// already carries an "unverified" marker, the honest self-assessment the finish
-// nudge exists to elicit. Case-insensitive: the model writes "unverified" /
-// "Unverified" interchangeably. Used to suppress the finish nudge on a finish
-// that already named what it couldn't prove (see maybeVerifyNudge).
-func newestAssistantUnverified(history []chmctx.Message) bool {
-	return agent.NewestAssistantUnverified(history)
 }
 
 // toolCallLeakWarning returns a user-facing diagnostic when the newest assistant
@@ -899,155 +798,16 @@ func toolCallLeakWarning(history []chmctx.Message) string {
 // call's target so the failure nudge can tell when the model keeps retrying the
 // same failing operation (see recordToolOutcome).
 func (m Model) dispatchNextTool() (tea.Model, tea.Cmd) {
-	call := m.runtime.Pending[0]
-	m.runtime.Pending = m.runtime.Pending[1:]
-	m.appendLine(styleDim.Render(tools.InlineStatus(call)))
-	m.lastToolKey = toolTargetKey(call)
-	m.toolRounds++
-	m.runtime.Phase = phaseRunning
-	return m, runToolCall(m.turn.Context, m.turn.ID, call)
+	work, _ := m.loop.NextTool(&m.turn, &m.runtime, m.executor)
+	m.appendLine(styleDim.Render(work.Status()))
+	return m, runToolCall(work)
 }
 
-// nudgeOrigin prefixes every deterministic backstop note. A weak (30B) model
-// reads a bare mid-turn system message as an empty/absent user turn ("the user
-// hasn't given me a new task, I'll just stop"), the exact misread that turned the
-// finish nudge net-negative on the galaxy run (it re-prompted an honest
-// `unverified` finish into a confident, caveat-free "it works"). Naming the note
-// as RecompHamr's own automated check, not the user's, keeps the model oriented.
-// Deliberately says nothing about whether to stop or keep going (each nudge body
-// owns that), so it can't induce the premature-completion failure the runaway /
-// verify wording fights.
-const nudgeOrigin = agent.NudgeOrigin
-
-// maxToolFailStreak is how many consecutive same-target failures trigger the
-// nudge. Generous on purpose: a model iterating on a hard edit gets several
-// attempts before being told it's stuck; catches genuine loops without
-// interrupting honest trial-and-error.
+// maxToolFailStreak is retained only for the exact debug-log denominator.
 const maxToolFailStreak = agent.MaxToolFailStreak
 
-// toolTargetKey is the stable identity used to detect a repeated-failure loop:
-// tool name + its target (the path for file tools, the command's first line for
-// PowerShell). Deliberately NOT the full argument set: a full-args key is defeated by
-// any cosmetic change between retries (a regenerated file body, a reworded
-// command). Keying on the target catches a model hammering the same operation
-// while leaving varied exploration alone.
-func toolTargetKey(call chmctx.ToolCall) string {
-	return agent.ToolTargetKey(call)
-}
-
-// toolResultFailed reports whether a tool result is an error the model should
-// react to. File tools wrap errors in parens ("(write error: ...)", "(not
-// found: ...)") and report success as plain text ("wrote N bytes"); PowerShell
-// appends "(exit: N)" / "(timeout after ...)" on failure. A user Ctrl+C
-// ("(cancelled)") never counts as a failure.
-func toolResultFailed(name, result string) bool {
-	return agent.ToolResultFailed(name, result)
-}
-
-// recordToolOutcome updates the failure streak from one finished tool result.
-// A success (or a failure of a different target) resets the streak; a same-
-// target failure extends it. lastToolKey was stamped in dispatchNextTool for
-// the call this result belongs to.
-func (m *Model) recordToolOutcome(name, content string) {
-	if !toolResultFailed(name, content) {
-		m.failKey, m.failStreak = "", 0
-		return
-	}
-	if m.lastToolKey == m.failKey && m.failKey != "" {
-		m.failStreak++
-	} else {
-		m.failKey = m.lastToolKey
-		m.failStreak = 1
-	}
-	// Log only failures: a success leaves the streak at 0 and is already visible
-	// as a tool_result. The climbing streak is the nudge machinery's state, the
-	// part the per-message records can't show.
-	dbgWritef("tool_outcome", "tool=%s FAILED · same-target streak=%d/%d · key=%s", name, m.failStreak, maxToolFailStreak, m.failKey)
-}
-
-// maybeFailureNudge appends one system-role note once the same target has
-// failed maxToolFailStreak times running, then resets the streak so it fires at
-// most once per run of failures. A nudge, not a yield: the model stays in
-// control and decides whether to pivot or stop and tell the user.
-func (m *Model) maybeFailureNudge() {
-	if m.failStreak < maxToolFailStreak {
-		return
-	}
-	dbgWritef("nudge", "repeated-failure nudge injected after %d same-target failures (key=%s)", m.failStreak, m.failKey)
-	m.turn.Append(chmctx.Message{
-		Role:    chmctx.RoleSystem,
-		Content: agent.FailureNudge(m.failStreak),
-	})
-	m.failKey, m.failStreak = "", 0
-}
-
-// maxToolRounds caps tool calls per turn before the runaway self-check fires.
-// Above an honest large build (the galaxy runs that finished cleanly ran ~60),
-// below a genuine runaway, so a doomed loop the same-target failure streak
-// can't see (a blocked install or lib-hunt re-fired with cosmetic variations)
-// still gets a self-check with context left, not after it has burned the turn.
-const maxToolRounds = agent.MaxToolRounds
-
-// maybeRunawayNudge appends one soft system note when a turn crosses
-// maxToolRounds tool calls without finishing. The runawayNudged latch fires it
-// exactly once per turn: this is consulted only when the pending queue drains,
-// but toolRounds increments per call, so a multi-tool-call round can jump the
-// counter past maxToolRounds between checks: a bare equality test would skip
-// the threshold and never fire. Framed as a self-check, not a stop order:
-// telling a 30B to "stop" mid-task is the premature-completion failure we
-// otherwise fight, so the model decides whether it is still converging.
-func (m *Model) maybeRunawayNudge() {
-	if m.runawayNudged || m.toolRounds < maxToolRounds {
-		return
-	}
-	m.runawayNudged = true
-	dbgWritef("nudge", "runaway-iteration nudge injected at %d tool calls this turn", m.toolRounds)
-	m.turn.Append(chmctx.Message{
-		Role:    chmctx.RoleSystem,
-		Content: agent.RunawayNudge(m.toolRounds),
-	})
-}
-
-// verifyNudgeMinRounds is how many tool calls a turn must have dispatched before
-// the finish re-grounding nudge can fire. Set so only a turn that did real,
-// multi-step work trips it: a quick answer or a one-line edit stays well under it,
-// while a build / refactor / test-fix loop clears it easily. Below this the
-// original request is still close in context and a re-ground would be noise; the
-// galaxy runs that shipped broken-but-claimed-done artifacts each made dozens.
+// verifyNudgeMinRounds is retained temporarily by adapter equivalence tests.
 const verifyNudgeMinRounds = agent.VerifyNudgeMinRounds
-
-// maybeVerifyNudge appends one re-grounding system note when a substantial turn
-// (>= verifyNudgeMinRounds tool calls) is about to finish with a clean, non-empty
-// reply, then latches so it fires at most once per turn. Returns true when it
-// nudged, so the caller re-prompts and the model can verify before its final
-// summary. The false-green finish (a confident summary for an artifact that was
-// never actually run) is invisible to the other three backstops, which only see
-// repeated failures, runaway counts, or an empty reply. Framed as re-grounding +
-// honest verification, never a stop order: telling a 30B to "stop" mid-task is the
-// premature-completion failure we otherwise fight.
-func (m *Model) maybeVerifyNudge() bool {
-	if m.verifyNudged || m.toolRounds < verifyNudgeMinRounds {
-		return false
-	}
-	// The nudge targets the false-green finish: a confident summary for work that
-	// was never run. A finish that already marks something `unverified` has done
-	// exactly the honest self-assessment the nudge would ask for; it is the
-	// OPPOSITE of a false green. Re-prompting it is a wasted round at best, and on
-	// a weak model a regression: the galaxy run's honest "unverified: browser
-	// runtime" got re-prompted into a confident, caveat-free "it works". Let an
-	// honest finish stand. A true false green carries no such marker, so it still
-	// gets nudged.
-	if newestAssistantUnverified(m.turn.History) {
-		return false
-	}
-	m.verifyNudged = true
-	dbgWritef("nudge", "finish re-grounding nudge injected at %d tool calls this turn", m.toolRounds)
-	m.turn.Append(chmctx.Message{
-		Role:    chmctx.RoleSystem,
-		Content: agent.VerifyNudge,
-	})
-	return true
-}
 
 // cursorOnFirstLine: true when ↑ should walk prompt history instead of moving
 // the textarea's own cursor. cursorOnLastLine is the mirror for ↓.
