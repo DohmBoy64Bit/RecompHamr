@@ -210,3 +210,13 @@ The TUI no longer opens model streams, executes tools, stores turn contexts, pac
 - Security: contexts and cancellation functions cannot be read, stored, logged, or invoked directly by presentation; opaque tool work remains the only carrier into tool execution.
 - Evidence: production TUI code contains no turn-context or cancel-function access, and the architecture check rejects either access pattern if reintroduced.
 - Known limits: exact-build runtime evidence remains blocked after three LM Studio load attempts failed for `google/gemma-4-12b-qat`: automatic settings failed at 52%, 4,096 context/50% GPU failed at 45%, and 2,048 context/full GPU failed at 53%, each with LM Studio's unknown model-load error. Agent-event logging and broader application/configuration ownership remain later Stage C slices.
+
+#### Checkpoint 2I — runtime façade and causal observation
+
+- Changed: production TUI turn/stream/tool transitions now pass through the app-composed `agent.Runtime` façade; agent orchestration emits request, retry, reasoning, assistant, accounting, pressure, error, tool, nudge, leak, cancellation, and turn records at their owning transitions. The protected file sink moved from presentation into `internal/logging`, with lifecycle and observer injection owned by `internal/app`.
+- Documented: current architecture, decision D-013, the active behavioral inventory, and this packet distinguish causal runtime observation from presentation rendering.
+- Verified: focused agent/runtime-observer, logging lifecycle/security, app composition, and TUI adapter suites pass. Architecture enforcement forbids TUI imports of tools/logging, direct agent-root construction, provider-error policy, and cancellation capabilities; history/configuration filesystem ownership remains explicitly outside this slice.
+- Coverage: focused `internal/agent` and `internal/logging` profiles and the canonical repository profile pass at exactly 100.0% (2011/2011 statements).
+- Security: prompts, reasoning, tool arguments, and results remain confined to the owner-protected log; acceptance reports consume category names only. Presentation receives no log handle, observer, credentials, context, cancel function, or resolved tool arguments.
+- Evidence: production stream and tool messages call `agent.Runtime.ApplyDelivery`, `ApplyToolResult`, `NextTool`, and `DecideClose`; application startup calls `logging.Open`, injects `logging.NewObserver`, and defers `logging.Close`.
+- Known limits: exact-build Gemma runtime execution remains blocked by the recorded LM Studio load failure; broader configuration/client/persistence extraction is outside Slice 2 and remains later Stage C work.

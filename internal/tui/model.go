@@ -78,11 +78,12 @@ type Model struct {
 	cfg *config.Config
 	cli *llm.Client
 
-	turn     *agent.TurnState   // agent-owned history, stable identity, and cancellation root
-	runtime  *agent.StreamState // agent-owned stream, pending calls, accounting, and connection facts
-	loop     *agent.LoopState   // agent-owned sequential-tool and loop-policy state
-	executor agent.ToolExecutor
-	system   string // embedded system prompt + working-directory anchor
+	turn         *agent.TurnState   // agent-owned history, stable identity, and cancellation root
+	runtime      *agent.StreamState // agent-owned stream, pending calls, accounting, and connection facts
+	loop         *agent.LoopState   // agent-owned sequential-tool and loop-policy state
+	executor     agent.ToolExecutor
+	agentRuntime agent.Runtime
+	system       string // embedded system prompt + working-directory anchor
 
 	// streaming is the live raw token buffer for the current content block,
 	// rendered above the prompt by View() while the model talks. On flush
@@ -100,13 +101,6 @@ type Model struct {
 	// replayed in handleResizeSettle after a width change wipes the terminal,
 	// and tests read it to verify what was emitted.
 	scroll *strings.Builder
-
-	// reasoning accumulates the current round's chain-of-thought (EventReasoning)
-	// for the debug log only; it never enters history (see llm.EventReasoning).
-	// Pointer like streaming/scroll: Model is copied by value across bubbletea
-	// and strings.Builder must not be copied after first use. Only written when
-	// logging is on; reset every round in applyDone and on abort.
-	reasoning *strings.Builder
 
 	ta       promptInput
 	renderer *glamour.TermRenderer
@@ -197,24 +191,19 @@ func New(cfg *config.Config, cli *llm.Client, runtime agent.Runtime, projectDir,
 		spinner:  sp,
 		// width/height left at 0; View() returns "" until the first
 		// WindowSizeMsg, so we don't flash an 80×24 frame then resize.
-		streaming: new(strings.Builder),
-		scroll:    new(strings.Builder),
-		reasoning: new(strings.Builder),
-		histIdx:   -1,
-		turn:      runtime.Turn,
-		runtime:   runtime.Stream,
-		loop:      runtime.Loop,
-		executor:  runtime.Executor,
+		streaming:    new(strings.Builder),
+		scroll:       new(strings.Builder),
+		histIdx:      -1,
+		turn:         runtime.Turn,
+		runtime:      runtime.Stream,
+		loop:         runtime.Loop,
+		executor:     runtime.Executor,
+		agentRuntime: runtime,
 	}
 	// Record the active backend once, before any turn, so a shared log
 	// names exactly which model/endpoint/context window produced the behaviour.
-	// Gated on dbgEnabled so the profile derefs run only when logging is on;
-	// off (the default) means New behaves exactly as before.
-	if dbgEnabled() {
-		dbgWriteSession(version, cfg.Active, cfg.ActiveProfile().LLM, cfg.ActiveURL(),
-			m.activeContextSize(), chmctx.Tokens(m.system),
-			agent.ToolNames())
-	}
+	m.agentRuntime.ObserveSession(version, cfg.Active, cfg.ActiveProfile().LLM, cfg.ActiveURL(),
+		m.activeContextSize(), chmctx.Tokens(m.system))
 	// Seed prompt history from .rehamr/history so ↑ recalls prompts from
 	// earlier sessions. Loaded entries carry no chip metadata (the on-disk
 	// format stores expanded text only), so a recalled multi-line paste
@@ -360,7 +349,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// fresh submit while the prior readEvent was in flight). Keep draining
 		// the channel so the producer goroutine exits cleanly, but never let
 		// the event mutate the now-active turn's state.
-		delivery := m.runtime.ApplyDelivery(m.turn, msg.stream, m.cfg.Active, msg.delivery)
+		delivery := m.agentRuntime.ApplyDelivery(msg.stream, m.cfg.Active, m.activeContextSize(), msg.delivery)
 		if !delivery.Accepted {
 			return m, readEvent(msg.stream)
 		}
@@ -370,7 +359,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Stale close from the prior turn's channel; running handleStreamClosed
 		// would nil out the live m.runtime.Stream and, worse, finalizeTurn + endTurn the
 		// active turn, killing the user's request out from under them.
-		delivery := m.runtime.ApplyDelivery(m.turn, msg.stream, m.cfg.Active, msg.delivery)
+		delivery := m.agentRuntime.ApplyDelivery(msg.stream, m.cfg.Active, m.activeContextSize(), msg.delivery)
 		if !delivery.Accepted || !delivery.Closed {
 			return m, nil
 		}
@@ -383,19 +372,9 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// startChat would abandon the in-flight stream. The turnCtx tag was
 		// captured at runToolCall time; endTurn deactivates that identity and a
 		// fresh beginTurn installs a new one that cannot match.
-		effect := m.loop.ApplyToolResult(m.turn, m.runtime, msg.delivery)
+		effect := m.agentRuntime.ApplyToolResult(msg.delivery)
 		if !effect.Accepted {
 			return m, nil
-		}
-		dbgWriteMessage("tool_result", effect.Message)
-		if effect.Failed {
-			dbgWritef("tool_outcome", "tool=%s FAILED · same-target streak=%d/%d · key=%s", effect.Message.ToolName, effect.FailStreak, maxToolFailStreak, effect.FailKey)
-		}
-		if effect.FailureNudged {
-			dbgWritef("nudge", "repeated-failure nudge injected after %d same-target failures (key=%s)", effect.FailureCount, effect.FailureKey)
-		}
-		if effect.RunawayNudged {
-			dbgWritef("nudge", "runaway-iteration nudge injected at %d tool calls this turn", effect.ToolRounds)
 		}
 		// Drain every remaining call before re-entering chat: OpenAI rejects an
 		// assistant.tool_calls message followed by fewer tool messages than
@@ -503,21 +482,19 @@ func (m Model) submit(sendText, echoText string, entry promptEntry) (tea.Model, 
 	_ = appendPromptHistory(m.cfg.Dir, safeText)
 
 	if strings.HasPrefix(sendText, "/") {
-		dbgWritef("user_slash", "%s", safeText)
+		m.agentRuntime.ObserveSlash(safeText)
 		return m.runSlash(sendText)
 	}
 	// A new user message is a new goal: drop any in-progress failure streak so
 	// a stale count can't trip the nudge early. History persists; only the
 	// counter resets.
-	m.loop.ResetUserGoal()
-	dbgWritef("user", "%s", sendText)
+	m.agentRuntime.ObserveUser(sendText)
 	return m, m.appendUserTurn(sendText)
 }
 
 func (m *Model) startChat() tea.Cmd {
-	runtime := agent.Runtime{Turn: m.turn, Stream: m.runtime, Loop: m.loop, Client: m.cli, Executor: m.executor}
-	stream, summary := runtime.StartRound(m.system, m.activeContextSize())
-	dbgWriteRequest(m.cfg.ActiveProfile().LLM, summary)
+	m.agentRuntime.Client = m.cli
+	stream, _ := m.agentRuntime.StartRound(m.system, m.cfg.ActiveProfile().LLM, m.activeContextSize())
 	return readEvent(stream)
 }
 
@@ -525,7 +502,7 @@ func (m *Model) startChat() tea.Cmd {
 // opaque per-turn root. Cancel-old-then-install-new keeps Ctrl+C consistent:
 // one agent-owned cancellation capability unwinds the whole current cascade.
 func (m *Model) installTurnContext() {
-	m.turn.Begin(context.Background(), time.Now())
+	m.agentRuntime.BeginTurn(time.Now())
 }
 
 // beginTurn installs a fresh per-turn context, flips phase to thinking, and
@@ -535,14 +512,13 @@ func (m *Model) beginTurn() tea.Cmd {
 	m.installTurnContext()
 	m.turnStart = time.Now()
 	m.lastOutcome = outcomeNone // the new run replaces the prior frozen summary
-	m.runtime.Phase = phaseThinking
 	return m.startChat()
 }
 
 // appendUserTurn appends a user-role message to history and starts a turn.
 // The only path that does so; used by submit.
 func (m *Model) appendUserTurn(content string) tea.Cmd {
-	m.turn.Append(chmctx.Message{Role: chmctx.RoleUser, Content: content})
+	m.agentRuntime.AppendUser(content)
 	return m.beginTurn()
 }
 
@@ -555,10 +531,7 @@ func (m *Model) appendUserTurn(content string) tea.Cmd {
 // whose tool_call_id no longer pairs the latest assistant message. Does NOT
 // touch scrollback; callers decide whether to flush streaming or emit a banner.
 func (m *Model) endTurn() {
-	m.turn.End()
-	wasRetrying := m.runtime.Retrying
-	m.runtime.ResetTurn()
-	m.loop.ResetTurn()
+	wasRetrying := m.agentRuntime.EndTurn()
 	// The queue-refusal hint says "send it when the turn ends"; that moment is
 	// now, so the advice would be stale from the next render on.
 	if m.status == queueSlashHint {
@@ -571,35 +544,16 @@ func (m *Model) endTurn() {
 	}
 }
 
-// handleStream dispatches one llm.Event to the matching apply* helper and
-// re-arms the stream reader; EventError unwinds the turn instead of looping.
-// Events arriving after cancellation are drained quietly; acting on them would
-// corrupt scroll (EventContent), re-populate pending (EventToolCall), or credit
-// a dead turn's tokens (EventDone).
-func (m Model) handleStream(e llm.Event) (tea.Model, tea.Cmd) {
-	if !m.runtime.Phase.Active() {
-		return m, readEvent(m.runtime.Stream)
-	}
-	effect := m.runtime.Apply(m.turn, m.cfg.Active, e)
-	return m.applyStreamEffect(effect)
-}
-
 func (m Model) applyStreamEffect(effect agent.StreamEffect) (tea.Model, tea.Cmd) {
 	if effect.RetryCleared {
 		m.status = ""
 	}
 	if effect.RetryText != "" {
 		m.status = effect.RetryText
-		dbgWritef("retry", "%s (%v)", effect.RetryText, effect.RetryError)
 	}
 	if effect.Content != "" {
 		// Display-only tab expansion keeps authoritative model history intact.
 		m.streaming.WriteString(strings.ReplaceAll(effect.Content, "\t", "    "))
-	}
-	if effect.Reasoning != "" {
-		if dbgEnabled() {
-			m.reasoning.WriteString(effect.Reasoning)
-		}
 	}
 	if effect.Done {
 		m.applyDoneEffect(effect)
@@ -612,41 +566,7 @@ func (m Model) applyStreamEffect(effect agent.StreamEffect) (tea.Model, tea.Cmd)
 	return m, readEvent(m.runtime.Stream)
 }
 
-// applyDone closes one LLM round: harvest the live context window, accumulate
-// turn/session tokens, append the assistant message, flush streaming. A turn
-// with tool calls fires one EventDone per round; counters accumulate so the
-// banner reflects the whole turn. Tokens==0 means the backend skipped
-// include_usage; the char/4 estimate carries the counter on those servers.
-func (m *Model) applyDone(e llm.Event) {
-	effect := m.runtime.Apply(m.turn, m.cfg.Active, e)
-	m.applyDoneEffect(effect)
-}
-
 func (m *Model) applyDoneEffect(effect agent.StreamEffect) {
-	// Round-level reasoning first (it preceded the answer), then the assistant
-	// message, then the round metrics, so the log reads in causal order.
-	if r := m.reasoning.String(); r != "" {
-		dbgWritef("reasoning", "%s", r)
-	}
-	m.reasoning.Reset()
-	if effect.Final != nil {
-		dbgWriteMessage("assistant", *effect.Final)
-	}
-	// prompt_tokens (server-counted, 0 = not reported) sits beside the request
-	// record's char/4 estimate so a forensic pass can calibrate the packer's
-	// undercount on real histories. Log-only; nothing reads it back.
-	dbgWritef("round_done", "tokens=%d (counted=%d) · prompt_tokens=%d · elapsed=%s · ctx_window=%d",
-		effect.ReportedTokens, effect.CountedTokens, effect.PromptTokens, effect.Elapsed.Round(time.Millisecond), effect.ContextWindow)
-	// Tripwire for the packer's blind spot: char/4 undercounts code-heavy
-	// history (measured ~1.6x on a real run), so the true prompt can reach the
-	// server's window while Pack still believes it has headroom. Ollama then
-	// front-truncates silently (200 OK, system prompt lost). A server count at
-	// or past 95% of the window is that band; log it so a forensic pass sees
-	// the overflow instead of inferring it. Log-only; the headroom constant
-	// stays put until a run actually trips this.
-	if ctxSize := m.activeContextSize(); effect.PromptTokens > 0 && effect.PromptTokens >= ctxSize-ctxSize/20 {
-		dbgWritef("ctx_pressure", "prompt_tokens=%d at >=95%% of ctx=%d; real prompt has outgrown the packer's estimate, next request risks silent server-side truncation", effect.PromptTokens, ctxSize)
-	}
 	m.flushStreaming()
 }
 
@@ -654,7 +574,6 @@ func (m *Model) applyDoneEffect(effect agent.StreamEffect) {
 // before the error (so the user keeps failure context), emit the one-line hint,
 // drop the pending queue, reset turn state.
 func (m *Model) applyError(err error) tea.Cmd {
-	dbgWritef("error", "%v", err)
 	m.abortTurn(styleError.Render(m.errorMessage(err)))
 	return nil
 }
@@ -665,7 +584,6 @@ func (m *Model) applyError(err error) tea.Cmd {
 // applyDone for the happy path.
 func (m *Model) abortTurn(banner string) {
 	m.flushStreaming()
-	m.reasoning.Reset()
 	if banner != "" {
 		m.appendLine(banner)
 	}
@@ -697,7 +615,7 @@ func (m *Model) finalizeTurn(outcome turnOutcome) {
 	if m.turnStart.IsZero() {
 		return // defensive: finalizeTurn only runs inside a turn beginTurn started
 	}
-	wall, tokens := m.runtime.Finalize(m.turnStart, time.Now())
+	wall, tokens := m.agentRuntime.FinalizeTurn(m.turnStart, time.Now())
 	m.lastElapsed = wall
 	m.lastTokens = tokens
 	m.lastOutcome = outcome
@@ -705,8 +623,7 @@ func (m *Model) finalizeTurn(outcome turnOutcome) {
 	if avg != "" {
 		avg = " · " + avg + " avg"
 	}
-	dbgWritef("turn_end", "%s · %s wall%s · session_total=%s",
-		humanTokens(tokens), wall.Round(time.Millisecond), avg, humanTokens(m.runtime.SessionTokens))
+	m.agentRuntime.ObserveTurnEnd(humanTokens(tokens), humanTokens(m.runtime.SessionTokens), wall, avg)
 	m.turnStart = time.Time{}
 }
 
@@ -718,25 +635,17 @@ func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
 	if !m.runtime.Phase.Active() {
 		return m, nil
 	}
-	decision := m.loop.DecideClose(m.turn, m.runtime)
+	decision := m.agentRuntime.DecideClose()
 	switch decision.Action {
 	case agent.CloseRunTool:
 		return m.dispatchNextTool()
 	case agent.CloseRestartModel:
-		switch decision.Reason {
-		case agent.CloseEmptyNudge:
-			dbgWritef("nudge", "empty-reply nudge injected (turn ended with no content and no tool call)")
-		case agent.CloseVerifyNudge:
-			dbgWritef("nudge", "finish re-grounding nudge injected at %d tool calls this turn", decision.ToolRounds)
-		}
 		return m, m.startChat()
 	case agent.CloseFinishStopped:
 		if decision.Reason == agent.CloseEmptyStall {
 			m.appendLine(styleError.Render("⚠ the model ended its turn with no reply and no tool call - it stalled, or your server dropped the call. If thinking is on, its reasoning parser may be swallowing calls - enable one (e.g. vLLM `--reasoning-parser`) or disable thinking for tool turns."))
-			dbgWritef("leak", "turn ended with an empty assistant message after a re-prompt (model stalled or the call was swallowed server-side)")
 		} else {
 			m.appendLine(toolCallLeakWarning(m.turn.History))
-			dbgWritef("leak", "turn ended with tool-call text leaked into the reply (server-side parser misconfigured)")
 		}
 		m.finalizeTurn(outcomeStopped)
 	default:
@@ -787,8 +696,7 @@ func toolCallLeakWarning(history []chmctx.Message) string {
 // call's target so the failure nudge can tell when the model keeps retrying the
 // same failing operation (see recordToolOutcome).
 func (m Model) dispatchNextTool() (tea.Model, tea.Cmd) {
-	work, _ := m.loop.NextTool(m.turn, m.runtime, m.executor)
-	dbgWritef("tool_start", "%s", work.Status())
+	work, _ := m.agentRuntime.NextTool()
 	m.appendLine(styleDim.Render(work.Status()))
 	return m, runToolCall(work)
 }

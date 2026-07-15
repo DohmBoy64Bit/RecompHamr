@@ -15,9 +15,25 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/tools"
 )
+
+// handleStream is the deterministic adapter-test entrypoint for raw synthetic
+// transport events. Production consumes only opaque agent deliveries.
+func (m Model) handleStream(event llm.Event) (tea.Model, tea.Cmd) {
+	if !m.runtime.Phase.Active() {
+		return m, readEvent(m.runtime.Stream)
+	}
+	effect := m.agentRuntime.ApplyEvent(m.cfg.Active, m.activeContextSize(), event)
+	return m.applyStreamEffect(effect)
+}
+
+func (m *Model) applyDone(event llm.Event) {
+	effect := m.agentRuntime.ApplyEvent(m.cfg.Active, m.activeContextSize(), event)
+	m.applyDoneEffect(effect)
+}
 
 func TestPhaseOutcomeContextAndInitContracts(t *testing.T) {
 	for p, want := range map[phase]string{phaseIdle: "", phaseThinking: "thinking", phaseStreaming: "generating", phaseRunning: "running"} {
@@ -240,9 +256,9 @@ func TestProbeSuccessFailureAndBackendCommands(t *testing.T) {
 
 func TestRemainingStateBranches(t *testing.T) {
 	dir := t.TempDir()
-	OpenDebugLog(dir)
+	logging.Open(dir)
 	m := baselineModel(t)
-	CloseDebugLog()
+	logging.Close()
 	if len(m.promptHistory) != 0 {
 		t.Fatal("unexpected history")
 	}
@@ -261,15 +277,14 @@ func TestRemainingStateBranches(t *testing.T) {
 		_ = tick()
 	}
 
-	OpenDebugLog(dir)
+	logging.Open(dir)
 	m.runtime.Phase = phaseThinking
 	m.runtime.BeginStream(m.turn.ID, make(chan llm.Event))
 	next, _ = m.handleStream(llm.Event{Kind: llm.EventReasoning, Content: "logged reasoning"})
 	m = next.(Model)
 	m.runtime.StreamingEstimate = 8
-	m.reasoning.WriteString("reason")
 	m.applyDone(llm.Event{Kind: llm.EventDone})
-	CloseDebugLog()
+	logging.Close()
 	if m.runtime.TurnTokens == 0 {
 		t.Fatal("estimated done tokens")
 	}

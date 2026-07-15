@@ -52,16 +52,8 @@ func TestHistoryAppendFailureAndTrimBoundaries(t *testing.T) {
 	}
 }
 
-func TestDebugLogSecurityFailureAndRenderFallback(t *testing.T) {
+func TestRenderFallback(t *testing.T) {
 	boom := errors.New("boom")
-	origRestrict := restrictDebugPath
-	t.Cleanup(func() { restrictDebugPath = origRestrict; CloseDebugLog() })
-	restrictDebugPath = func(string, bool) error { return boom }
-	OpenDebugLog(t.TempDir())
-	if dbgEnabled() {
-		t.Fatal("security failure enabled log")
-	}
-
 	m := baselineModel(t)
 	m.renderer = nil
 	if _, err := renderMarkdown(&m, "x"); err == nil {

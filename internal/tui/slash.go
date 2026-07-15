@@ -179,13 +179,11 @@ func (m *Model) rebuildClient() {
 }
 
 func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
-	m.turn.Reset()
+	m.agentRuntime.ResetConversation()
 	m.scroll.Reset()
-	m.runtime.ResetSession()
 	// Drop any queued follow-up: it targeted the conversation just wiped.
 	m.queued = nil
 	// Reset the repeated-failure streak so the next turn starts clean.
-	m.loop.ResetUserGoal()
 	// Wipe prompt recall too: in-memory ring and on-disk .rehamr/history,
 	// or leftover history would contradict the "fresh start" promise.
 	m.promptHistory = nil

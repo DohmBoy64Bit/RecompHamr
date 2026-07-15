@@ -11,6 +11,7 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 )
 
 // newTestModel wires a model against a mock OpenAI-compatible SSE server so
@@ -29,7 +30,7 @@ func newTestModel(t *testing.T, handler http.HandlerFunc) Model {
 		t.Fatal(err)
 	}
 	client := llm.New(srv.URL, cfg.ActiveProfile().LLM, "")
-	m := New(cfg, client, agent.NewRuntime(client, agent.LocalToolExecutor()), t.TempDir(), "test")
+	m := New(cfg, client, agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), t.TempDir(), "test")
 	sized, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	return sized.(Model)
 }
@@ -86,5 +87,5 @@ func stripANSI(s string) string {
 
 func testModel(t *testing.T, cfg *config.Config, client *llm.Client) Model {
 	t.Helper()
-	return New(cfg, client, agent.NewRuntime(client, agent.LocalToolExecutor()), t.TempDir(), "test")
+	return New(cfg, client, agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), t.TempDir(), "test")
 }

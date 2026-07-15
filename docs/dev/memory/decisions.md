@@ -52,3 +52,7 @@ Separation preserves every accepted Stage A behavior. Move existing responsibili
 ## D-012 — Application composition constructs the agent runtime
 
 `internal/app` constructs the agent runtime and injects its model and tool dependencies before selecting the concrete frontend. The runtime aggregate is a transitional mechanical boundary: it preserves the Bubble Tea value-model behavior while later checkpoints encapsulate mutable orchestration state and narrow presentation access to typed events and immutable facts.
+
+## D-013 — Agent orchestration emits causal records
+
+`internal/agent` emits stream, tool, cancellation, policy, and turn records at the state transition that owns them. `internal/app` injects the observer and owns its lifecycle through `internal/logging`; presentation applies typed effects but does not reconstruct orchestration events or open the protected log file.

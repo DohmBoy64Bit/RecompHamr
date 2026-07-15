@@ -13,6 +13,7 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/tui"
 )
 
@@ -23,13 +24,13 @@ var (
 	getEnvironment      = os.Getenv
 	newClient           = llm.New
 	newAgentRuntime     = func(client *llm.Client) agent.Runtime {
-		return agent.NewRuntime(client, agent.LocalToolExecutor())
+		return agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver())
 	}
 	newFrontend = func(cfg *config.Config, client *llm.Client, runtime agent.Runtime, projectDir, version string) tea.Model {
 		return tui.New(cfg, client, runtime, projectDir, version)
 	}
-	openDebugLog      = tui.OpenDebugLog
-	closeDebugLog     = tui.CloseDebugLog
+	openDebugLog      = logging.Open
+	closeDebugLog     = logging.Close
 	printFrontendHelp = tui.PrintHelp
 	runTeaProgram     = executeTeaProgram
 	newTeaProgram     = createTeaProgram

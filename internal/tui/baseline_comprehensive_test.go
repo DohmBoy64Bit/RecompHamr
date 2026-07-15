@@ -13,6 +13,7 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/tools"
 )
@@ -25,7 +26,7 @@ func baselineModel(t *testing.T) Model {
 		t.Fatal(err)
 	}
 	client := llm.New(cfg.ActiveURL(), cfg.ActiveProfile().LLM, "")
-	return New(cfg, client, agent.NewRuntime(client, agent.LocalToolExecutor()), t.TempDir(), "test")
+	return New(cfg, client, agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), t.TempDir(), "test")
 }
 
 func TestCommandBoundariesAndErrorHints(t *testing.T) {
@@ -84,36 +85,4 @@ func TestFormatBoundaries(t *testing.T) {
 			t.Fatalf("int %d = %q", n, got)
 		}
 	}
-}
-
-func TestDebugLogLifecycleAndPayloads(t *testing.T) {
-	CloseDebugLog()
-	OpenDebugLog("")
-	if dbgEnabled() {
-		t.Fatal("empty path enabled logging")
-	}
-	dir := t.TempDir()
-	OpenDebugLog(dir)
-	if !dbgEnabled() {
-		t.Fatal("logging not enabled")
-	}
-	dbgWriteSession("v", "p", "m", "u", 100, 10, []string{"read_file"})
-	dbgWriteRequest("m", agent.RequestSummary{ContextSize: 100, Budget: 80, History: 2, Packed: 1, Tokens: 1, Truncated: 1, Dropped: 1})
-	dbgWriteMessage("assistant", chmctx.Message{Role: chmctx.RoleAssistant, Content: "answer", ToolCalls: []chmctx.ToolCall{{ID: "1", Name: "read_file", Arguments: map[string]any{"path": "x"}}}})
-	dbgWriteMessage("tool", chmctx.Message{Role: chmctx.RoleTool, ToolName: "read_file", ToolCallID: "1"})
-	CloseDebugLog()
-	CloseDebugLog()
-	raw, err := os.ReadFile(filepath.Join(dir, "log.txt"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range []string{"session", "request", "TOOL_CALL", "tool=read_file"} {
-		if !strings.Contains(string(raw), want) {
-			t.Fatalf("log missing %q", want)
-		}
-	}
-	dbgWritef("off", "ignored")
-	dbgWriteRequest("m", agent.RequestSummary{ContextSize: 1, Budget: 1})
-	dbgWriteMessage("off", chmctx.Message{})
-	OpenDebugLog(filepath.Join(dir, "missing", "child"))
 }

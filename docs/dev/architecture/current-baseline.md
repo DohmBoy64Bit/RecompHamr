@@ -10,6 +10,7 @@ internal/app
     +--> internal/config
     +--> internal/llm
     +--> internal/agent
+    +--> internal/logging
     +--> internal/tui
               |
               +--> internal/agent
@@ -23,6 +24,10 @@ internal/agent
     +--> internal/llm
     +--> internal/provider
     +--> internal/tools
+
+internal/logging
+    +--> internal/config
+    +--> internal/ctx
 ```
 
 ## Completed ownership
@@ -33,6 +38,6 @@ internal/agent
 
 ## Remaining temporary ownership
 
-Stage C slice 2 is in progress. `internal/agent` now owns request packing/tool definitions, the mutable turn root, stable turn/round identity, model-round startup and opaque reading, stable-identity delivery validation, raw event reduction/accounting, sequential local-tool execution, result pairing, cancellation identity, all loop-policy latch state, stream-close decisions, and provider-specific turn/probe diagnostic classification. `internal/app` constructs the typed agent runtime with its model and tool dependencies and injects it into the concrete frontend; the runtime allocates the single turn, stream, and loop state roots shared by Bubble Tea model copies. Turn contexts and cancel functions are private agent capabilities; presentation can only begin, query, or end a turn through lifecycle methods. The TUI schedules opaque agent stream/tool work and applies typed display/log/finish effects; production TUI code no longer imports `internal/tools`, packs model history, opens model requests, reads raw transport channels, inspects raw delivered events, executes tool calls, stores cancellation capabilities, decides loop policy, or classifies provider errors. Further snapshot encapsulation, logging ownership, and the final architecture/deletion boundary remain later Stage C work.
+Stage C slice 2 is in progress. `internal/agent` now owns request packing/tool definitions, the mutable turn root, stable turn/round identity, model-round startup and opaque reading, stable-identity delivery validation, raw event reduction/accounting, sequential local-tool execution, result pairing, cancellation identity, all loop-policy latch state, stream-close decisions, provider-specific turn/probe diagnostic classification, and causal runtime observation. `internal/app` constructs the typed agent runtime with its model/tool dependencies and private observer, and owns the protected debug-log lifecycle through `internal/logging`; the runtime allocates the single turn, stream, and loop state roots shared by Bubble Tea model copies. Turn contexts and cancel functions are private agent capabilities; presentation can only submit lifecycle intents and apply typed effects. Production TUI code no longer imports `internal/tools` or `internal/logging`, packs model history, opens model requests, reads raw transport channels, inspects raw delivered events, executes tool calls, stores cancellation capabilities, decides loop policy, classifies provider errors, emits orchestration records, or opens the private debug log. Further immutable snapshot encapsulation and the final Stage C deletion boundary remain later work; Slice 2 runtime acceptance is still open.
 
 Backend packages must not import `internal/tui`. `internal/app` is the sole current exception because a composition root must select the concrete frontend. Later slices replace that concrete runtime coupling with typed frontend contracts while preserving the accepted layout and behavior.
