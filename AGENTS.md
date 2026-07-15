@@ -11,7 +11,7 @@ Order of work:
 3. integrate RecompHamr capabilities one coherent subsystem at a time;
 4. verify each capability against evidence, tests, docs, and runtime behavior.
 
-The repository is currently **Stage A: fresh-source barebones baseline**. Until the baseline gate is accepted, do not add Legacy feature families, MCP, skills, new command families, project memory, diagnostics systems, reverse-engineering helpers, or a TUI redesign.
+**Stage A: fresh-source barebones baseline** is accepted. The repository is currently in **Stage C: separation of concerns**. Preserve every accepted behavior while moving application and agent ownership out of presentation; do not add Legacy feature families, MCP, skills, new command families, project memory, diagnostics systems, reverse-engineering helpers, or a TUI redesign during separation.
 
 ## Codex reading route
 

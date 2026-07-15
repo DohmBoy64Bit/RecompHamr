@@ -15,7 +15,7 @@ Until the baseline gate is manually accepted:
 
 Do not add new filesystem, process, networking, persistence, MCP, or skills lifecycle responsibilities to the TUI.
 
-During Stage C, move orchestration and side effects behind typed application contracts while preserving accepted observable behavior. Presentation should end with rendering, presentation state, and input-to-intent translation.
+Stage C is an ownership move, not a rewrite. Move orchestration and side effects behind typed application contracts while preserving every accepted observable behavior. Presentation should end with rendering, presentation state, and input-to-intent translation; do not opportunistically change layout, interaction, agent policy, persistence, or error behavior while extracting code.
 
 ## Verification
 

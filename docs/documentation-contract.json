@@ -34,6 +34,7 @@
     ,"docs/dev/workflows/stage-a-acceptance-work-packet.md"
     ,"docs/dev/workflows/tui-acceptance-harness.md"
     ,"docs/dev/workflows/tui-acceptance-harness-work-packet.md"
+    ,"docs/dev/workflows/stage-c-separation-work-packet.md"
   ],
   "required_content": {
     "README.md": [
@@ -238,6 +239,15 @@
       "Outcome",
       "In scope",
       "Out of scope",
+      "Stop condition"
+    ],
+    "docs/dev/workflows/stage-c-separation-work-packet.md": [
+      "Outcome",
+      "In scope",
+      "Out of scope",
+      "internal/app",
+      "internal/agent",
+      "Deleting `internal/tui`",
       "Stop condition"
     ],
     "docs/README.md": [

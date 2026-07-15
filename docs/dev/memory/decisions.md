@@ -44,3 +44,7 @@ RecompHamr-Legacy defines feature evidence and required compatibility, not inter
 ## D-010 — Future skills use the Agent Skills standard
 
 Stage G must implement standards-based Agent Skills support rather than restore the Legacy skills system one-to-one. The Agent Skills client-implementation guide is mandatory before client work, and every migrated Legacy skill must be converted and evaluated under the current Agent Skills authority set documented in `docs/dev/roadmap/agent-skills-standard.md`.
+
+## D-011 — Stage C is ownership movement, not a rewrite
+
+Separation preserves every accepted Stage A behavior. Move existing responsibilities behind narrow typed boundaries in small slices; do not redesign the TUI, replace the agent policy, alter persistence, or opportunistically modernize behavior. Slice 1 makes `internal/app` the composition root while keeping the existing TUI model intact.
