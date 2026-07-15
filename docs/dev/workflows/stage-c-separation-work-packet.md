@@ -229,4 +229,14 @@ The TUI no longer opens model streams, executes tools, stores turn contexts, pac
 - Coverage: focused `internal/agent` and affected TUI suites and the canonical repository profile pass at exactly 100.0% (2017/2017 statements).
 - Security: snapshots exclude history, contexts, cancellation, streams, tool calls/arguments, credentials, reasoning, and observer state. The only stream accessor returns the existing opaque reader needed for Bubble Tea scheduling.
 - Evidence: production rendering calls `Runtime.Snapshot`; input calls `Runtime.Active`; probe/context paths call typed runtime methods; no production TUI source matches `m.turn.`, `m.runtime.`, or `m.loop.`.
-- Known limits: exact-build Gemma runtime evidence remains blocked; configuration/client/persistence extraction is explicitly outside Slice 2.
+- Known limits: exact-build Gemma runtime evidence remains open; the model is now loaded, but the Codex desktop host denied foreground activation of the bound Windows Terminal window before input delivery. Configuration/client/persistence extraction is explicitly outside Slice 2.
+
+#### Checkpoint 2K — deletion-boundary and runtime audit
+
+- Changed: no production behavior changed. The final source audit confirmed that TUI orchestration references are confined to the app-composed runtime façade; retained state aliases exist only as focused test-observation seams, and the agent-owned cancellation capability remains private.
+- Documented: current architecture and this packet now replace the obsolete Gemma-load blocker with the directly observed Windows foreground-activation blocker.
+- Verified: the canonical gate passes on the exact build. Source searches found no production TUI imports of tools/logging, mutable agent-component reads, raw transport handling, direct tool execution, cancellation capabilities, or loop-policy decisions.
+- Coverage: the canonical repository profile remains exactly 100.0% (2017/2017 statements); behavioral rows remain `unverified` until runtime acceptance completes.
+- Security: three acceptance launches failed before any synthetic prompt was delivered. Reports remain sanitized, the private log was not copied, and no fixture tool or process side effect ran.
+- Evidence: LM Studio reports `google/gemma-4-12b-qat` loaded at 16,384 tokens on port 1234. Normal foreground activation with verification retries, attached-input activation, and direct window switching were each denied by the Codex desktop host; the sanitized report records failure at the first `type_text` step.
+- Known limits: run the committed `agent-tool-loop-cancel.json` scenario from an interactive desktop PowerShell/Windows Terminal session against the same build, then review its report and screenshots before changing `AGENT-01`, `AGENT-02`, or `TUI-04` to verified.

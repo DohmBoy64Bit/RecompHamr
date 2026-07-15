@@ -78,10 +78,10 @@ type Model struct {
 	cfg *config.Config
 	cli *llm.Client
 
-	turn         *agent.TurnState   // agent-owned history, stable identity, and cancellation root
-	runtime      *agent.StreamState // agent-owned stream, pending calls, accounting, and connection facts
-	loop         *agent.LoopState   // agent-owned sequential-tool and loop-policy state
-	executor     agent.ToolExecutor
+	turn         *agent.TurnState   // test-visible alias; private turn capabilities remain inside internal/agent
+	runtime      *agent.StreamState // test-visible alias; production paths use agentRuntime methods
+	loop         *agent.LoopState   // test-visible alias; production paths use agentRuntime methods
+	executor     agent.ToolExecutor // test-visible injected executor alias
 	agentRuntime agent.Runtime
 	system       string // embedded system prompt + working-directory anchor
 
