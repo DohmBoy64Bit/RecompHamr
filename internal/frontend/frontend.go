@@ -21,6 +21,20 @@ const (
 // Active reports whether the phase belongs to a live turn.
 func (p Phase) Active() bool { return p != PhaseIdle }
 
+// Label returns the accepted user-facing status text for the phase.
+func (p Phase) Label() string {
+	switch p {
+	case PhaseThinking:
+		return "thinking"
+	case PhaseStreaming:
+		return "generating"
+	case PhaseRunning:
+		return "running"
+	default:
+		return ""
+	}
+}
+
 // Profile is a non-secret immutable model-profile fact for presentation.
 type Profile struct {
 	Name        string
@@ -153,6 +167,8 @@ const (
 	EventReachability
 	// EventProbe reports an authenticated profile probe.
 	EventProbe
+	// EventTurnStarted begins presentation timing for one accepted user goal.
+	EventTurnStarted
 	// EventContent carries streamed visible assistant content.
 	EventContent
 	// EventFlush requests presentation to commit its live content block.
@@ -179,7 +195,10 @@ type Event struct {
 	Silent        bool
 	OK            bool
 	Elapsed       time.Duration
+	At            time.Time
 	Tokens        int
+	Cancelled     bool
+	Natural       bool
 }
 
 // Work is captured asynchronous application work. Run owns its timeout and

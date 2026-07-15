@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 )
 
@@ -23,13 +22,13 @@ const (
 
 // phase aliases the presentation-neutral agent state during the mechanical
 // Stage C adapter migration.
-type phase = agent.Phase
+type phase = frontend.Phase
 
 const (
-	phaseIdle      = agent.PhaseIdle
-	phaseThinking  = agent.PhaseThinking
-	phaseStreaming = agent.PhaseStreaming
-	phaseRunning   = agent.PhaseRunning
+	phaseIdle      = frontend.PhaseIdle
+	phaseThinking  = frontend.PhaseThinking
+	phaseStreaming = frontend.PhaseStreaming
+	phaseRunning   = frontend.PhaseRunning
 )
 
 // turnOutcome is how a finished turn ended, frozen into the status bar until the
@@ -72,13 +71,6 @@ type Model struct {
 
 	controller  frontend.Controller
 	startupWork frontend.Work
-
-	turn         *agent.TurnState   // test-visible alias; private turn capabilities remain inside internal/agent
-	runtime      *agent.StreamState // test-visible alias; production paths use agentRuntime methods
-	loop         *agent.LoopState   // test-visible alias; production paths use agentRuntime methods
-	executor     agent.ToolExecutor // test-visible injected executor alias
-	agentRuntime agent.Runtime
-	system       string // embedded system prompt + working-directory anchor
 
 	// streaming is the live raw token buffer for the current content block,
 	// rendered above the prompt by View() while the model talks. On flush
@@ -160,11 +152,11 @@ type Model struct {
 
 	quitArmedAt time.Time // first Ctrl+C in idle arms; second within 3s quits
 
-	status string // transient status-bar hint; cleared by the event that obsoletes it (keypress, quit-arm timer, endTurn)
-
+	status                    string // transient status-bar hint; cleared by the event that obsoletes it (keypress, quit-arm timer, endTurn)
+	fireQueuedAfterTransition bool
 }
 
-func New(controller frontend.Controller, runtime agent.Runtime, system, version string) Model {
+func New(controller frontend.Controller, version string) Model {
 	ta := newPromptInput()
 
 	// Fixed dark style: WithAutoStyle queries the terminal (OSC 11) before
@@ -179,20 +171,14 @@ func New(controller frontend.Controller, runtime agent.Runtime, system, version 
 	m := Model{
 		Version:    version,
 		controller: controller,
-		system:     system,
 		ta:         ta,
 		renderer:   r,
 		spinner:    sp,
 		// width/height left at 0; View() returns "" until the first
 		// WindowSizeMsg, so we don't flash an 80×24 frame then resize.
-		streaming:    new(strings.Builder),
-		scroll:       new(strings.Builder),
-		histIdx:      -1,
-		turn:         runtime.Turn,
-		runtime:      runtime.Stream,
-		loop:         runtime.Loop,
-		executor:     runtime.Executor,
-		agentRuntime: runtime,
+		streaming: new(strings.Builder),
+		scroll:    new(strings.Builder),
+		histIdx:   -1,
 	}
 	bootstrap := controller.Bootstrap()
 	m.startupWork = bootstrap.Work
@@ -209,23 +195,6 @@ func New(controller frontend.Controller, runtime agent.Runtime, system, version 
 	}
 	return m
 }
-
-// activeContextSize returns the context window the packer should aim at: the
-// live server-reported value for the active profile if known, else the on-disk
-// ContextSize, else defaultPackFallback, so providers before their first
-// response (and any missing/zero value) still get a sensible budget.
-func (m *Model) activeContextSize() int {
-	facts := m.controller.Snapshot()
-	if v := facts.ContextSize; v > 0 {
-		return v
-	}
-	return defaultPackFallback
-}
-
-// defaultPackFallback is the conservative window used until the server reports
-// a real value. Matches config.defaultContextSize so profiles behave like
-// a fresh local one until X-Context-Window arrives on the next response.
-const defaultPackFallback = 16177
 
 // resizeSettleDelay debounces width-resize bursts: longer than typical drag
 // SIGWINCH cadence (10-50ms) so a continuous drag collapses to one settle,
@@ -315,53 +284,18 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleResizeSettle(msg)
 
 	case frontendCompletionMsg:
-		return m.applyFrontendTransition(m.controller.Dispatch(frontend.Complete(msg.completion)))
+		next, cmd := m.applyFrontendTransition(m.controller.Dispatch(frontend.Complete(msg.completion)))
+		m = next.(Model)
+		if m.fireQueuedAfterTransition {
+			m.fireQueuedAfterTransition = false
+			return m.fireQueued()
+		}
+		return m, cmd
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
-
-	case streamEventMsg:
-		// Stale event from a stream the current turn no longer owns (Ctrl+C →
-		// fresh submit while the prior readEvent was in flight). Keep draining
-		// the channel so the producer goroutine exits cleanly, but never let
-		// the event mutate the now-active turn's state.
-		delivery := m.agentRuntime.ApplyDelivery(msg.stream, m.controller.Snapshot().Active, m.activeContextSize(), msg.delivery)
-		if !delivery.Accepted {
-			return m, readEvent(msg.stream)
-		}
-		return m.applyStreamEffect(delivery.Stream)
-
-	case streamClosedMsg:
-		// Stale close from the prior turn's channel; running handleStreamClosed
-		// would release the live agent stream and, worse, finalizeTurn + endTurn the
-		// active turn, killing the user's request out from under them.
-		delivery := m.agentRuntime.ApplyDelivery(msg.stream, m.controller.Snapshot().Active, m.activeContextSize(), msg.delivery)
-		if !delivery.Accepted || !delivery.Closed {
-			return m, nil
-		}
-		return m.handleStreamClosed()
-
-	case toolResultMsg:
-		// Stale result from a turn the user already cancelled. Without this
-		// drop, the orphan tool message gets appended to the live turn's history
-		// (no preceding assistant.tool_calls → the next /v1 request 400s) and
-		// startChat would abandon the in-flight stream. The turnCtx tag was
-		// captured at runToolCall time; endTurn deactivates that identity and a
-		// fresh beginTurn installs a new one that cannot match.
-		effect := m.agentRuntime.ApplyToolResult(msg.delivery)
-		if !effect.Accepted {
-			return m, nil
-		}
-		// Drain every remaining call before re-entering chat: OpenAI rejects an
-		// assistant.tool_calls message followed by fewer tool messages than
-		// calls issued, so a partial dispatch 400s and loses the rest.
-		// Sequential dispatch in emit order keeps the pairing intact.
-		if effect.ContinueTools {
-			return m.dispatchNextTool()
-		}
-		return m, m.startChat()
 
 	case quitArmResetMsg:
 		if !m.quitArmedAt.IsZero() && time.Now().After(m.quitArmedAt) {
@@ -466,178 +400,7 @@ func (m Model) submit(sendText, echoText string, entry promptEntry) (tea.Model, 
 	// A new user message is a new goal: drop any in-progress failure streak so
 	// a stale count can't trip the nudge early. History persists; only the
 	// counter resets.
-	m.agentRuntime.ObserveUser(sendText)
-	return m, m.appendUserTurn(sendText)
-}
-
-func (m *Model) startChat() tea.Cmd {
-	stream, _ := m.agentRuntime.StartRound(m.system, m.controller.Snapshot().ActiveModel, m.activeContextSize())
-	return readEvent(stream)
-}
-
-// installTurnContext cancels any in-flight turn context and installs a fresh
-// opaque per-turn root. Cancel-old-then-install-new keeps Ctrl+C consistent:
-// one agent-owned cancellation capability unwinds the whole current cascade.
-func (m *Model) installTurnContext() {
-	m.agentRuntime.BeginTurn(time.Now())
-}
-
-// beginTurn installs a fresh per-turn context, flips phase to thinking, and
-// returns the chat stream-reader Cmd. Every path starting a new LLM round
-// funnels through here so one agent-owned cancellation root cancels the cascade.
-func (m *Model) beginTurn() tea.Cmd {
-	m.installTurnContext()
-	m.turnStart = time.Now()
-	m.lastOutcome = outcomeNone // the new run replaces the prior frozen summary
-	return m.startChat()
-}
-
-// appendUserTurn appends a user-role message to history and starts a turn.
-// The only path that does so; used by submit.
-func (m *Model) appendUserTurn(content string) tea.Cmd {
-	m.agentRuntime.AppendUser(content)
-	return m.beginTurn()
-}
-
-// endTurn zeroes per-turn state after a turn finishes or aborts. Pair to
-// beginTurn. Cancels the per-turn context unconditionally to release the
-// CancelFunc; Background-rooted contexts otherwise leak one child cancelCtx
-// per turn until the process exits. Drops pending tool calls so a turn cut
-// short mid-dispatch (Ctrl+C or error) can't leak a leftover call into the next
-// turn, which would dispatch with stale args and append an orphan tool_result
-// whose tool_call_id no longer pairs the latest assistant message. Does NOT
-// touch scrollback; callers decide whether to flush streaming or emit a banner.
-func (m *Model) endTurn() {
-	m.finishTurnReset(m.agentRuntime.EndTurn())
-}
-
-func (m *Model) finishTurnReset(wasRetrying bool) {
-	// The queue-refusal hint says "send it when the turn ends"; that moment is
-	// now, so the advice would be stale from the next render on.
-	if m.status == queueSlashHint {
-		m.status = ""
-	}
-	// A retry hint dies with its turn: a Ctrl+C during the backoff wait would
-	// otherwise leave "retry 1/3 in 15s" stranded in the idle status bar.
-	if wasRetrying {
-		m.status = ""
-	}
-}
-
-func (m Model) applyStreamEffect(effect agent.StreamEffect) (tea.Model, tea.Cmd) {
-	if effect.RetryCleared {
-		m.status = ""
-	}
-	if effect.RetryText != "" {
-		m.status = effect.RetryText
-	}
-	if effect.Content != "" {
-		// Display-only tab expansion keeps authoritative model history intact.
-		m.streaming.WriteString(strings.ReplaceAll(effect.Content, "\t", "    "))
-	}
-	if effect.Done {
-		m.applyDoneEffect(effect)
-	} else if effect.Flush {
-		m.flushStreaming()
-	}
-	if effect.Error != nil {
-		return m, m.applyError(effect.Error)
-	}
-	return m, readEvent(m.agentRuntime.CurrentStream())
-}
-
-func (m *Model) applyDoneEffect(effect agent.StreamEffect) {
-	m.flushStreaming()
-}
-
-// applyError unwinds the turn on a stream error: preserve content streamed
-// before the error (so the user keeps failure context), emit the one-line hint,
-// drop the pending queue, reset turn state.
-func (m *Model) applyError(err error) tea.Cmd {
-	m.abortTurn(styleError.Render(m.errorMessage(err)), false)
-	return nil
-}
-
-// abortTurn winds down a turn that did not complete normally: flush in-flight
-// text so the partial block lands in scrollback, post the explanatory banner,
-// drop pending tool calls, reset per-turn counters and context. Pair to
-// applyDone for the happy path.
-func (m *Model) abortTurn(banner string, cancelled bool) {
-	m.flushStreaming()
-	if banner != "" {
-		m.appendLine(banner)
-	}
-	// A prompt queued mid-turn must NOT auto-fire on an abort: the user took back
-	// control, so its follow-up may no longer be wanted. Restore it to the
-	// textarea instead (editable, one Enter to send), which also avoids leaving an
-	// idle "queued" box that would orphan-fire after the next turn. Only when the
-	// textarea is empty, so a draft typed mid-turn isn't clobbered.
-	if m.queued != nil {
-		if m.ta.Value() == "" {
-			m.setPromptText(m.queued.send)
-		}
-		m.queued = nil
-	}
-	// finalizeTurn folds the in-flight estimate into the counters and zeroes it,
-	// so the avg counts what was generated up to the interrupt; don't drop it here.
-	m.finalizeTurn(outcomeStopped)
-	if cancelled {
-		wasRetrying := m.agentRuntime.CancelTurn()
-		m.finishTurnReset(wasRetrying)
-		return
-	}
-	m.endTurn() // drops pending tool calls along with the rest of the turn state
-}
-
-// finalizeTurn freezes the finished turn's wall-clock summary into the status
-// bar (shown at idle until the next submit) and logs the totals. outcome is
-// the finish glyph: ✓ clean, ✗ abort/stall. The bar's avg tok/s divides
-// lastTokens by lastElapsed (wall-clock), so it stays self-verifying against
-// the duration shown right beside it. There is no scrollback banner: the footer
-// owns the run summary, and the precise wall time lands in the turn_end log.
-// Common to every wind-down (handleStreamClosed and abortTurn both call it).
-func (m *Model) finalizeTurn(outcome turnOutcome) {
-	if m.turnStart.IsZero() {
-		return // defensive: finalizeTurn only runs inside a turn beginTurn started
-	}
-	wall, tokens := m.agentRuntime.FinalizeTurn(m.turnStart, time.Now())
-	m.lastElapsed = wall
-	m.lastTokens = tokens
-	m.lastOutcome = outcome
-	avg := humanRate(tokens, wall)
-	if avg != "" {
-		avg = " · " + avg + " avg"
-	}
-	m.agentRuntime.ObserveTurnEnd(humanTokens(tokens), humanTokens(m.agentRuntime.Snapshot().SessionTokens), wall, avg)
-	m.turnStart = time.Time{}
-}
-
-// handleStreamClosed drives what happens after one round's stream finishes:
-// dispatch the next pending tool call, or, if none, finalize the turn and
-// hand control back. A turn ends precisely when the assistant emits no tool
-// calls; there is no loop tool to land on.
-func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
-	if !m.agentRuntime.Snapshot().Phase.Active() {
-		return m, nil
-	}
-	decision := m.agentRuntime.DecideClose()
-	switch decision.Action {
-	case agent.CloseRunTool:
-		return m.dispatchNextTool()
-	case agent.CloseRestartModel:
-		return m, m.startChat()
-	case agent.CloseFinishStopped:
-		if decision.Reason == agent.CloseEmptyStall {
-			m.appendLine(styleError.Render("⚠ the model ended its turn with no reply and no tool call - it stalled, or your server dropped the call. If thinking is on, its reasoning parser may be swallowing calls - enable one (e.g. vLLM `--reasoning-parser`) or disable thinking for tool turns."))
-		} else {
-			m.appendLine(styleError.Render("⚠ a tool call leaked into the reply as text instead of running - your model server isn't parsing tool calls. Enable its OpenAI tool-call parser server-side (e.g. vLLM `--tool-call-parser`, llama.cpp `--jinja`)."))
-		}
-		m.finalizeTurn(outcomeStopped)
-	default:
-		m.finalizeTurn(outcomeDone)
-	}
-	m.endTurn()
-	return m.fireQueued()
+	return m.applyFrontendTransition(m.controller.Dispatch(frontend.SubmitGoal(sendText, time.Now())))
 }
 
 // fireQueued auto-submits a prompt the user queued mid-turn, once the turn has
@@ -654,16 +417,6 @@ func (m Model) fireQueued() (tea.Model, tea.Cmd) {
 	q := m.queued
 	m.queued = nil
 	return m.submit(q.send, q.echo, promptEntry{display: q.send})
-}
-
-// dispatchNextTool pops the next pending tool call and runs it. Every tool
-// flows through runToolCall; none are special-cased. lastToolKey records this
-// call's target so the failure nudge can tell when the model keeps retrying the
-// same failing operation (see recordToolOutcome).
-func (m Model) dispatchNextTool() (tea.Model, tea.Cmd) {
-	work, _ := m.agentRuntime.NextTool()
-	m.appendLine(styleDim.Render(work.Status()))
-	return m, runToolCall(work)
 }
 
 // cursorOnFirstLine: true when ↑ should walk prompt history instead of moving

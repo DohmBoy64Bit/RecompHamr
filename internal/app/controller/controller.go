@@ -3,6 +3,8 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"time"
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
@@ -19,12 +21,14 @@ const (
 // Controller translates backend-neutral frontend intents into exactly-once
 // application actions while retaining all backend capabilities privately.
 type Controller struct {
-	session *session.Runtime
-	agent   agent.Runtime
-	system  string
-	version string
-	nextID  uint64
-	pending map[uint64]struct{}
+	session   *session.Runtime
+	agent     agent.Runtime
+	system    string
+	version   string
+	nextID    uint64
+	pending   map[uint64]struct{}
+	turnStart time.Time
+	now       func() time.Time
 }
 
 // NewController constructs the stable application/frontend boundary.
@@ -35,6 +39,7 @@ func NewController(sessionRuntime *session.Runtime, agentRuntime agent.Runtime, 
 		system:  system,
 		version: version,
 		pending: make(map[uint64]struct{}),
+		now:     time.Now,
 	}
 }
 
@@ -100,12 +105,26 @@ func (c *Controller) Dispatch(intent frontend.Intent) frontend.Transition {
 		}
 	case frontend.IntentClearConversation:
 		c.agent.ResetConversation()
+		c.turnStart = time.Time{}
 		_ = c.session.ClearHistory()
 	case frontend.IntentComplete:
 		c.applyCompletion(intent.WorkCompletion(), &transition)
-	case frontend.IntentCancel, frontend.IntentSubmitGoal, frontend.IntentInvalid:
-		// Agent-turn intents migrate in Checkpoint 4D; until then the accepted
-		// TUI path remains authoritative. Invalid intents are permanent no-ops.
+	case frontend.IntentSubmitGoal:
+		if !c.agent.Active() {
+			c.agent.ObserveUser(intent.Text())
+			c.agent.BeginTurn(intent.Time())
+			c.agent.AppendUser(intent.Text())
+			c.turnStart = intent.Time()
+			transition.Events = []frontend.Event{{Kind: frontend.EventTurnStarted, At: intent.Time()}}
+			transition.Work = c.startRound()
+		}
+	case frontend.IntentCancel:
+		if c.agent.Active() {
+			c.agent.ObserveCancel()
+			transition.Events = c.finishTurn(false, true, false, "✗ cancelled", intent.Time())
+		}
+	case frontend.IntentInvalid:
+		// The zero-value malformed intent is a permanent no-op.
 	}
 	transition.Snapshot = c.Snapshot()
 	return transition
@@ -145,7 +164,143 @@ func (c *Controller) applyCompletion(value frontend.Completion, transition *fron
 			}
 			transition.Events = []frontend.Event{event}
 		}
+	case modelCompletion:
+		c.applyModelCompletion(result, transition)
+	case toolCompletion:
+		c.applyToolCompletion(result, transition)
 	}
+}
+
+type modelCompletion struct {
+	stream   *agent.Stream
+	delivery agent.StreamDelivery
+}
+
+type toolCompletion struct{ delivery agent.ToolDelivery }
+
+func (c *Controller) startRound() frontend.Work {
+	snapshot := c.Snapshot()
+	stream, _ := c.agent.StartRound(c.system, snapshot.ActiveModel, c.activeContextSize(snapshot))
+	return c.readStream(stream)
+}
+
+func (c *Controller) readStream(stream *agent.Stream) frontend.Work {
+	return c.capture(func() any { return modelCompletion{stream: stream, delivery: stream.Read()} })
+}
+
+func (c *Controller) applyModelCompletion(result modelCompletion, transition *frontend.Transition) {
+	snapshot := c.Snapshot()
+	delivery := c.agent.ApplyDelivery(result.stream, snapshot.Active, c.activeContextSize(snapshot), result.delivery)
+	if !delivery.Accepted {
+		if !result.delivery.Closed() {
+			transition.Work = c.readStream(result.stream)
+		}
+		return
+	}
+	if delivery.Closed {
+		c.applyClose(transition)
+		return
+	}
+	effect := delivery.Stream
+	if effect.RetryCleared {
+		transition.Events = append(transition.Events, frontend.Event{Kind: frontend.EventStatus})
+	}
+	if effect.RetryText != "" {
+		transition.Events = append(transition.Events, frontend.Event{Kind: frontend.EventStatus, Text: effect.RetryText})
+	}
+	if effect.Content != "" {
+		transition.Events = append(transition.Events, frontend.Event{Kind: frontend.EventContent, Text: effect.Content})
+	}
+	if effect.Flush || effect.Done {
+		transition.Events = append(transition.Events, frontend.Event{Kind: frontend.EventFlush})
+	}
+	if effect.Error != nil {
+		message := agent.StreamErrorMessage(effect.Error, snapshot.Active, snapshot.ActiveURL)
+		transition.Events = append(transition.Events, c.finishTurn(false, false, false, message, c.now())...)
+		transition.Work = c.readStream(result.stream)
+		return
+	}
+	transition.Work = c.readStream(result.stream)
+}
+
+func (c *Controller) applyClose(transition *frontend.Transition) {
+	if !c.agent.Active() {
+		return
+	}
+	decision := c.agent.DecideClose()
+	switch decision.Action {
+	case agent.CloseRunTool:
+		c.nextTool(transition)
+	case agent.CloseRestartModel:
+		transition.Work = c.startRound()
+	case agent.CloseFinishStopped:
+		message := "⚠ a tool call leaked into the reply as text instead of running - your model server isn't parsing tool calls. Enable its OpenAI tool-call parser server-side (e.g. vLLM `--tool-call-parser`, llama.cpp `--jinja`)."
+		if decision.Reason == agent.CloseEmptyStall {
+			message = "⚠ the model ended its turn with no reply and no tool call - it stalled, or your server dropped the call. If thinking is on, its reasoning parser may be swallowing calls - enable one (e.g. vLLM `--reasoning-parser`) or disable thinking for tool turns."
+		}
+		transition.Events = append(transition.Events, c.finishTurn(false, false, true, message, c.now())...)
+	default:
+		transition.Events = append(transition.Events, c.finishTurn(true, false, true, "", c.now())...)
+	}
+}
+
+func (c *Controller) nextTool(transition *frontend.Transition) {
+	work, ok := c.agent.NextTool()
+	if !ok {
+		return
+	}
+	transition.Events = append(transition.Events, frontend.Event{Kind: frontend.EventToolStatus, Text: work.Status()})
+	transition.Work = c.capture(func() any { return toolCompletion{delivery: work.Run()} })
+}
+
+func (c *Controller) applyToolCompletion(result toolCompletion, transition *frontend.Transition) {
+	effect := c.agent.ApplyToolResult(result.delivery)
+	if !effect.Accepted {
+		return
+	}
+	if effect.ContinueTools {
+		c.nextTool(transition)
+		return
+	}
+	transition.Work = c.startRound()
+}
+
+func (c *Controller) finishTurn(ok, cancelled, natural bool, message string, now time.Time) []frontend.Event {
+	wall, tokens := time.Duration(0), 0
+	if !c.turnStart.IsZero() {
+		wall, tokens = c.agent.FinalizeTurn(c.turnStart, now)
+	}
+	average := humanRate(tokens, wall)
+	if average != "" {
+		average = " · " + average + " avg"
+	}
+	c.agent.ObserveTurnEnd(humanTokens(tokens), humanTokens(c.agent.Snapshot().SessionTokens), wall, average)
+	if cancelled {
+		c.agent.CancelTurn()
+	} else {
+		c.agent.EndTurn()
+	}
+	c.turnStart = time.Time{}
+	return []frontend.Event{{Kind: frontend.EventTurnFinished, Text: message, Elapsed: wall, Tokens: tokens, OK: ok, Cancelled: cancelled, Natural: natural}}
+}
+
+func humanTokens(n int) string {
+	if n < 1000 {
+		return fmt.Sprintf("%d tok", n)
+	}
+	return fmt.Sprintf("%.1fk tok", float64(n)/1000)
+}
+
+func humanRate(tokens int, elapsed time.Duration) string {
+	seconds := elapsed.Seconds()
+	if tokens <= 0 || seconds <= 0 {
+		return ""
+	}
+	rate := float64(tokens) / seconds
+	if rate < 10 {
+		return fmt.Sprintf("%.1f tok/s", rate)
+	}
+	return fmt.Sprintf("%d tok/s", int(math.Round(rate)))
 }
 
 func (c *Controller) activeContextSize(snapshot frontend.Snapshot) int {

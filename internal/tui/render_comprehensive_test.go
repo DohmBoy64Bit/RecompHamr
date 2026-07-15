@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -30,15 +31,17 @@ func TestRenderQueuedViewAndStatusStates(t *testing.T) {
 	}
 	m.suppressView = false
 
-	m.runtime.SessionTokens = 1234
-	m.runtime.StreamingEstimate = 4
-	m.runtime.Phase = phaseThinking
+	mutateTestSnapshot(&m, func(snapshot *frontend.Snapshot) {
+		snapshot.SessionTokens = 1234
+		snapshot.StreamingEstimate = 4
+		snapshot.Phase = phaseThinking
+	})
 	m.turnStart = time.Now().Add(-2 * time.Second)
 	m.status = "status"
 	if bar := m.renderStatusBar(); !strings.Contains(bar, "thinking") || !strings.Contains(bar, "status") || !strings.Contains(bar, "1.2k") {
 		t.Fatalf("active bar = %q", bar)
 	}
-	m.runtime.Phase = phaseIdle
+	setTestPhase(&m, phaseIdle)
 	m.lastOutcome = outcomeDone
 	m.lastElapsed = 2 * time.Second
 	m.lastTokens = 20

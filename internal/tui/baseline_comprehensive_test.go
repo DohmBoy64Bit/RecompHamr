@@ -1,21 +1,15 @@
 package tui
 
 import (
-	"context"
-	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
-	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/tools"
 )
 
 func baselineModel(t *testing.T) Model {
@@ -27,39 +21,6 @@ func baselineModel(t *testing.T) Model {
 	}
 	sessionRuntime := session.NewRuntime(cfg)
 	return newModelWithRuntime(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), "test system", "test")
-}
-
-func TestCommandBoundariesAndErrorHints(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "x.txt")
-	if err := os.WriteFile(path, []byte("hello"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	turn := agent.NewTurnState(nil)
-	turn.Begin(ctx, time.Now())
-	turn.ID = 7
-	stream := agent.NewStreamState()
-	stream.Pending = []chmctx.ToolCall{{ID: "1", Name: tools.ReadFileName, Arguments: map[string]any{"path": path}}}
-	loop := agent.LoopState{}
-	work, _ := loop.NextTool(&turn, &stream, agent.LocalToolExecutor())
-	msg := runToolCall(work)().(toolResultMsg)
-	if msg.delivery.Message.Content != "hello" || msg.delivery.TurnID != 7 {
-		t.Fatalf("tool result = %#v", msg)
-	}
-	m := baselineModel(t)
-	if got := m.errorMessage(nil); got != "" {
-		t.Fatalf("nil error = %q", got)
-	}
-	if got := m.errorMessage(provider.ErrUnauthorized); !strings.Contains(got, "key rejected") {
-		t.Fatalf("auth = %q", got)
-	}
-	un := provider.ErrUnreachable{Err: errors.New("offline")}
-	if !agent.IsUnreachable(un) || !strings.Contains(m.errorMessage(un), "unreachable") {
-		t.Fatal("unreachable mapping failed")
-	}
-	if got := m.errorMessage(errors.New("bad")); !strings.Contains(got, "bad") {
-		t.Fatalf("generic = %q", got)
-	}
 }
 
 func TestFormatBoundaries(t *testing.T) {

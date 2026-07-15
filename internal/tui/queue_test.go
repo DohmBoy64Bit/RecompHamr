@@ -1,19 +1,13 @@
 package tui
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
-	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 )
 
 // TestQueueStoresPromptMidTurn: Enter while a turn is running stashes the typed
@@ -21,9 +15,8 @@ import (
 // drop. The turn keeps running (phase unchanged) and nothing is submitted yet.
 func TestQueueStoresPromptMidTurn(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.runtime.Phase = phaseThinking
+	setTestPhase(&m, phaseThinking)
 	m.ta.SetValue("run the tests next")
-	before := len(m.turn.History)
 
 	out, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	om := out.(Model)
@@ -34,11 +27,8 @@ func TestQueueStoresPromptMidTurn(t *testing.T) {
 	if om.ta.Value() != "" {
 		t.Fatalf("textarea must be cleared after queuing, got %q", om.ta.Value())
 	}
-	if om.runtime.Phase != phaseThinking {
-		t.Fatalf("queuing must not change the running phase, got %v", om.runtime.Phase)
-	}
-	if len(om.turn.History) != before {
-		t.Fatalf("queuing must not submit (history grew by %d)", len(om.turn.History)-before)
+	if om.controller.Snapshot().Phase != phaseThinking {
+		t.Fatalf("queuing must not change the running phase, got %v", om.controller.Snapshot().Phase)
 	}
 	if cmd != nil {
 		t.Fatal("queuing must not start a turn (nil Cmd)")
@@ -49,7 +39,7 @@ func TestQueueStoresPromptMidTurn(t *testing.T) {
 // a reflexive Enter while watching the agent doesn't queue an empty slot.
 func TestQueueEmptyMidTurnIsNoOp(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.runtime.Phase = phaseThinking
+	setTestPhase(&m, phaseThinking)
 	if m.ta.Value() != "" {
 		t.Fatal("precondition: textarea empty")
 	}
@@ -64,7 +54,7 @@ func TestQueueEmptyMidTurnIsNoOp(t *testing.T) {
 // prompt that fires as a single turn.
 func TestQueueSecondEnterAppends(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.runtime.Phase = phaseThinking
+	setTestPhase(&m, phaseThinking)
 
 	m.ta.SetValue("run the tests")
 	o1, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -88,7 +78,7 @@ func TestQueueSecondEnterAppends(t *testing.T) {
 // prose. The refused draft must stay in the textarea, nothing lost.
 func TestQueueRefusesSlashMix(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.runtime.Phase = phaseThinking
+	setTestPhase(&m, phaseThinking)
 	m.ta.SetValue("/clear")
 	o1, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m1 := o1.(Model)
@@ -108,7 +98,7 @@ func TestQueueRefusesSlashMix(t *testing.T) {
 
 	// Reverse order: prose queued first, slash appended.
 	mr := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	mr.runtime.Phase = phaseThinking
+	setTestPhase(&mr, phaseThinking)
 	mr.ta.SetValue("run the tests")
 	o3, _ := mr.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m3 := o3.(Model)
@@ -156,8 +146,8 @@ func TestQueueAutoSubmitsAfterTurn(t *testing.T) {
 	if !strings.Contains(strings.Join(bodies, ""), "second please") {
 		t.Fatalf("the queued prompt never reached the server:\n%s", strings.Join(bodies, "\n"))
 	}
-	if final.runtime.Phase.Active() {
-		t.Fatalf("both turns done → idle, got phase %v", final.runtime.Phase)
+	if final.controller.Snapshot().Phase.Active() {
+		t.Fatalf("both turns done → idle, got phase %v", final.controller.Snapshot().Phase)
 	}
 }
 
@@ -167,15 +157,14 @@ func TestQueueAutoSubmitsAfterTurn(t *testing.T) {
 // orphan-fire after the next turn.
 func TestQueueRestoredOnCtrlC(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.turn.Begin(context.Background(), time.Now())
-	m.runtime.Phase = phaseThinking
+	setTestPhase(&m, phaseThinking)
 	m.queued = &queuedPrompt{send: "later task", echo: "later task"}
 
 	out, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	om := out.(Model)
 
-	if om.runtime.Phase.Active() {
-		t.Fatalf("Ctrl+C must return to idle, got %v", om.runtime.Phase)
+	if om.controller.Snapshot().Phase.Active() {
+		t.Fatalf("Ctrl+C must return to idle, got %v", om.controller.Snapshot().Phase)
 	}
 	if om.queued != nil {
 		t.Fatalf("Ctrl+C must clear the slot, got %+v", om.queued)
@@ -190,8 +179,7 @@ func TestQueueRestoredOnCtrlC(t *testing.T) {
 // clobbering the in-progress text.
 func TestQueueRestoreKeepsExistingDraft(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.turn.Begin(context.Background(), time.Now())
-	m.runtime.Phase = phaseThinking
+	setTestPhase(&m, phaseThinking)
 	m.queued = &queuedPrompt{send: "queued one", echo: "queued one"}
 	m.ta.SetValue("a fresh draft")
 
@@ -206,42 +194,12 @@ func TestQueueRestoreKeepsExistingDraft(t *testing.T) {
 	}
 }
 
-// TestQueueWaitsForVerifyNudge: a substantial clean finish triggers the verify
-// re-grounding nudge, which continues the turn. The queued prompt must NOT fire
-// then (the turn isn't ending); it stays queued until the turn truly ends.
-func TestQueueWaitsForVerifyNudge(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.installTurnContext()
-	m.runtime.Phase = phaseStreaming
-	m.loop.ToolRounds = agent.VerifyNudgeMinRounds // substantial → verify nudge fires
-	m.runtime.BeginStream(m.turn.ID, make(chan llm.Event))
-	m.turn.History = []chmctx.Message{
-		{Role: chmctx.RoleUser, Content: "build it"},
-		{Role: chmctx.RoleAssistant, Content: "Done, all features built."},
-	}
-	m.queued = &queuedPrompt{send: "now deploy", echo: "now deploy"}
-
-	out, cmd := m.handleStreamClosed()
-	om := out.(Model)
-
-	if cmd == nil || !om.loop.VerifyNudged {
-		t.Fatal("a substantial clean finish must re-prompt via the verify nudge")
-	}
-	if om.queued == nil || om.queued.send != "now deploy" {
-		t.Fatalf("the queued prompt must wait through the verify re-prompt, got %+v", om.queued)
-	}
-	last := om.turn.History[len(om.turn.History)-1]
-	if last.Role != chmctx.RoleSystem {
-		t.Fatalf("the re-prompt must append the verify note, not the queued user msg, got %+v", last)
-	}
-}
-
 // TestUnqueueRestoresToTextarea: Backspace on an empty prompt while a turn runs
 // pulls the queued prompt back into the textarea and clears the slot, a
 // reversible way to edit or drop it.
 func TestUnqueueRestoresToTextarea(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.runtime.Phase = phaseThinking
+	setTestPhase(&m, phaseThinking)
 	m.queued = &queuedPrompt{send: "hello there", echo: "hello there"}
 
 	out, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
@@ -260,7 +218,7 @@ func TestUnqueueRestoresToTextarea(t *testing.T) {
 // so editing a second prompt never clobbers the first.
 func TestUnqueueOnlyWhenTextareaEmpty(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.runtime.Phase = phaseThinking
+	setTestPhase(&m, phaseThinking)
 	m.queued = &queuedPrompt{send: "queued one", echo: "queued one"}
 	m.ta.SetValue("draft")
 
@@ -291,7 +249,7 @@ func TestClearWipesQueue(t *testing.T) {
 // nothing renders when the slot is empty.
 func TestQueuedPromptRendersInView(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.runtime.Phase = phaseThinking
+	setTestPhase(&m, phaseThinking)
 
 	m.queued = &queuedPrompt{send: "run the tests", echo: "run the tests"}
 	view := stripANSI(m.View())
@@ -313,7 +271,7 @@ func TestQueuedPromptRendersInView(t *testing.T) {
 // same Value()/DisplayValue() split submit uses for a typed prompt.
 func TestQueueExpandsChipsOnFire(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.runtime.Phase = phaseThinking
+	setTestPhase(&m, phaseThinking)
 
 	big := strings.Repeat("payload line\n", 6) // ≥5 lines → collapses into a chip
 	out, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(big), Paste: true})
@@ -332,37 +290,5 @@ func TestQueueExpandsChipsOnFire(t *testing.T) {
 	}
 	if !strings.Contains(m2.queued.echo, "Pasted text") {
 		t.Fatalf("echo must stay COLLAPSED, got %q", m2.queued.echo)
-	}
-}
-
-// TestQueueAutoFireUnitFromStreamClosed: a clean, trivial finish with a prompt
-// queued must submit it from handleStreamClosed: phase back to thinking, a chat
-// Cmd returned, the queued user message appended, and the slot cleared.
-func TestQueueAutoFireUnitFromStreamClosed(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.installTurnContext()
-	m.runtime.Phase = phaseStreaming
-	m.runtime.BeginStream(m.turn.ID, make(chan llm.Event)) // non-nil so handleStreamClosed proceeds
-	m.turn.History = []chmctx.Message{
-		{Role: chmctx.RoleUser, Content: "first"},
-		{Role: chmctx.RoleAssistant, Content: "done"},
-	}
-	m.queued = &queuedPrompt{send: "next task", echo: "next task"}
-
-	out, cmd := m.handleStreamClosed()
-	om := out.(Model)
-
-	if cmd == nil {
-		t.Fatal("a queued prompt must start the next turn (non-nil Cmd)")
-	}
-	if om.runtime.Phase != phaseThinking {
-		t.Fatalf("auto-fire must begin a new turn (thinking), got %v", om.runtime.Phase)
-	}
-	if om.queued != nil {
-		t.Fatalf("slot must clear on auto-fire, got %+v", om.queued)
-	}
-	last := om.turn.History[len(om.turn.History)-1]
-	if last.Role != chmctx.RoleUser || last.Content != "next task" {
-		t.Fatalf("auto-fire must append the queued user message, got %+v", last)
 	}
 }

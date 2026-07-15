@@ -15,7 +15,6 @@ internal/app
     +--> internal/app/controller
     +--> internal/tui
               |
-              +--> internal/agent
               +--> internal/frontend
 
 internal/agent
@@ -46,6 +45,6 @@ Stage C slice 2 is accepted. `internal/agent` owns request packing/tool definiti
 
 Stage C slice 3 is accepted. Checkpoint 3A moved the complete prompt-history filesystem implementation into `internal/session`. Checkpoint 3B added one app-composed `session.Runtime` that owns configuration reload, active-profile persistence, resolved credential use, concrete client replacement, and captured reachability/probe work. The TUI receives immutable non-secret snapshots and opaque bounded work, and production TUI code no longer imports config, LLM, or provider packages or performs history/config filesystem I/O. Focused/canonical verification and the complete user-confirmed Windows Terminal checklist preserve model switching, real response, persistence, history, representative rendering, clean exit, and shell restoration.
 
-Stage C slice 4 is in progress. Checkpoints 4B and 4C add backend-neutral `internal/frontend` contracts and an independently tested controller under `internal/app/controller`, then route startup/history, reload, activation, reachability/probe work, and conversation-history clearing through that boundary. Production TUI code no longer imports or stores `internal/session` or `internal/ctx`; it runs opaque controller work and returns completions without inspecting backend payloads. The TUI still retains the temporary `internal/agent` façade and agent lifecycle aliases until checkpoint 4D.
+Stage C slice 4 is in progress. Checkpoints 4B through 4D add backend-neutral `internal/frontend` contracts and an independently tested controller under `internal/app/controller`, then route every session and agent action through that boundary. The controller now owns model reads, stream reduction, sequential tools, close policy, cancellation, stale work draining/rejection, and final accounting. Production TUI code imports only `internal/frontend` among project runtime packages and retains only rendering, transcript/editor/popover/queue/timing state, input translation, opaque-work scheduling, and event presentation. The remaining work is terminal-adapter isolation, strengthened deletion-boundary enforcement, final documentation/audit, and exact-commit closure evidence.
 
 Backend packages must not import `internal/tui`. `internal/app` is the sole current exception because a composition root must select the concrete frontend. Later slices replace that concrete runtime coupling with typed frontend contracts while preserving the accepted layout and behavior.

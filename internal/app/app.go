@@ -28,7 +28,7 @@ var (
 		return agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver())
 	}
 	newFrontend = func(sessionRuntime *session.Runtime, runtime agent.Runtime, system, version string) tea.Model {
-		return tui.New(appcontroller.NewController(sessionRuntime, runtime, system, version), runtime, system, version)
+		return tui.New(appcontroller.NewController(sessionRuntime, runtime, system, version), version)
 	}
 	openDebugLog      = logging.Open
 	closeDebugLog     = logging.Close

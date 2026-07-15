@@ -16,6 +16,11 @@ func TestSnapshotProfilePhaseAndCommands(t *testing.T) {
 	if PhaseIdle.Active() || !PhaseThinking.Active() || !PhaseStreaming.Active() || !PhaseRunning.Active() {
 		t.Fatal("phase activity contract")
 	}
+	for phase, want := range map[Phase]string{PhaseIdle: "", PhaseThinking: "thinking", PhaseStreaming: "generating", PhaseRunning: "running", Phase(99): ""} {
+		if got := phase.Label(); got != want {
+			t.Fatalf("phase %d = %q", phase, got)
+		}
+	}
 	commands := Commands()
 	commands[0].Name = "changed"
 	if got := Commands(); len(got) != 2 || got[0].Name != "/clear" || got[1].Name != "/models" {

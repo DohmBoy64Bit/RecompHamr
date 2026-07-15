@@ -120,8 +120,11 @@ func (m Model) cmdModel(args []string) (tea.Model, tea.Cmd) {
 			m.appendLine(styleError.Render("⚠ " + event.Text))
 			return m, nil
 		}
+		if event.Kind == frontend.EventProfileActivated {
+			m.appendActivation(event, transition.Snapshot)
+		}
 	}
-	return m.applyFrontendTransition(transition)
+	return m, runFrontendWork(transition.Work)
 }
 
 // printModelList writes the "▸ active, name, llm @ url" rollup to scroll.
@@ -143,9 +146,20 @@ func (m *Model) printModelList() {
 // cheaper reachability ping.
 func (m *Model) confirmActive(profile string) tea.Cmd {
 	transition := m.controller.Dispatch(frontend.Activate(profile))
-	next, cmd := m.applyFrontendTransition(transition)
-	*m = next.(Model)
-	return cmd
+	for _, event := range transition.Events {
+		if event.Kind == frontend.EventProfileActivated {
+			m.appendActivation(event, transition.Snapshot)
+		}
+	}
+	return runFrontendWork(transition.Work)
+}
+
+func (m *Model) appendActivation(event frontend.Event, snapshot frontend.Snapshot) {
+	if snapshot.ActiveKeyed {
+		m.appendLine(styleDim.Render(fmt.Sprintf("▶ probing %s · %s @ %s", event.Profile, event.Model, event.URL)))
+		return
+	}
+	m.appendLine(styleOK.Render(fmt.Sprintf("✓ active: %s · %s @ %s", event.Profile, event.Model, event.URL)))
 }
 
 func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {

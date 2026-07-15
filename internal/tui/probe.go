@@ -2,10 +2,11 @@ package tui
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 )
 
@@ -23,16 +24,54 @@ func (m Model) applyFrontendTransition(transition frontend.Transition) (tea.Mode
 		case frontend.EventWarning:
 			m.appendLine(styleWarn.Render("⚠ " + event.Text))
 		case frontend.EventProfileActivated:
-			if transition.Snapshot.ActiveKeyed {
-				m.appendLine(styleDim.Render(fmt.Sprintf("▶ probing %s · %s @ %s", event.Profile, event.Model, event.URL)))
-			} else {
-				m.appendLine(styleOK.Render(fmt.Sprintf("✓ active: %s · %s @ %s", event.Profile, event.Model, event.URL)))
-			}
+			m.appendActivation(event, transition.Snapshot)
 		case frontend.EventProbe:
 			m.applyProbeEvent(event, transition.Snapshot)
+		case frontend.EventTurnStarted:
+			m.turnStart = event.At
+			m.lastOutcome = outcomeNone
+		case frontend.EventContent:
+			m.streaming.WriteString(strings.ReplaceAll(event.Text, "\t", "    "))
+		case frontend.EventFlush:
+			m.flushStreaming()
+		case frontend.EventStatus:
+			m.status = event.Text
+		case frontend.EventToolStatus:
+			m.appendLine(styleDim.Render(event.Text))
+		case frontend.EventTurnFinished:
+			m.applyTurnFinished(event)
+			if event.Natural {
+				m.fireQueuedAfterTransition = true
+			}
 		}
 	}
 	return m, runFrontendWork(transition.Work)
+}
+
+func (m *Model) applyTurnFinished(event frontend.Event) {
+	m.flushStreaming()
+	if event.Text != "" {
+		if event.Cancelled {
+			m.appendLine(styleWarn.Render(event.Text))
+		} else {
+			m.appendLine(styleError.Render(event.Text))
+		}
+	}
+	if !event.Natural && m.queued != nil {
+		if m.ta.Value() == "" {
+			m.setPromptText(m.queued.send)
+		}
+		m.queued = nil
+	}
+	m.lastElapsed = event.Elapsed
+	m.lastTokens = event.Tokens
+	if event.OK {
+		m.lastOutcome = outcomeDone
+	} else {
+		m.lastOutcome = outcomeStopped
+	}
+	m.turnStart = time.Time{}
+	m.status = ""
 }
 
 func (m *Model) applyProbeEvent(event frontend.Event, facts frontend.Snapshot) {
@@ -53,10 +92,4 @@ func (m *Model) applyProbeEvent(event frontend.Event, facts frontend.Snapshot) {
 	}
 	m.appendLine(styleOK.Render(fmt.Sprintf(
 		"✓ active: %s · %s @ %s%s", event.Profile, p.Model, p.URL, suffix)))
-}
-
-// probeErrorMessage maps provider errors to human hints for the
-// activation line. Falls back to the raw error string for anything else.
-func probeErrorMessage(err error) string {
-	return agent.ProbeErrorMessage(err)
 }

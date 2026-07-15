@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,9 +13,47 @@ import (
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
+	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
 )
+
+type scriptedClient struct{ rounds [][]llm.Event }
+
+func (s *scriptedClient) Chat(context.Context, []chmctx.Message, []llm.Tool) <-chan llm.Event {
+	ch := make(chan llm.Event, len(s.rounds[0]))
+	for _, event := range s.rounds[0] {
+		ch <- event
+	}
+	close(ch)
+	s.rounds = s.rounds[1:]
+	return ch
+}
+
+func scriptedController(t *testing.T, rounds [][]llm.Event, execute func(context.Context, chmctx.ToolCall) chmctx.Message) *Controller {
+	t.Helper()
+	cfg := config.Default()
+	cfg.Dir = t.TempDir()
+	sessionRuntime := session.NewRuntime(cfg)
+	if execute == nil {
+		execute = func(context.Context, chmctx.ToolCall) chmctx.Message { return chmctx.Message{Role: chmctx.RoleTool} }
+	}
+	runtime := agent.NewRuntime(&scriptedClient{rounds: rounds}, agent.NewToolExecutor(execute))
+	controller := NewController(sessionRuntime, runtime, "system", "test")
+	controller.now = func() time.Time { return time.Unix(20, 0) }
+	return controller
+}
+
+func driveTransition(controller *Controller, transition frontend.Transition, limit int) ([]frontend.Event, frontend.Transition) {
+	events := append([]frontend.Event(nil), transition.Events...)
+	for transition.Work != nil && limit > 0 {
+		transition = controller.Dispatch(frontend.Complete(transition.Work.Run()))
+		events = append(events, transition.Events...)
+		limit--
+	}
+	return events, transition
+}
 
 func controllerFixture(t *testing.T) (*Controller, *config.Config, *httptest.Server) {
 	t.Helper()
@@ -119,10 +158,35 @@ func TestControllerSessionIntentsAndProbe(t *testing.T) {
 	if len(controller.session.LoadHistory()) != 0 {
 		t.Fatal("clear retained history")
 	}
-	for _, intent := range []frontend.Intent{frontend.Cancel(time.Now()), frontend.SubmitGoal("later", time.Now()), {}} {
+	for _, intent := range []frontend.Intent{frontend.Cancel(time.Now()), {}} {
 		if got := controller.Dispatch(intent); len(got.Events) != 0 || got.Work != nil {
-			t.Fatalf("transitional no-op = %#v", got)
+			t.Fatalf("inactive no-op = %#v", got)
 		}
+	}
+	start := time.Now().Add(-time.Second)
+	transition = controller.Dispatch(frontend.SubmitGoal("later", start))
+	if len(transition.Events) != 1 || transition.Events[0].Kind != frontend.EventTurnStarted || transition.Work == nil {
+		t.Fatalf("submit = %#v", transition)
+	}
+	var events []frontend.Event
+	for transition.Work != nil {
+		transition = controller.Dispatch(frontend.Complete(transition.Work.Run()))
+		events = append(events, transition.Events...)
+	}
+	if len(events) < 3 || events[0].Kind != frontend.EventContent || events[len(events)-1].Kind != frontend.EventTurnFinished || !events[len(events)-1].OK {
+		t.Fatalf("turn events = %#v", events)
+	}
+	transition = controller.Dispatch(frontend.SubmitGoal("cancel", start))
+	staleWork := transition.Work
+	transition = controller.Dispatch(frontend.Cancel(start.Add(time.Second)))
+	if len(transition.Events) != 1 || !transition.Events[0].Cancelled || transition.Events[0].Natural || transition.Snapshot.Phase.Active() {
+		t.Fatalf("cancel = %#v", transition)
+	}
+	if got := controller.Dispatch(frontend.Complete(staleWork.Run())); len(got.Events) != 0 {
+		t.Fatalf("stale stream drain = %#v", got)
+	}
+	if humanTokens(999) != "999 tok" || humanTokens(1500) != "1.5k tok" || humanRate(0, time.Second) != "" || humanRate(5, time.Second) != "5.0 tok/s" || humanRate(15, time.Second) != "15 tok/s" {
+		t.Fatal("turn formatting")
 	}
 
 	path := filepath.Join(cfg.Dir, "config.yaml")
@@ -151,4 +215,126 @@ func TestControllerStaleAndFailedWork(t *testing.T) {
 	if len(got.Events) != 1 || got.Events[0].Kind != frontend.EventProbe || got.Events[0].OK || got.Events[0].Text != "probe failed" || got.Snapshot.Connected {
 		t.Fatalf("failed probe = %#v", got)
 	}
+}
+
+func TestControllerStreamTransitionsAndErrors(t *testing.T) {
+	final := chmctx.Message{Role: chmctx.RoleAssistant, Content: "hello"}
+	controller := scriptedController(t, [][]llm.Event{{
+		{Kind: llm.EventRetry, Content: "retrying"},
+		{Kind: llm.EventContent, Content: "hello"},
+		{Kind: llm.EventDone, Final: &final, Tokens: 12},
+	}}, nil)
+	start := time.Unix(10, 0)
+	events, transition := driveTransition(controller, controller.Dispatch(frontend.SubmitGoal("goal", start)), 10)
+	if transition.Work != nil || transition.Snapshot.Phase.Active() {
+		t.Fatalf("unfinished transition = %#v", transition)
+	}
+	kinds := make([]frontend.EventKind, 0, len(events))
+	for _, event := range events {
+		kinds = append(kinds, event.Kind)
+	}
+	want := []frontend.EventKind{frontend.EventTurnStarted, frontend.EventStatus, frontend.EventStatus, frontend.EventContent, frontend.EventFlush, frontend.EventTurnFinished}
+	if fmt.Sprint(kinds) != fmt.Sprint(want) || !events[len(events)-1].OK || events[len(events)-1].Tokens != 12 {
+		t.Fatalf("stream events = %#v", events)
+	}
+	activeController := scriptedController(t, [][]llm.Event{{{Kind: llm.EventContent, Content: "pending"}}}, nil)
+	if got := activeController.Dispatch(frontend.SubmitGoal("one", start)); got.Work == nil {
+		t.Fatal("fresh submit rejected")
+	} else if duplicate := activeController.Dispatch(frontend.SubmitGoal("two", start)); duplicate.Work != nil || len(duplicate.Events) != 0 {
+		t.Fatalf("active duplicate = %#v", duplicate)
+	}
+
+	errController := scriptedController(t, [][]llm.Event{{{Kind: llm.EventError, Err: fmt.Errorf("broken")}}}, nil)
+	events, transition = driveTransition(errController, errController.Dispatch(frontend.SubmitGoal("error", start)), 10)
+	if transition.Work != nil || events[len(events)-1].Kind != frontend.EventTurnFinished || events[len(events)-1].Natural || !strings.Contains(events[len(events)-1].Text, "broken") {
+		t.Fatalf("error events = %#v transition=%#v", events, transition)
+	}
+}
+
+func TestControllerSequentialToolsAndStaleTool(t *testing.T) {
+	calls := []chmctx.ToolCall{
+		{ID: "1", Name: "read_file", Arguments: map[string]any{"path": "one"}},
+		{ID: "2", Name: "write_file", Arguments: map[string]any{"path": "two", "content": "ok"}},
+	}
+	finalTools := chmctx.Message{Role: chmctx.RoleAssistant, ToolCalls: calls}
+	finalDone := chmctx.Message{Role: chmctx.RoleAssistant, Content: "done"}
+	var executed []string
+	controller := scriptedController(t, [][]llm.Event{
+		{{Kind: llm.EventToolCall, ToolCall: &calls[0]}, {Kind: llm.EventToolCall, ToolCall: &calls[1]}, {Kind: llm.EventDone, Final: &finalTools}},
+		{{Kind: llm.EventContent, Content: "done"}, {Kind: llm.EventDone, Final: &finalDone}},
+	}, func(_ context.Context, call chmctx.ToolCall) chmctx.Message {
+		executed = append(executed, call.ID)
+		return chmctx.Message{Role: chmctx.RoleTool, ToolCallID: call.ID, ToolName: call.Name, Content: "ok"}
+	})
+	events, transition := driveTransition(controller, controller.Dispatch(frontend.SubmitGoal("tools", time.Unix(10, 0))), 20)
+	if transition.Work != nil || fmt.Sprint(executed) != "[1 2]" || events[len(events)-1].Kind != frontend.EventTurnFinished || !events[len(events)-1].OK {
+		t.Fatalf("tool loop events=%#v executed=%v transition=%#v", events, executed, transition)
+	}
+	toolStatuses := 0
+	for _, event := range events {
+		if event.Kind == frontend.EventToolStatus {
+			toolStatuses++
+		}
+	}
+	if toolStatuses != 2 {
+		t.Fatalf("tool statuses = %d", toolStatuses)
+	}
+
+	stale := scriptedController(t, [][]llm.Event{{{Kind: llm.EventToolCall, ToolCall: &calls[0]}, {Kind: llm.EventDone, Final: &finalTools}}}, nil)
+	transition = stale.Dispatch(frontend.SubmitGoal("cancel tool", time.Unix(10, 0)))
+	for transition.Work != nil && transition.Snapshot.Phase != frontend.PhaseRunning {
+		transition = stale.Dispatch(frontend.Complete(transition.Work.Run()))
+	}
+	toolWork := transition.Work
+	stale.Dispatch(frontend.Cancel(time.Unix(11, 0)))
+	if got := stale.Dispatch(frontend.Complete(toolWork.Run())); got.Work != nil || len(got.Events) != 0 {
+		t.Fatalf("stale tool = %#v", got)
+	}
+	empty := frontend.Transition{}
+	stale.nextTool(&empty)
+	if empty.Work != nil || len(empty.Events) != 0 {
+		t.Fatalf("empty next tool = %#v", empty)
+	}
+}
+
+func TestControllerClosePolicies(t *testing.T) {
+	empty := chmctx.Message{Role: chmctx.RoleAssistant}
+	controller := scriptedController(t, [][]llm.Event{
+		{{Kind: llm.EventDone, Final: &empty}},
+		{{Kind: llm.EventDone, Final: &empty}},
+	}, nil)
+	events, transition := driveTransition(controller, controller.Dispatch(frontend.SubmitGoal("stall", time.Unix(10, 0))), 20)
+	if transition.Work != nil || events[len(events)-1].Natural != true || !strings.Contains(events[len(events)-1].Text, "stalled") {
+		t.Fatalf("empty policy = %#v", events)
+	}
+
+	leak := chmctx.Message{Role: chmctx.RoleAssistant, Content: "<tool_call>bad"}
+	controller = scriptedController(t, [][]llm.Event{{{Kind: llm.EventDone, Final: &leak}}}, nil)
+	events, _ = driveTransition(controller, controller.Dispatch(frontend.SubmitGoal("leak", time.Unix(10, 0))), 10)
+	if !strings.Contains(events[len(events)-1].Text, "leaked") {
+		t.Fatalf("leak policy = %#v", events)
+	}
+
+	inactive := frontend.Transition{}
+	controller.applyClose(&inactive)
+	if len(inactive.Events) != 0 || inactive.Work != nil {
+		t.Fatalf("inactive close = %#v", inactive)
+	}
+	controller.applyToolCompletion(toolCompletion{}, &inactive)
+	if len(inactive.Events) != 0 || inactive.Work != nil {
+		t.Fatalf("malformed tool completion = %#v", inactive)
+	}
+
+	controller.agent.BeginTurn(time.Unix(30, 0))
+	oldEvents := make(chan llm.Event, 1)
+	oldEvents <- llm.Event{Kind: llm.EventContent, Content: "stale"}
+	oldStream := controller.agent.Stream.BeginStream(controller.agent.Turn.ID, oldEvents)
+	delivery := oldStream.Read()
+	controller.agent.Stream.BeginStream(controller.agent.Turn.ID, make(chan llm.Event))
+	staleTransition := frontend.Transition{}
+	controller.applyModelCompletion(modelCompletion{stream: oldStream, delivery: delivery}, &staleTransition)
+	if staleTransition.Work == nil || len(staleTransition.Events) != 0 {
+		t.Fatalf("stale nonclosed stream = %#v", staleTransition)
+	}
+	controller.agent.EndTurn()
 }

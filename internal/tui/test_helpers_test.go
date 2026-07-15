@@ -11,13 +11,45 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	appcontroller "github.com/DohmBoy64Bit/RecompHamr/internal/app/controller"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
 )
 
+type snapshotController struct {
+	frontend.Controller
+	snapshot frontend.Snapshot
+}
+
+func (c *snapshotController) Snapshot() frontend.Snapshot { return c.snapshot }
+func (c *snapshotController) Dispatch(intent frontend.Intent) frontend.Transition {
+	switch intent.Kind() {
+	case frontend.IntentCancel:
+		c.snapshot.Phase = frontend.PhaseIdle
+		return frontend.Transition{Snapshot: c.snapshot, Events: []frontend.Event{{Kind: frontend.EventTurnFinished, Text: "✗ cancelled", Cancelled: true}}}
+	case frontend.IntentSubmitGoal:
+		c.snapshot.Phase = frontend.PhaseThinking
+		return frontend.Transition{Snapshot: c.snapshot, Events: []frontend.Event{{Kind: frontend.EventTurnStarted, At: intent.Time()}}}
+	default:
+		transition := c.Controller.Dispatch(intent)
+		c.snapshot = transition.Snapshot
+		return transition
+	}
+}
+
+func mutateTestSnapshot(m *Model, mutate func(*frontend.Snapshot)) {
+	snapshot := m.controller.Snapshot()
+	mutate(&snapshot)
+	m.controller = &snapshotController{Controller: m.controller, snapshot: snapshot}
+}
+
+func setTestPhase(m *Model, phase frontend.Phase) {
+	mutateTestSnapshot(m, func(snapshot *frontend.Snapshot) { snapshot.Phase = phase })
+}
+
 func newModelWithRuntime(sessionRuntime *session.Runtime, runtime agent.Runtime, system, version string) Model {
-	return New(appcontroller.NewController(sessionRuntime, runtime, system, version), runtime, system, version)
+	return New(appcontroller.NewController(sessionRuntime, runtime, system, version), version)
 }
 
 // newTestModel wires a model against a mock OpenAI-compatible SSE server so

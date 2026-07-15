@@ -312,7 +312,7 @@ func (m Model) splashLines() []string {
 
 func (m Model) renderStatusBar() string {
 	sep := styleStatus.Render(" · ")
-	snapshot := m.agentRuntime.Snapshot()
+	snapshot := m.controller.Snapshot()
 	segs := []string{backendLabel(m.controller.Snapshot().Active, snapshot.Connected)}
 
 	if live := snapshot.SessionTokens + snapshot.StreamingEstimate; live > 0 {

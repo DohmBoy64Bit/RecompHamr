@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"context"
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -10,319 +8,159 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
-	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/tools"
 )
 
-// handleStream is the deterministic adapter-test entrypoint for raw synthetic
-// transport events. Production consumes only opaque agent deliveries.
-func (m Model) handleStream(event llm.Event) (tea.Model, tea.Cmd) {
-	if !m.runtime.Phase.Active() {
-		return m, readEvent(m.runtime.Stream)
+type fakeFrontendController struct {
+	snapshot    frontend.Snapshot
+	bootstrap   frontend.Transition
+	transitions []frontend.Transition
+	intents     []frontend.Intent
+}
+
+func (f *fakeFrontendController) Bootstrap() frontend.Transition { return f.bootstrap }
+func (f *fakeFrontendController) Snapshot() frontend.Snapshot    { return f.snapshot }
+func (f *fakeFrontendController) Dispatch(intent frontend.Intent) frontend.Transition {
+	f.intents = append(f.intents, intent)
+	if len(f.transitions) == 0 {
+		return frontend.Transition{Snapshot: f.snapshot}
 	}
-	effect := m.agentRuntime.ApplyEvent(m.controller.Snapshot().Active, m.activeContextSize(), event)
-	return m.applyStreamEffect(effect)
+	transition := f.transitions[0]
+	f.transitions = f.transitions[1:]
+	f.snapshot = transition.Snapshot
+	return transition
 }
 
-type frontendWorkFunc func() frontend.Completion
+type fakeFrontendWork struct{ completion frontend.Completion }
 
-func (f frontendWorkFunc) Run() frontend.Completion { return f() }
+func (w fakeFrontendWork) Run() frontend.Completion { return w.completion }
 
-func (m *Model) applyDone(event llm.Event) {
-	effect := m.agentRuntime.ApplyEvent(m.controller.Snapshot().Active, m.activeContextSize(), event)
-	m.applyDoneEffect(effect)
+func presentationModel(controller *fakeFrontendController) Model {
+	model := New(controller, "test")
+	model.width, model.height = 100, 30
+	return model
 }
 
-func TestPhaseOutcomeContextAndInitContracts(t *testing.T) {
-	for p, want := range map[phase]string{phaseIdle: "", phaseThinking: "thinking", phaseStreaming: "generating", phaseRunning: "running"} {
-		if p.Label() != want {
-			t.Fatalf("phase %d = %q", p, p.Label())
+func TestFrontendEventsReproducePresentationState(t *testing.T) {
+	now := time.Now().Add(-time.Second)
+	controller := &fakeFrontendController{snapshot: frontend.Snapshot{Active: "local", ActiveModel: "model", Connected: true}}
+	m := presentationModel(controller)
+	m.queued = &queuedPrompt{send: "queued", echo: "queued"}
+	transition := frontend.Transition{Snapshot: controller.snapshot, Events: []frontend.Event{
+		{Kind: frontend.EventTurnStarted, At: now},
+		{Kind: frontend.EventStatus, Text: "retry"},
+		{Kind: frontend.EventContent, Text: "a\tb"},
+		{Kind: frontend.EventFlush},
+		{Kind: frontend.EventToolStatus, Text: "read_file x"},
+		{Kind: frontend.EventTurnFinished, Text: "✗ cancelled", Elapsed: time.Second, Tokens: 8, Cancelled: true},
+	}}
+	next, cmd := m.applyFrontendTransition(transition)
+	m = next.(Model)
+	if cmd != nil || m.turnStart != (time.Time{}) || m.lastOutcome != outcomeStopped || m.lastTokens != 8 || m.queued != nil || m.ta.Value() != "queued" {
+		t.Fatalf("finished state = %#v", m)
+	}
+	scroll := stripANSI(m.scroll.String())
+	if !strings.Contains(scroll, "a    b") || !strings.Contains(scroll, "read_file x") || !strings.Contains(scroll, "cancelled") || m.status != "" {
+		t.Fatalf("events scroll=%q status=%q", scroll, m.status)
+	}
+}
+
+func TestFrontendCompletionAndNaturalQueueFireExactlyOnce(t *testing.T) {
+	controller := &fakeFrontendController{snapshot: frontend.Snapshot{Active: "local", Phase: frontend.PhaseThinking}}
+	controller.bootstrap = frontend.Transition{Snapshot: controller.snapshot, Events: []frontend.Event{{Kind: frontend.EventHistory, Values: []string{"remember"}}}, Work: fakeFrontendWork{completion: "startup"}}
+	controller.transitions = []frontend.Transition{
+		{Snapshot: frontend.Snapshot{Active: "local"}, Events: []frontend.Event{{Kind: frontend.EventTurnFinished, OK: true, Natural: true}}},
+		{Snapshot: frontend.Snapshot{Active: "local"}},
+		{Snapshot: frontend.Snapshot{Active: "local", Phase: frontend.PhaseThinking}, Events: []frontend.Event{{Kind: frontend.EventTurnStarted, At: time.Now()}}, Work: fakeFrontendWork{completion: "queued-work"}},
+	}
+	m := presentationModel(controller)
+	if len(m.promptHistory) != 1 || m.promptHistory[0].display != "remember" {
+		t.Fatalf("history = %#v", m.promptHistory)
+	}
+	m.queued = &queuedPrompt{send: "next", echo: "next"}
+	msg := runFrontendWork(controller.bootstrap.Work)()
+	next, cmd := m.update(msg)
+	m = next.(Model)
+	if cmd == nil || len(controller.intents) != 3 || controller.intents[0].Kind() != frontend.IntentComplete || controller.intents[1].Kind() != frontend.IntentAppendHistory || controller.intents[2].Kind() != frontend.IntentSubmitGoal {
+		t.Fatalf("intents = %#v cmd=%v", controller.intents, cmd)
+	}
+	if m.queued != nil || m.lastOutcome != outcomeNone || m.controller.Snapshot().Phase != frontend.PhaseThinking {
+		t.Fatalf("natural finish = %#v", m)
+	}
+	if completion := cmd().(frontendCompletionMsg); completion.completion != "queued-work" {
+		t.Fatalf("queued completion = %#v", completion)
+	}
+
+	controller.transitions = []frontend.Transition{{Snapshot: controller.snapshot, Events: []frontend.Event{{Kind: frontend.EventWarning, Text: "warn"}, {Kind: frontend.EventProfileActivated, Profile: "p", Model: "m", URL: "u"}}}}
+	next, _ = m.update(frontendCompletionMsg{completion: "other"})
+	m = next.(Model)
+	if !strings.Contains(stripANSI(m.scroll.String()), "warn") || !strings.Contains(stripANSI(m.scroll.String()), "active: p") {
+		t.Fatal("completion events missing")
+	}
+
+	if _, cmd = m.update(tea.FocusMsg{}); cmd != nil {
+		t.Fatal("focus produced command")
+	}
+}
+
+func TestFrontendWorkNilAndPhaseLabels(t *testing.T) {
+	if runFrontendWork(nil) != nil {
+		t.Fatal("nil work")
+	}
+	for phase, label := range map[frontend.Phase]string{
+		frontend.PhaseIdle: "", frontend.PhaseThinking: "thinking", frontend.PhaseStreaming: "generating", frontend.PhaseRunning: "running", frontend.Phase(99): "",
+	} {
+		if phase.Label() != label {
+			t.Fatalf("phase %d = %q", phase, phase.Label())
 		}
 	}
-	if outcomeNone.marker() != "" || outcomeDone.marker() != "✓" || outcomeStopped.marker() != "✗" {
-		t.Fatal("outcome markers")
-	}
-	m := baselineModel(t)
-	if m.Init() == nil {
-		t.Fatal("init command missing")
-	}
-	keyedCfg := config.Default()
-	keyedCfg.Dir = t.TempDir()
-	keyedCfg.ActiveProfile().Key = "secret"
-	keyedRuntime := session.NewRuntime(keyedCfg)
-	keyed := newModelWithRuntime(keyedRuntime, agent.NewRuntime(keyedRuntime, agent.LocalToolExecutor()), "test system", "test")
-	if keyed.Init() == nil {
-		t.Fatal("keyed init command missing")
-	}
-	active := m.controller.Snapshot().Active
-	m.runtime.LiveContextSize[active] = 1234
-	if m.activeContextSize() != 1234 {
-		t.Fatal("live context")
-	}
-	delete(m.runtime.LiveContextSize, active)
-	fallbackCfg := config.Default()
-	fallbackCfg.Dir = t.TempDir()
-	fallbackCfg.ActiveProfile().ContextSize = 0
-	fallbackRuntime := session.NewRuntime(fallbackCfg)
-	fallback := newModelWithRuntime(fallbackRuntime, agent.NewRuntime(fallbackRuntime, agent.LocalToolExecutor()), "test system", "test")
-	if fallback.activeContextSize() != defaultPackFallback {
-		t.Fatal("fallback context")
-	}
-	m.installTurnContext()
-	first := m.turn.ID
-	m.installTurnContext()
-	if first == m.turn.ID || !m.turn.Active() {
-		t.Fatal("turn context")
-	}
-	m.status = queueSlashHint
-	m.runtime.Retrying = true
-	m.endTurn()
-	if m.status != "" || m.runtime.Phase != phaseIdle {
-		t.Fatal("end turn cleanup")
-	}
 }
 
-func TestStreamEventStateMachine(t *testing.T) {
-	m := baselineModel(t)
-	m.runtime.Phase = phaseThinking
-	m.turnStart = time.Now().Add(-time.Second)
-	ch := make(chan llm.Event, 2)
-	m.runtime.BeginStream(m.turn.ID, ch)
-	next, _ := m.handleStream(llm.Event{Kind: llm.EventRetry, Content: "retry"})
-	m = next.(Model)
-	if !m.runtime.Retrying || m.status != "retry" {
-		t.Fatal("retry")
+func TestFrontendUpdateAndProbeBranches(t *testing.T) {
+	profiles := []frontend.Profile{{Name: "active", Model: "model", URL: "http://active", Active: true}}
+	controller := &fakeFrontendController{snapshot: frontend.Snapshot{Active: "active", Profiles: profiles}}
+	controller.bootstrap = frontend.Transition{Snapshot: controller.snapshot, Work: fakeFrontendWork{completion: "startup"}}
+	m := presentationModel(controller)
+	if batch, ok := m.Init()().(tea.BatchMsg); !ok || len(batch) != 3 {
+		t.Fatalf("init = %#v", batch)
 	}
-	next, _ = m.handleStream(llm.Event{Kind: llm.EventReasoning, Content: "reasoning bytes"})
-	m = next.(Model)
-	if m.runtime.Retrying || m.runtime.StreamingEstimate == 0 {
-		t.Fatal("reasoning")
-	}
-	next, _ = m.handleStream(llm.Event{Kind: llm.EventToolArgs, Content: "arguments"})
-	m = next.(Model)
-	if m.runtime.Phase != phaseStreaming {
-		t.Fatal("tool args phase")
-	}
-	next, _ = m.handleStream(llm.Event{Kind: llm.EventContent, Content: "a\tb"})
-	m = next.(Model)
-	if !strings.Contains(m.streaming.String(), "a    b") {
-		t.Fatal("content tabs")
-	}
-	call := chmctx.ToolCall{ID: "1", Name: tools.ReadFileName, Arguments: map[string]any{"path": "x"}}
-	next, _ = m.handleStream(llm.Event{Kind: llm.EventToolCall, ToolCall: &call})
-	m = next.(Model)
-	if len(m.runtime.Pending) != 1 {
-		t.Fatal("tool call not queued")
-	}
-	final := chmctx.Message{Role: chmctx.RoleAssistant, Content: "done", ToolCalls: []chmctx.ToolCall{call}}
-	next, _ = m.handleStream(llm.Event{Kind: llm.EventDone, Final: &final, Tokens: 9, PromptTokens: 4000, ContextWindow: 4096})
-	m = next.(Model)
-	if m.runtime.TurnTokens != 9 || m.runtime.LiveContextSize[m.controller.Snapshot().Active] != 4096 || len(m.turn.History) == 0 {
-		t.Fatal("done accounting")
-	}
-	next, cmd := m.handleStreamClosed()
-	m = next.(Model)
-	if cmd == nil || m.runtime.Phase != phaseRunning || len(m.runtime.Pending) != 0 {
-		t.Fatal("dispatch pending")
-	}
-
-	m.turn.Begin(context.Background(), time.Now())
-	toolMsg := chmctx.Message{Role: chmctx.RoleTool, ToolName: tools.ReadFileName, Content: "ok"}
-	next, _ = m.update(toolResultMsg{delivery: agent.ToolDelivery{TurnID: 1, Message: toolMsg}})
-	m = next.(Model)
-	if m.runtime.Phase != phaseThinking {
-		t.Fatal("tool result did not resume")
-	}
-	before := len(m.turn.History)
-	next, _ = m.update(toolResultMsg{delivery: agent.ToolDelivery{TurnID: 2, Message: toolMsg}})
-	m = next.(Model)
-	if len(m.turn.History) != before {
-		t.Fatal("stale tool result")
-	}
-
-	m.runtime.Phase = phaseStreaming
-	m.turnStart = time.Now().Add(-time.Second)
-	m.streaming.WriteString("partial")
-	next, _ = m.handleStream(llm.Event{Kind: llm.EventError, Err: provider.ErrUnreachable{Err: errors.New("down")}})
-	m = next.(Model)
-	if m.runtime.Phase != phaseIdle || m.runtime.Connected {
-		t.Fatal("error unwind")
-	}
-	next, _ = m.handleStream(llm.Event{Kind: llm.EventContent, Content: "stale"})
-	if next.(Model).runtime.Phase != phaseIdle {
-		t.Fatal("inactive event")
-	}
-}
-
-func TestUpdateTypedMessagesAndClosedOutcomes(t *testing.T) {
-	m := baselineModel(t)
-	for _, msg := range []tea.Msg{tea.FocusMsg{}, tea.BlurMsg{}, tea.KeyMsg{Type: tea.KeyRunes}, spinner.TickMsg{}} {
+	for _, msg := range []tea.Msg{
+		tea.KeyMsg{Type: tea.KeyRunes},
+		tea.WindowSizeMsg{Width: 100, Height: 30},
+		resizeSettleMsg{gen: 99},
+		spinner.TickMsg{},
+		struct{}{},
+	} {
 		next, _ := m.update(msg)
 		m = next.(Model)
-	}
-	current := make(chan llm.Event)
-	staleEvents := make(chan llm.Event, 1)
-	staleEvents <- llm.Event{Kind: llm.EventContent}
-	close(staleEvents)
-	staleState := agent.NewStreamState()
-	stale := staleState.BeginStream(m.turn.ID+1, staleEvents)
-	m.runtime.BeginStream(m.turn.ID, current)
-	m.runtime.Phase = phaseThinking
-	if _, cmd := m.update(streamEventMsg{stream: stale, delivery: stale.Read()}); cmd == nil {
-		t.Fatal("stale event not drained")
-	}
-	if _, cmd := m.update(streamClosedMsg{stream: stale, delivery: stale.Read()}); cmd != nil {
-		t.Fatal("stale close acted")
 	}
 	m.quitArmedAt = time.Now().Add(-time.Second)
 	m.status = quitArmText
 	next, _ := m.update(quitArmResetMsg{})
 	m = next.(Model)
-	if m.status != "" {
-		t.Fatal("quit reset")
-	}
-	next, _ = m.update(struct{}{})
-	_ = next.(Model)
-
-	m = baselineModel(t)
-	m.runtime.Phase = phaseThinking
-	m.turnStart = time.Now().Add(-time.Second)
-	m.turn.Begin(context.Background(), time.Now())
-	m.turn.History = []chmctx.Message{{Role: chmctx.RoleAssistant}}
-	next, cmd := m.handleStreamClosed()
-	m = next.(Model)
-	if cmd == nil || !m.loop.EmptyNudged {
-		t.Fatal("empty nudge")
-	}
-	m.runtime.Phase = phaseThinking
-	m.runtime.Stream = nil
-	next, _ = m.handleStreamClosed()
-	m = next.(Model)
-	if m.runtime.Phase != phaseIdle || !strings.Contains(m.scroll.String(), "ended its turn") {
-		t.Fatal("empty stall")
-	}
-	m = baselineModel(t)
-	m.runtime.Phase = phaseThinking
-	m.turnStart = time.Now().Add(-time.Second)
-	m.turn.History = []chmctx.Message{{Role: chmctx.RoleAssistant, Content: "<tool_call>bad"}}
-	next, _ = m.handleStreamClosed()
-	m = next.(Model)
-	if m.lastOutcome != outcomeStopped {
-		t.Fatal("leak outcome")
-	}
-}
-
-func TestProbeSuccessFailureAndBackendCommands(t *testing.T) {
-	m := baselineModel(t)
-	active := m.controller.Snapshot().Active
-	next, _ := m.applyFrontendTransition(frontend.Transition{Snapshot: m.controller.Snapshot(), Events: []frontend.Event{{Kind: frontend.EventProbe, Profile: active, Text: "key rejected"}}})
-	m = next.(Model)
-	next, _ = m.applyFrontendTransition(frontend.Transition{Snapshot: m.controller.Snapshot(), Events: []frontend.Event{{Kind: frontend.EventProbe, Profile: "vanished", OK: true, ContextWindow: 10}}})
-	m = next.(Model)
-	next, _ = m.applyFrontendTransition(frontend.Transition{Snapshot: m.controller.Snapshot(), Events: []frontend.Event{{Kind: frontend.EventProbe, Profile: active, OK: true, ContextWindow: 8192}}})
-	m = next.(Model)
-	if !strings.Contains(m.scroll.String(), "ctx: 8,192") {
-		t.Fatal("probe presentation")
-	}
-	if probeErrorMessage(provider.ErrUnauthorized) != "key rejected" || !strings.Contains(probeErrorMessage(provider.ErrUnreachable{Err: errors.New("down")}), "unreachable") || probeErrorMessage(errors.New("raw")) != "raw" {
-		t.Fatal("probe hints")
+	if m.status != "" || quitArmReset(time.Now()) != (quitArmResetMsg{}) || resizeSettled(4)(time.Now()) != (resizeSettleMsg{gen: 4}) {
+		t.Fatal("timer branches")
 	}
 
-}
-
-func TestRemainingStateBranches(t *testing.T) {
-	dir := t.TempDir()
-	logging.Open(dir)
-	m := baselineModel(t)
-	logging.Close()
-	if len(m.promptHistory) != 0 {
-		t.Fatal("unexpected history")
-	}
-	if runFrontendWork(nil) != nil {
-		t.Fatal("nil frontend work")
-	}
-	completionCmd := runFrontendWork(frontendWorkFunc(func() frontend.Completion { return "foreign" }))
-	next, _ := m.update(completionCmd())
+	transition := frontend.Transition{Snapshot: controller.snapshot, Events: []frontend.Event{
+		{Kind: frontend.EventProbe, Profile: "active", Text: "failed"},
+		{Kind: frontend.EventProbe, Profile: "missing", OK: true},
+		{Kind: frontend.EventProbe, Profile: "active", OK: true, ContextWindow: 8192},
+	}}
+	next, _ = m.applyFrontendTransition(transition)
 	m = next.(Model)
-	next, _ = m.applyFrontendTransition(frontend.Transition{Snapshot: m.controller.Snapshot(), Events: []frontend.Event{
-		{Kind: frontend.EventWarning, Text: "warning"},
-		{Kind: frontend.EventProfileActivated, Profile: "p", Model: "m", URL: "u"},
-	}})
-	m = next.(Model)
-	if !strings.Contains(m.scroll.String(), "warning") || !strings.Contains(m.scroll.String(), "active: p") {
-		t.Fatal("frontend events")
+	scroll := stripANSI(m.scroll.String())
+	if !strings.Contains(scroll, "probe active: failed") || !strings.Contains(scroll, "ctx: 8,192") {
+		t.Fatalf("probe scroll = %q", scroll)
 	}
-	next, _ = m.applyFrontendTransition(frontend.Transition{Snapshot: m.controller.Snapshot()})
-	m = next.(Model)
-	m.runtime.Pending = []chmctx.ToolCall{{Name: tools.ReadFileName}, {Name: tools.ReadFileName}}
-	m.turn.Begin(context.Background(), time.Now())
-	next, cmd := m.update(toolResultMsg{delivery: agent.ToolDelivery{TurnID: 1, Message: chmctx.Message{Role: chmctx.RoleTool}}})
-	m = next.(Model)
-	if cmd == nil || len(m.runtime.Pending) != 1 {
-		t.Fatal("pending tool chain")
+	m.ta.SetValue("draft")
+	m.queued = &queuedPrompt{send: "queued", echo: "queued"}
+	m.applyTurnFinished(frontend.Event{Kind: frontend.EventTurnFinished})
+	if m.ta.Value() != "draft" || m.queued != nil {
+		t.Fatal("finish clobbered draft")
 	}
-	m.resizeGen = 2
-	_, tick := m.handleWindowSize(tea.WindowSizeMsg{Width: 20, Height: 10})
-	if tick != nil {
-		_ = tick()
-	}
-
-	logging.Open(dir)
-	m.runtime.Phase = phaseThinking
-	m.runtime.BeginStream(m.turn.ID, make(chan llm.Event))
-	next, _ = m.handleStream(llm.Event{Kind: llm.EventReasoning, Content: "logged reasoning"})
-	m = next.(Model)
-	m.runtime.StreamingEstimate = 8
-	m.applyDone(llm.Event{Kind: llm.EventDone})
-	logging.Close()
-	if m.runtime.TurnTokens == 0 {
-		t.Fatal("estimated done tokens")
-	}
-	m.runtime.Phase = phaseIdle
-	next, _ = m.handleStreamClosed()
-	if next.(Model).runtime.Phase != phaseIdle {
-		t.Fatal("idle close")
-	}
-	if _, ok := agent.NewestAssistant([]chmctx.Message{{Role: chmctx.RoleUser}}); ok {
-		t.Fatal("found absent assistant")
-	}
-	if agent.HasToolCallLeak([]chmctx.Message{{Role: chmctx.RoleAssistant, Content: "<tool_call>", ToolCalls: []chmctx.ToolCall{{Name: "x"}}}}) {
-		t.Fatal("structured call warned")
-	}
-	m.turn.History = []chmctx.Message{{Role: chmctx.RoleAssistant, Content: "UNVERIFIED: runtime"}}
-	m.loop.ToolRounds = agent.VerifyNudgeMinRounds
-	m.loop.VerifyNudged = false
-	m.runtime.Pending = nil
-	if decision := m.loop.DecideClose(m.turn, m.runtime); decision.Action != agent.CloseFinishDone {
-		t.Fatal("honest unverified finish nudged")
-	}
-	if _, ok := quitArmReset(time.Now()).(quitArmResetMsg); !ok {
-		t.Fatal("quit reset callback")
-	}
-	if got := resizeSettled(7)(time.Now()).(resizeSettleMsg); got.gen != 7 {
-		t.Fatal("resize callback")
-	}
-}
-
-func TestToolResultAdapterEmitsPolicyLogs(t *testing.T) {
-	m := baselineModel(t)
-	m.turn.Begin(context.Background(), time.Now())
-	m.runtime.Phase = phaseRunning
-	m.loop.LastToolKey = tools.ReadFileName + "|x"
-	m.loop.FailKey = m.loop.LastToolKey
-	m.loop.FailStreak = agent.MaxToolFailStreak - 1
-	m.loop.ToolRounds = agent.MaxToolRounds
-	result := chmctx.Message{Role: chmctx.RoleTool, ToolName: tools.ReadFileName, Content: "(read error: x)"}
-	next, cmd := m.update(toolResultMsg{delivery: agent.ToolDelivery{TurnID: m.turn.ID, Message: result}})
-	m = next.(Model)
-	if cmd == nil || m.loop.FailStreak != 0 || !m.loop.RunawayNudged || m.runtime.Phase != phaseThinking {
-		t.Fatal("policy effect adapter")
+	m.applyTurnFinished(frontend.Event{Kind: frontend.EventTurnFinished, Text: "error"})
+	if !strings.Contains(stripANSI(m.scroll.String()), "error") {
+		t.Fatal("error finish missing")
 	}
 }
