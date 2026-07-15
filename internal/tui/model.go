@@ -330,7 +330,7 @@ func (m *Model) activeContextSize() int {
 // defaultPackFallback is the conservative window used until the server reports
 // a real value. Matches config.defaultContextSize so profiles behave like
 // a fresh local one until X-Context-Window arrives on the next response.
-const defaultPackFallback = 32768
+const defaultPackFallback = 16177
 
 // resizeSettleDelay debounces width-resize bursts: longer than typical drag
 // SIGWINCH cadence (10-50ms) so a continuous drag collapses to one settle,

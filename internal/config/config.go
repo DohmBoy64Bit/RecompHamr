@@ -39,15 +39,11 @@ var DefaultSystemPrompt string
 
 const DirName = ".rehamr"
 
-// defaultContextSize is the local profile's packing budget and the floor
-// Bootstrap coerces a bogus/missing context_size to. It must match what a stock
-// local server actually honors, NOT the model's theoretical max: Ollama's /v1
-// shim reports no X-Context-Window, so recomphamr packs to this value blind: set
-// it too high and the server silently front-truncates the prompt, dropping the
-// embedded system prompt and early tool results with no error. 32k is the safe
-// stock-Ollama tier and the seeded local model's native window. Users who raise
-// their server's num_ctx (OLLAMA_CONTEXT_LENGTH; see README) lift this to match.
-const defaultContextSize = 32768
+// defaultContextSize is the seeded LM Studio profile's packing budget and the
+// floor Bootstrap coerces a bogus/missing context_size to. It matches the
+// accepted Gemma runtime configuration; users who load the model with a
+// different context window should update their persisted profile to match.
+const defaultContextSize = 16177
 
 // managedProfiles are seeded on first run with the same local profile shape as
 // the pinned upstream baseline, minus the hosted-service profile. After first
@@ -55,8 +51,8 @@ const defaultContextSize = 32768
 // never re-adds anything.
 var managedProfiles = map[string]Profile{
 	"local": {
-		LLM:         "qwen3.6:27b",
-		URL:         "http://localhost:11434",
+		LLM:         "google/gemma-4-12b-qat",
+		URL:         "http://localhost:1234",
 		Key:         "",
 		ContextSize: defaultContextSize,
 	},

@@ -51,7 +51,7 @@ func TestBootstrapCreatesLayout(t *testing.T) {
 	if !ok {
 		t.Fatal("default should include a 'local' profile")
 	}
-	if p.URL != "http://localhost:11434" || p.LLM != "qwen3.6:27b" || p.ContextSize != 32768 {
+	if p.URL != "http://localhost:1234" || p.LLM != "google/gemma-4-12b-qat" || p.ContextSize != 16177 {
 		t.Fatalf("default local profile mismatch: %+v", p)
 	}
 }

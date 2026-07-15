@@ -2,19 +2,23 @@
 
 On first run, RecompHamr creates `.rehamr/config.yaml` in the current project directory.
 
-The baseline seeds one local OpenAI-compatible profile:
+The baseline seeds one LM Studio OpenAI-compatible profile for the accepted
+Gemma runtime. Start LM Studio's local server and load the named model before
+the first real turn:
 
 ```yaml
 active: local
 models:
   local:
-    llm: qwen3.6:27b
-    url: http://localhost:11434
+    llm: google/gemma-4-12b-qat
+    url: http://localhost:1234
     key: ""
-    context_size: 32768
+    context_size: 16177
 ```
 
 The values are editable. Any endpoint used by the baseline must expose the OpenAI-compatible chat-completions interface expected by `internal/llm`.
+Changing these source defaults affects newly created configuration files only;
+RecompHamr never overwrites an existing `.rehamr/config.yaml`.
 
 ## Switching profiles
 

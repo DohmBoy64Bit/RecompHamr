@@ -6,7 +6,7 @@
 active: local
 models:
     local:
-        llm: qwen3.6:27b
-        url: http://localhost:11434
+        llm: google/gemma-4-12b-qat
+        url: http://localhost:1234
         key: ""
-        context_size: 32768
+        context_size: 16177
