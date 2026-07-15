@@ -30,15 +30,15 @@ func TestRenderQueuedViewAndStatusStates(t *testing.T) {
 	}
 	m.suppressView = false
 
-	m.sessionTokens = 1234
-	m.streamingEstimate = 4
-	m.phase = phaseThinking
+	m.runtime.SessionTokens = 1234
+	m.runtime.StreamingEstimate = 4
+	m.runtime.Phase = phaseThinking
 	m.turnStart = time.Now().Add(-2 * time.Second)
 	m.status = "status"
 	if bar := m.renderStatusBar(); !strings.Contains(bar, "thinking") || !strings.Contains(bar, "status") || !strings.Contains(bar, "1.2k") {
 		t.Fatalf("active bar = %q", bar)
 	}
-	m.phase = phaseIdle
+	m.runtime.Phase = phaseIdle
 	m.lastOutcome = outcomeDone
 	m.lastElapsed = 2 * time.Second
 	m.lastTokens = 20

@@ -39,7 +39,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Mid-turn Backspace on an empty prompt pulls a queued prompt back into
 		// the textarea for editing; any other Backspace is an ordinary character
 		// delete and falls through to the textarea.
-		if m.phase.active() && m.queued != nil && m.ta.Value() == "" {
+		if m.runtime.Phase.Active() && m.queued != nil && m.ta.Value() == "" {
 			return m.unqueuePrompt()
 		}
 	case tea.KeyCtrlD:
@@ -48,7 +48,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// textarea is empty then, since submit resets it) so a reflexive press
 		// can't quit without cancelling turnCtx and orphan a running tool's
 		// process group. Ctrl+C is the mid-turn escape.
-		if m.ta.Value() == "" && !m.phase.active() {
+		if m.ta.Value() == "" && !m.runtime.Phase.Active() {
 			return m, tea.Quit
 		}
 		return m, nil
@@ -220,7 +220,7 @@ func (m Model) handleEnter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// matches no binding at all, falling through to a rune-insert no-op.
 		return m.forwardToTextarea(tea.KeyMsg{Type: tea.KeyEnter})
 	}
-	if m.phase.active() {
+	if m.runtime.Phase.Active() {
 		return m.queuePrompt()
 	}
 	sel, hasSel := m.currentSuggestion()

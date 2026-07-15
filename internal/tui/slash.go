@@ -181,8 +181,7 @@ func (m *Model) rebuildClient() {
 func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
 	m.turn.Reset()
 	m.scroll.Reset()
-	m.sessionTokens = 0
-	m.streamingEstimate = 0
+	m.runtime.ResetSession()
 	// Drop any queued follow-up: it targeted the conversation just wiped.
 	m.queued = nil
 	// Reset the repeated-failure streak so the next turn starts clean.

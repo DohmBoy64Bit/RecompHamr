@@ -27,31 +27,16 @@ const (
 	pingTimeout  = 2 * time.Second // backend reachability probe budget
 )
 
-// phase is the turn state machine and single source of truth: idle = no turn;
-// thinking = awaiting the model, no tokens yet; streaming = content flowing;
-// running = a tool is executing.
-type phase int
+// phase aliases the presentation-neutral agent state during the mechanical
+// Stage C adapter migration.
+type phase = agent.Phase
 
 const (
-	phaseIdle phase = iota
-	phaseThinking
-	phaseStreaming
-	phaseRunning
+	phaseIdle      = agent.PhaseIdle
+	phaseThinking  = agent.PhaseThinking
+	phaseStreaming = agent.PhaseStreaming
+	phaseRunning   = agent.PhaseRunning
 )
-
-func (p phase) active() bool { return p != phaseIdle }
-
-func (p phase) label() string {
-	switch p {
-	case phaseThinking:
-		return "thinking"
-	case phaseStreaming:
-		return "generating"
-	case phaseRunning:
-		return "running"
-	}
-	return ""
-}
 
 // turnOutcome is how a finished turn ended, frozen into the status bar until the
 // next submit. outcomeNone is the zero value (no turn has finished yet, or the
@@ -94,8 +79,9 @@ type Model struct {
 	cfg *config.Config
 	cli *llm.Client
 
-	turn   agent.TurnState // model-facing history, stable identity, and cancellation root
-	system string          // embedded system prompt + working-directory anchor
+	turn    agent.TurnState   // model-facing history, stable identity, and cancellation root
+	runtime agent.StreamState // stream, pending calls, phase, accounting, and connection facts
+	system  string            // embedded system prompt + working-directory anchor
 
 	// streaming is the live raw token buffer for the current content block,
 	// rendered above the prompt by View() while the model talks. On flush
@@ -125,17 +111,6 @@ type Model struct {
 	renderer *glamour.TermRenderer
 	spinner  spinner.Model
 
-	// streaming state
-	stream <-chan llm.Event
-
-	// pending tool calls waiting to be executed after an assistant turn
-	pending []chmctx.ToolCall
-
-	// turn-level stats (reset in finalizeTurn) + session-cumulative count
-	// (reset only by /clear, so the status bar carries the running session
-	// total).
-	turnTokens    int
-	sessionTokens int
 	// turnStart stamps the wall-clock start of the current turn, set in beginTurn
 	// (the user-submit path only; tool re-entry bypasses it), so it spans every
 	// tool round rather than resetting per round. The status bar ticks
@@ -153,11 +128,8 @@ type Model struct {
 	// only in the final usage block, so without this the footer would freeze
 	// through the whole reasoning phase then jump. Reset to 0 on
 	// EventDone/Error, where the real count takes over.
-	streamingEstimate int
-
-	connected bool // last known backend reachability (refreshed on ping / stream error)
-	width     int
-	height    int
+	width  int
+	height int
 
 	// View() returns "" while suppressView is on, so bubbletea's async ticker
 	// can't commit a stale frame mid-drag.
@@ -199,13 +171,6 @@ type Model struct {
 	quitArmedAt time.Time // first Ctrl+C in idle arms; second within 3s quits
 
 	status string // transient status-bar hint; cleared by the event that obsoletes it (keypress, quit-arm timer, endTurn)
-	phase  phase  // idle / thinking / streaming / running
-
-	// retrying marks that status currently shows an llm.EventRetry backoff
-	// hint; the next non-retry stream event clears it (content = the retry
-	// succeeded, error = the banner takes over). A flag rather than a text
-	// compare because the hint is dynamic ("retry 1/3 in 2s").
-	retrying bool
 
 	// Repeated-failure nudge, the first of the four deterministic backstops. A
 	// turn otherwise ends purely when the model stops calling tools; nothing
@@ -254,13 +219,6 @@ type Model struct {
 	// nudge, never a hard yield; verifyNudged latches it to once per turn. Reset in
 	// endTurn.
 	verifyNudged bool
-
-	// liveContextSize is the per-profile, runtime-only context window the
-	// server reports via X-Context-Window. Seeded by Probe at activation and
-	// refreshed on every chat EventDone, so a server-side change applies on the
-	// next prompt without a restart. Used when an endpoint reports the optional X-Context-Window hint; otherwise
-	// packing falls back to Profile.ContextSize. Never persisted.
-	liveContextSize map[string]int
 }
 
 func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model {
@@ -276,22 +234,21 @@ func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model 
 	sp.Style = styleSpinner
 
 	m := Model{
-		Version:   version,
-		cfg:       cfg,
-		cli:       cli,
-		system:    buildSystem(projectDir),
-		ta:        ta,
-		renderer:  r,
-		spinner:   sp,
-		connected: true, // optimistic until the first ping proves otherwise
+		Version:  version,
+		cfg:      cfg,
+		cli:      cli,
+		system:   buildSystem(projectDir),
+		ta:       ta,
+		renderer: r,
+		spinner:  sp,
 		// width/height left at 0; View() returns "" until the first
 		// WindowSizeMsg, so we don't flash an 80×24 frame then resize.
-		streaming:       new(strings.Builder),
-		scroll:          new(strings.Builder),
-		reasoning:       new(strings.Builder),
-		histIdx:         -1,
-		turn:            agent.NewTurnState(nil),
-		liveContextSize: map[string]int{},
+		streaming: new(strings.Builder),
+		scroll:    new(strings.Builder),
+		reasoning: new(strings.Builder),
+		histIdx:   -1,
+		turn:      agent.NewTurnState(nil),
+		runtime:   agent.NewStreamState(),
 	}
 	// Record the active backend once, before any turn, so a shared log
 	// names exactly which model/endpoint/context window produced the behaviour.
@@ -315,7 +272,7 @@ func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model 
 // ContextSize, else defaultPackFallback, so providers before their first
 // response (and any missing/zero value) still get a sensible budget.
 func (m *Model) activeContextSize() int {
-	if v, ok := m.liveContextSize[m.cfg.Active]; ok && v > 0 {
+	if v, ok := m.runtime.LiveContextSize[m.cfg.Active]; ok && v > 0 {
 		return v
 	}
 	if v := m.cfg.ActiveProfile().ContextSize; v > 0 {
@@ -431,7 +388,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.baseURL != m.cli.BaseURL {
 			return m, nil
 		}
-		m.connected = msg.ok
+		m.runtime.Connected = msg.ok
 		return m, nil
 
 	case probeMsg:
@@ -447,16 +404,16 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// fresh submit while the prior readEvent was in flight). Keep draining
 		// the channel so the producer goroutine exits cleanly, but never let
 		// the event mutate the now-active turn's state.
-		if msg.ch != m.stream {
-			return m, readEvent(msg.ch)
+		if !m.runtime.Current(msg.stream) || msg.delivery.TurnID != m.turn.ID {
+			return m, readEvent(msg.stream)
 		}
-		return m.handleStream(msg.e)
+		return m.handleStream(msg.delivery.Event)
 
 	case streamClosedMsg:
 		// Stale close from the prior turn's channel; running handleStreamClosed
-		// would nil out the live m.stream and, worse, finalizeTurn + endTurn the
+		// would nil out the live m.runtime.Stream and, worse, finalizeTurn + endTurn the
 		// active turn, killing the user's request out from under them.
-		if msg.ch != m.stream {
+		if !m.runtime.Current(msg.stream) || msg.delivery.TurnID != m.turn.ID {
 			return m, nil
 		}
 		return m.handleStreamClosed()
@@ -478,7 +435,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// assistant.tool_calls message followed by fewer tool messages than
 		// calls issued, so a partial dispatch 400s and loses the rest.
 		// Sequential dispatch in emit order keeps the pairing intact.
-		if len(m.pending) > 0 {
+		if len(m.runtime.Pending) > 0 {
 			return m.dispatchNextTool()
 		}
 		// Queue drained: only now is it safe to inject a system nudge. A
@@ -486,7 +443,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// results would break that pairing and 400 the next request.
 		m.maybeFailureNudge()
 		m.maybeRunawayNudge()
-		m.phase = phaseThinking
+		m.runtime.Phase = phaseThinking
 		return m, m.startChat()
 
 	case quitArmResetMsg:
@@ -599,9 +556,8 @@ func (m Model) submit(sendText, echoText string, entry promptEntry) (tea.Model, 
 
 func (m *Model) startChat() tea.Cmd {
 	msgs := m.buildMessages()
-	ch := m.cli.Chat(m.turn.Context, msgs, m.buildTools())
-	m.stream = ch
-	return readEvent(ch)
+	stream := m.runtime.StartRound(&m.turn, m.cli, msgs, m.buildTools())
+	return readEvent(stream)
 }
 
 // installTurnContext cancels any in-flight turn context and installs a fresh
@@ -618,7 +574,7 @@ func (m *Model) beginTurn() tea.Cmd {
 	m.installTurnContext()
 	m.turnStart = time.Now()
 	m.lastOutcome = outcomeNone // the new run replaces the prior frozen summary
-	m.phase = phaseThinking
+	m.runtime.Phase = phaseThinking
 	return m.startChat()
 }
 
@@ -639,8 +595,8 @@ func (m *Model) appendUserTurn(content string) tea.Cmd {
 // touch scrollback; callers decide whether to flush streaming or emit a banner.
 func (m *Model) endTurn() {
 	m.turn.End()
-	m.phase = phaseIdle
-	m.pending = nil
+	wasRetrying := m.runtime.Retrying
+	m.runtime.ResetTurn()
 	m.toolRounds = 0
 	m.runawayNudged = false
 	m.emptyNudged = false
@@ -652,8 +608,7 @@ func (m *Model) endTurn() {
 	}
 	// A retry hint dies with its turn: a Ctrl+C during the backoff wait would
 	// otherwise leave "retry 1/3 in 15s" stranded in the idle status bar.
-	if m.retrying {
-		m.retrying = false
+	if wasRetrying {
 		m.status = ""
 	}
 }
@@ -679,82 +634,36 @@ func (m *Model) buildTools() []llm.Tool {
 // corrupt scroll (EventContent), re-populate pending (EventToolCall), or credit
 // a dead turn's tokens (EventDone).
 func (m Model) handleStream(e llm.Event) (tea.Model, tea.Cmd) {
-	if !m.phase.active() {
-		return m, readEvent(m.stream)
+	if !m.runtime.Phase.Active() {
+		return m, readEvent(m.runtime.Stream)
 	}
-	// A retry hint is obsolete the moment anything else arrives: content means
-	// the resend succeeded, an error means the banner takes over.
-	if m.retrying && e.Kind != llm.EventRetry {
-		m.retrying = false
+	effect := m.runtime.Apply(&m.turn, m.cfg.Active, e)
+	if effect.RetryCleared {
 		m.status = ""
 	}
-	switch e.Kind {
-	case llm.EventRetry:
-		// The client is waiting out a backoff before resending a transiently
-		// failed request. Surface the wait in the status bar so it doesn't
-		// read as a frozen turn; history is untouched.
-		m.retrying = true
-		m.status = e.Content
-		dbgWritef("retry", "%s (%v)", e.Content, e.Err)
-	case llm.EventContent:
-		m.applyContent(e)
-	case llm.EventReasoning:
-		// Reasoning streams while phase stays "thinking": still deliberating,
-		// no user-facing content yet. Hidden from the transcript (not written
-		// to scroll); only the live token estimate ticks up in the status bar.
-		// When logging, accumulate it so the round's chain-of-thought lands in
-		// the debug log, the highest-signal record for understanding why the
-		// model chose a tool or went wrong.
-		m.streamingEstimate += len(e.Content) / 4
+	if effect.RetryText != "" {
+		m.status = effect.RetryText
+		dbgWritef("retry", "%s (%v)", effect.RetryText, effect.RetryError)
+	}
+	if effect.Content != "" {
+		// Display-only tab expansion keeps authoritative model history intact.
+		m.streaming.WriteString(strings.ReplaceAll(effect.Content, "\t", "    "))
+	}
+	if effect.Reasoning != "" {
 		if dbgEnabled() {
-			m.reasoning.WriteString(e.Content)
+			m.reasoning.WriteString(effect.Reasoning)
 		}
-	case llm.EventToolArgs:
-		// Tool-call arguments stream as the model writes a file (write_file /
-		// edit_file) or a PowerShell script. Count them live like content so the
-		// counter doesn't freeze through a long file write, and flip to
-		// "generating": the model is producing output, not thinking. The
-		// resolved call still arrives whole as EventToolCall; this only feeds
-		// the estimate, nothing reaches history here.
-		if m.phase == phaseThinking {
-			m.phase = phaseStreaming
-		}
-		m.streamingEstimate += len(e.Content) / 4
-	case llm.EventToolCall:
-		m.applyToolCall(e)
-	case llm.EventDone:
-		m.applyDone(e)
-	case llm.EventError:
+	}
+	if effect.Done {
+		m.applyDoneEffect(e, effect)
+	} else if effect.Flush {
+		m.flushStreaming()
+	}
+	if effect.Error != nil {
+		e.Err = effect.Error
 		return m, m.applyError(e)
 	}
-	return m, readEvent(m.stream)
-}
-
-// applyContent writes one streamed text chunk to the live buffer and promotes
-// phase from thinking to streaming on the first chunk so the status bar shows
-// tokens flowing. View() renders the buffer live above the prompt; once the
-// block ends it's flushed through glamour into scrollback via tea.Println.
-func (m *Model) applyContent(e llm.Event) {
-	if m.phase == phaseThinking {
-		m.phase = phaseStreaming
-	}
-	// Expand tabs on the way into the display buffer: terminals advance a
-	// literal tab to the next 8-column stop while every width computation
-	// downstream (View's live ansi.Wrap, glamour's code-fence padding,
-	// wrapForScrollback) counts it as one cell, so a tab-indented code block
-	// passes the width checks yet physically overflows and drifts the
-	// renderer's cursor math. Display-only: history keeps e.Final untouched.
-	m.streaming.WriteString(strings.ReplaceAll(e.Content, "\t", "    "))
-	m.streamingEstimate += len(e.Content) / 4
-}
-
-// applyToolCall queues a streamed tool call for later dispatch. flushStreaming
-// up front commits this round's text to scroll before the inline tool-call
-// status lands, so the user sees styled text *before* the "▶ powershell: ..." line,
-// not all at once at turn end.
-func (m *Model) applyToolCall(e llm.Event) {
-	m.flushStreaming()
-	m.pending = append(m.pending, *e.ToolCall)
+	return m, readEvent(m.runtime.Stream)
 }
 
 // applyDone closes one LLM round: harvest the live context window, accumulate
@@ -763,32 +672,25 @@ func (m *Model) applyToolCall(e llm.Event) {
 // banner reflects the whole turn. Tokens==0 means the backend skipped
 // include_usage; the char/4 estimate carries the counter on those servers.
 func (m *Model) applyDone(e llm.Event) {
-	if e.ContextWindow > 0 {
-		m.liveContextSize[m.cfg.Active] = e.ContextWindow
-	}
-	delta := e.Tokens
-	if delta == 0 {
-		delta = m.streamingEstimate
-	}
-	m.turnTokens += delta
-	m.sessionTokens += delta
-	m.streamingEstimate = 0
-	m.connected = true
+	effect := m.runtime.Apply(&m.turn, m.cfg.Active, e)
+	m.applyDoneEffect(e, effect)
+}
+
+func (m *Model) applyDoneEffect(e llm.Event, effect agent.StreamEffect) {
 	// Round-level reasoning first (it preceded the answer), then the assistant
 	// message, then the round metrics, so the log reads in causal order.
 	if r := m.reasoning.String(); r != "" {
 		dbgWritef("reasoning", "%s", r)
 	}
 	m.reasoning.Reset()
-	if e.Final != nil {
-		dbgWriteMessage("assistant", *e.Final)
-		m.turn.Append(*e.Final)
+	if effect.Final != nil {
+		dbgWriteMessage("assistant", *effect.Final)
 	}
 	// prompt_tokens (server-counted, 0 = not reported) sits beside the request
 	// record's char/4 estimate so a forensic pass can calibrate the packer's
 	// undercount on real histories. Log-only; nothing reads it back.
 	dbgWritef("round_done", "tokens=%d (counted=%d) · prompt_tokens=%d · elapsed=%s · ctx_window=%d",
-		e.Tokens, delta, e.PromptTokens, e.Elapsed.Round(time.Millisecond), e.ContextWindow)
+		e.Tokens, effect.CountedTokens, e.PromptTokens, e.Elapsed.Round(time.Millisecond), e.ContextWindow)
 	// Tripwire for the packer's blind spot: char/4 undercounts code-heavy
 	// history (measured ~1.6x on a real run), so the true prompt can reach the
 	// server's window while Pack still believes it has headroom. Ollama then
@@ -808,7 +710,7 @@ func (m *Model) applyDone(e llm.Event) {
 func (m *Model) applyError(e llm.Event) tea.Cmd {
 	dbgWritef("error", "%v", e.Err)
 	if isUnreachable(e.Err) {
-		m.connected = false
+		m.runtime.Connected = false
 	}
 	m.abortTurn(styleError.Render(m.errorMessage(e)))
 	return nil
@@ -852,28 +754,17 @@ func (m *Model) finalizeTurn(outcome turnOutcome) {
 	if m.turnStart.IsZero() {
 		return // defensive: finalizeTurn only runs inside a turn beginTurn started
 	}
-	// Commit the in-flight round's live estimate before measuring. On a clean
-	// finish it's already 0 (applyDone folded the round into turnTokens at
-	// EventDone). But a Ctrl+C or error mid-stream interrupts before EventDone,
-	// so the cancelled round's tokens (often the whole generation) sit only in
-	// streamingEstimate; without this they'd vanish from the avg and the session
-	// total would drop backward. char/4 is the best count for a round that never
-	// reported usage.
-	m.turnTokens += m.streamingEstimate
-	m.sessionTokens += m.streamingEstimate
-	m.streamingEstimate = 0
-	wall := time.Since(m.turnStart)
+	wall, tokens := m.runtime.Finalize(m.turnStart, time.Now())
 	m.lastElapsed = wall
-	m.lastTokens = m.turnTokens
+	m.lastTokens = tokens
 	m.lastOutcome = outcome
-	avg := humanRate(m.turnTokens, wall)
+	avg := humanRate(tokens, wall)
 	if avg != "" {
 		avg = " · " + avg + " avg"
 	}
 	dbgWritef("turn_end", "%s · %s wall%s · session_total=%s",
-		humanTokens(m.turnTokens), wall.Round(time.Millisecond), avg, humanTokens(m.sessionTokens))
+		humanTokens(tokens), wall.Round(time.Millisecond), avg, humanTokens(m.runtime.SessionTokens))
 	m.turnStart = time.Time{}
-	m.turnTokens = 0
 }
 
 // handleStreamClosed drives what happens after one round's stream finishes:
@@ -881,13 +772,13 @@ func (m *Model) finalizeTurn(outcome turnOutcome) {
 // hand control back. A turn ends precisely when the assistant emits no tool
 // calls; there is no loop tool to land on.
 func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
-	m.stream = nil
+	m.runtime.EndStream()
 	// Stale close from a cancelled turn (handleCtrlC / EventError reset phase
 	// to idle).
-	if !m.phase.active() {
+	if !m.runtime.Phase.Active() {
 		return m, nil
 	}
-	if len(m.pending) > 0 {
+	if len(m.runtime.Pending) > 0 {
 		// The model issued a tool call, genuine progress. Re-arm the empty-reply
 		// latch so a LATER transient empty on this same (long) turn earns its own
 		// re-prompt instead of hitting the leak-and-die branch below. The latch
@@ -917,7 +808,7 @@ func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
 				Role:    chmctx.RoleSystem,
 				Content: agent.EmptyReplyNudge,
 			})
-			m.phase = phaseThinking
+			m.runtime.Phase = phaseThinking
 			return m, m.startChat()
 		}
 		m.appendLine(styleError.Render("⚠ the model ended its turn with no reply and no tool call - it stalled, or your server dropped the call. If thinking is on, its reasoning parser may be swallowing calls - enable one (e.g. vLLM `--reasoning-parser`) or disable thinking for tool turns."))
@@ -935,7 +826,7 @@ func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
 		// unverified) before it hands control back. Mirrors the empty-reply re-prompt:
 		// applyDone already flushed this summary to scrollback and appended it to
 		// history, so the streaming buffer is clean and startChat resumes safely.
-		m.phase = phaseThinking
+		m.runtime.Phase = phaseThinking
 		return m, m.startChat()
 	}
 	m.finalizeTurn(outcome)
@@ -1008,12 +899,12 @@ func toolCallLeakWarning(history []chmctx.Message) string {
 // call's target so the failure nudge can tell when the model keeps retrying the
 // same failing operation (see recordToolOutcome).
 func (m Model) dispatchNextTool() (tea.Model, tea.Cmd) {
-	call := m.pending[0]
-	m.pending = m.pending[1:]
+	call := m.runtime.Pending[0]
+	m.runtime.Pending = m.runtime.Pending[1:]
 	m.appendLine(styleDim.Render(tools.InlineStatus(call)))
 	m.lastToolKey = toolTargetKey(call)
 	m.toolRounds++
-	m.phase = phaseRunning
+	m.runtime.Phase = phaseRunning
 	return m, runToolCall(m.turn.Context, m.turn.ID, call)
 }
 

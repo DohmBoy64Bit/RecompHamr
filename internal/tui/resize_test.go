@@ -66,7 +66,7 @@ func TestWidthChangeSuppressesView(t *testing.T) {
 
 	mx := mm.(Model)
 	mx.streaming.WriteString("partial reply line one\nline two\nline three\n")
-	mx.phase = phaseStreaming
+	mx.runtime.Phase = phaseStreaming
 	mm = mx
 
 	for _, next := range []int{60, 100} { // narrow then widen, both must suppress

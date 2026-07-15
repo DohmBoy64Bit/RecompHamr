@@ -142,7 +142,7 @@ func TestHistoryTabEscapeAndQuitKeys(t *testing.T) {
 
 func TestEnterQueueAndSlashContracts(t *testing.T) {
 	m := baselineModel(t)
-	m.phase = phaseThinking
+	m.runtime.Phase = phaseThinking
 	next, _ := m.handleEnter(tea.KeyMsg{Type: tea.KeyEnter})
 	m = next.(Model)
 	if m.queued != nil {
@@ -172,7 +172,7 @@ func TestEnterQueueAndSlashContracts(t *testing.T) {
 		t.Fatal("slash boundary")
 	}
 
-	m.phase = phaseIdle
+	m.runtime.Phase = phaseIdle
 	m.ta.Reset()
 	next, cmd := m.handleKey(tea.KeyMsg{Type: tea.KeyCtrlD})
 	if cmd == nil {
@@ -266,7 +266,7 @@ func TestHandleKeyAllInteractionBranches(t *testing.T) {
 	if cmd == nil || m.ta.Value() != "" {
 		t.Fatal("ctrl-l")
 	}
-	m.phase = phaseThinking
+	m.runtime.Phase = phaseThinking
 	m.queued = &queuedPrompt{send: "edit me", echo: "edit me"}
 	next, _ = m.handleKey(tea.KeyMsg{Type: tea.KeyBackspace})
 	m = next.(Model)
@@ -277,7 +277,7 @@ func TestHandleKeyAllInteractionBranches(t *testing.T) {
 	if cmd != nil {
 		t.Fatal("active ctrl-d")
 	}
-	m.phase = phaseIdle
+	m.runtime.Phase = phaseIdle
 	m.ta.SetValue("one\ntwo")
 	m.ta.ta.CursorUp()
 	m.ta.ta.CursorStart()
@@ -303,11 +303,11 @@ func TestHandleKeyAllInteractionBranches(t *testing.T) {
 	_, _ = m.handleTab(tea.KeyMsg{Type: tea.KeyTab})
 
 	m.turn.CancelFunc = func() {}
-	m.phase = phaseThinking
+	m.runtime.Phase = phaseThinking
 	m.turnStart = time.Now().Add(-time.Second)
 	next, _ = m.handleCtrlC()
 	m = next.(Model)
-	if m.phase != phaseIdle {
+	if m.runtime.Phase != phaseIdle {
 		t.Fatal("active ctrl-c")
 	}
 	m.setPopover([]argOption{{value: "x"}}, false, "")

@@ -18,12 +18,13 @@ import (
 // fresh submit, the prior turn's readEvent Cmd is still scheduled; without the
 // tag its tokens leak into the new turn, or its close runs endTurn against it.
 type streamEventMsg struct {
-	ch <-chan llm.Event
-	e  llm.Event
+	stream   *agent.Stream
+	delivery agent.StreamDelivery
 }
 
 type streamClosedMsg struct {
-	ch <-chan llm.Event
+	stream   *agent.Stream
+	delivery agent.StreamDelivery
 }
 
 // toolResultMsg carries one finished tool call back to Update, tagged with the
@@ -38,13 +39,13 @@ type toolResultMsg struct {
 
 // readEvent drains one event from the LLM stream as a tea.Msg, re-scheduled
 // until the channel closes. Tags ch so Update can spot stale prior-turn events.
-func readEvent(ch <-chan llm.Event) tea.Cmd {
+func readEvent(stream *agent.Stream) tea.Cmd {
 	return func() tea.Msg {
-		e, ok := <-ch
-		if !ok {
-			return streamClosedMsg{ch: ch}
+		delivery := stream.Read()
+		if delivery.Closed {
+			return streamClosedMsg{stream: stream, delivery: delivery}
 		}
-		return streamEventMsg{ch: ch, e: e}
+		return streamEventMsg{stream: stream, delivery: delivery}
 	}
 }
 

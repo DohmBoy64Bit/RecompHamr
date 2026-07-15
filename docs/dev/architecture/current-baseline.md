@@ -27,6 +27,6 @@ internal/app
 
 ## Remaining temporary ownership
 
-Stage C slice 2 is in progress. `internal/agent` now owns the production request-packing/tool-schema helpers, pure assistant/tool classification and nudge text contracts, and the mutable turn root containing model-facing history, context lifecycle, cancellation, and stable turn identity. Tool results cross the presentation boundary with `agent.TurnID` rather than a context pointer. `internal/tui` still owns chat-stream reduction, tool dispatch, accounting, phase transitions, and policy latch decisions while delegating history/context mutations to the extracted turn root.
+Stage C slice 2 is in progress. `internal/agent` now owns request packing/tool definitions, pure loop-policy contracts, the mutable turn root, stable turn/round identity, model-round startup, opaque stream reading, event reduction, pending-call collection, phase/retry/connectivity state, live context hints, and turn/session token accounting. The TUI schedules opaque agent stream reads and applies typed display/log effects; it no longer opens model requests, reads raw transport channels, or defines stream accounting transitions. Tool execution, stream-close loop decisions, policy latches, and final diagnostic styling remain transitional TUI ownership.
 
 Backend packages must not import `internal/tui`. `internal/app` is the sole current exception because a composition root must select the concrete frontend. Later slices replace that concrete runtime coupling with typed frontend contracts while preserving the accepted layout and behavior.

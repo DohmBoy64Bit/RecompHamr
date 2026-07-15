@@ -150,3 +150,13 @@ The TUI no longer opens model streams, executes tools, stores turn contexts, pac
 - Security: contexts and cancel functions remain opaque runtime values and are neither logged nor included in presentation messages; `TurnID` carries no secret or user content.
 - Evidence: production submit/end/clear/result paths use `agent.TurnState` and `agent.TurnID`.
 - Known limits: stream channels, pending tool calls, accounting, phase transitions, and loop-policy latch state still reside in `internal/tui`.
+
+#### Checkpoint 2C — model stream and accounting reducer
+
+- Changed: moved model-round startup, opaque stream reading, stable round identity, phase/retry/connectivity transitions, pending-call collection, live context hints, token accounting, interrupted-turn finalization, and transport-event reduction into `internal/agent`; the TUI applies typed content/reasoning/flush/retry/done/error effects.
+- Documented: current architecture and this checkpoint record the exact remaining close/tool/policy adapter debt.
+- Verified: focused agent reducer tests cover every event kind, unknown events, malformed nil tool-call safety, retry clearing, content/reasoning/tool-argument accounting, authoritative and estimated usage, context hints, connection failures, opaque event/close delivery, stream replacement, and session finalization; retained TUI state/render tests pass.
+- Coverage: `internal/agent` passes at 100.0% focused statement coverage; full behavioral rows remain unverified pending tool-loop extraction and exact-build runtime acceptance.
+- Security: typed `StreamEffect` excludes contexts, credentials, and resolved tool arguments; presentation holds only an opaque stream reader and stable identifiers.
+- Evidence: production chat startup and event handling call `StreamState.StartRound`, `Stream.Read`, `StreamState.Apply`, and `StreamState.Finalize`.
+- Known limits: sequential tool execution, stream-close finish policy, policy latches, error diagnostic mapping, and app-composed frontend contracts remain open.
