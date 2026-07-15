@@ -1,0 +1,17 @@
+node_modules/
+.DS_Store
+.env
+**/data/
+**/bin
+**/.codehamr
+**/dist
+**/.claude
+CLAUDE.md
+/codehamr
+
+# Local verification output
+dist/
+
+# Local Go coverage profiles
+coverage.out
+*.coverprofile

@@ -1,0 +1,76 @@
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+
+$Root = Split-Path -Parent $PSScriptRoot
+
+function Fail([string]$Message) {
+    throw "baseline check failed: $Message"
+}
+
+$RemovedDirectories = @(
+    'internal/cloud',
+    'internal/mcp',
+    'internal/skills',
+    'internal/update',
+    'internal/classifier',
+    'internal/doctor',
+    'internal/project'
+)
+
+foreach ($Relative in $RemovedDirectories) {
+    if (Test-Path (Join-Path $Root $Relative)) {
+        Fail "removed subsystem still exists: $Relative"
+    }
+}
+
+$GoMod = Get-Content -Raw (Join-Path $Root 'go.mod')
+$Pinned = @(
+    'github.com/charmbracelet/bubbles v0.20.0',
+    'github.com/charmbracelet/bubbletea v1.2.4',
+    'github.com/charmbracelet/glamour v0.8.0',
+    'github.com/charmbracelet/lipgloss v1.0.0'
+)
+foreach ($Needle in $Pinned) {
+    if (-not $GoMod.Contains($Needle)) {
+        Fail "frozen TUI dependency drifted: $Needle"
+    }
+}
+
+$GoFiles = Get-ChildItem -Path $Root -Recurse -File -Filter '*.go'
+$ForbiddenCodePatterns = @(
+    'internal/cloud',
+    'internal/mcp',
+    'internal/skills',
+    'internal/update',
+    'internal/classifier',
+    'internal/doctor',
+    'internal/project',
+    'codehamr.com',
+    'CODEHAMR_',
+    '.codehamr'
+)
+foreach ($Pattern in $ForbiddenCodePatterns) {
+    $Hit = $GoFiles | Select-String -SimpleMatch -Pattern $Pattern | Select-Object -First 1
+    if ($null -ne $Hit) {
+        Fail "forbidden active code reference '$Pattern' at $($Hit.Path):$($Hit.LineNumber)"
+    }
+}
+
+$ToolSource = Get-Content -Raw (Join-Path $Root 'internal/tools/powershell.go')
+foreach ($Name in @('powershell', 'read_file', 'write_file', 'edit_file')) {
+    if (-not $ToolSource.Contains($Name)) {
+        Fail "baseline tool surface is missing $Name"
+    }
+}
+foreach ($RemovedTool in @('repomixr', 'recomp_reference', 'MCPExec')) {
+    if ($ToolSource.Contains($RemovedTool)) {
+        Fail "removed tool/extension hook is still active: $RemovedTool"
+    }
+}
+
+$TodoHit = $GoFiles | Select-String -Pattern '\bTODO\b|\bFIXME\b' | Select-Object -First 1
+if ($null -ne $TodoHit) {
+    Fail "unfinished marker at $($TodoHit.Path):$($TodoHit.LineNumber)"
+}
+
+Write-Host 'baseline policy: PASS'

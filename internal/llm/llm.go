@@ -1,0 +1,678 @@
+// Package llm is RecompHamr's OpenAI-compatible LLM client. It speaks the OpenAI
+// chat-completions wire format and nothing else: one POST to
+// `$BaseURL/v1/chat/completions`, SSE streamed back, no per-backend branches.
+//
+// One code path serves every backend:
+//   - local Ollama, via the OpenAI-compatible `/v1` shim Ollama itself ships
+//   - any other endpoint already speaking OpenAI's wire format
+//
+// Deliberately unsupported, to keep the client uniform:
+//   - Ollama's native `/api/chat` (NDJSON, different schema, no tool-call IDs)
+//   - LiteLLM's `ollama_chat` translator (non-standard deltas, shared indices)
+//
+// If you're special-casing a provider here, the fix almost always belongs on
+// the server: make it emit standard OpenAI shapes.
+package llm
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"sync/atomic"
+	"time"
+
+	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
+)
+
+type Tool struct {
+	Type     string      `json:"type"`
+	Function FunctionDef `json:"function"`
+}
+
+type FunctionDef struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Parameters  map[string]any `json:"parameters"`
+}
+
+// wireMessage is the outbound OpenAI request shape; responses parse via streamChunk.
+//
+// Content has no omitempty: silent PowerShell commands (e.g. heredoc writes) yield an
+// empty tool-result string, and omitting the field makes Ollama's /v1 shim 400
+// with "invalid message content type: <nil>". Always send an explicit string.
+type wireMessage struct {
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	Name       string     `json:"name,omitempty"`         // tool name
+	ToolCallID string     `json:"tool_call_id,omitempty"` // tool role
+	ToolCalls  []toolCall `json:"tool_calls,omitempty"`
+}
+
+type toolCall struct {
+	// Index keys which call a streaming delta belongs to. Fragments arrive
+	// across chunks; slot lookup MUST key on this, not on slice position.
+	Index    int          `json:"index,omitempty"`
+	ID       string       `json:"id,omitempty"`
+	Type     string       `json:"type,omitempty"` // always "function"
+	Function toolCallFunc `json:"function"`
+}
+
+type toolCallFunc struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"` // OpenAI stringifies args
+}
+
+type chatRequest struct {
+	Model           string         `json:"model"`
+	Messages        []wireMessage  `json:"messages"`
+	Tools           []Tool         `json:"tools,omitempty"`
+	Stream          bool           `json:"stream"`
+	StreamOptions   *streamOptions `json:"stream_options,omitempty"`
+	ReasoningEffort string         `json:"reasoning_effort,omitempty"`
+}
+
+// streamOptions: without include_usage, OpenAI-compatible servers omit the
+// usage block in the SSE tail chunk and the per-turn token counter sits at 0.
+type streamOptions struct {
+	IncludeUsage bool `json:"include_usage"`
+}
+
+// streamChunk is one OpenAI SSE frame. finish_reason is deliberately not
+// decoded: readSSE dispatches accumulated tool calls at stream end, not on
+// finish_reason=="tool_calls", staying provider agnostic since Ollama's /v1 shim
+// sometimes closes with "stop" even after streaming tool_calls.
+type streamChunk struct {
+	Choices []struct {
+		Delta streamDelta `json:"delta"`
+	} `json:"choices"`
+	Usage *struct {
+		CompletionTokens int `json:"completion_tokens"`
+		PromptTokens     int `json:"prompt_tokens"`
+	} `json:"usage,omitempty"`
+	// Error is the mid-stream failure frame OpenAI-compatible backends (and
+	// OpenRouter-style proxies) emit when the provider dies after 200 OK:
+	// `data: {"error":{...}}`, then the connection closes with no [DONE].
+	// Without decoding it, the frame parses to zero choices, the close reads
+	// as clean EOF, and a mid-sentence-truncated turn finalizes as a success.
+	Error *struct {
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
+}
+
+type streamDelta struct {
+	Role    string `json:"role,omitempty"`
+	Content string `json:"content,omitempty"`
+	// Reasoning is the incremental chain-of-thought fragment that reasoning
+	// models stream in `delta.reasoning` before answer
+	// tokens. Forwarded as EventReasoning to keep the UI animating, but never
+	// round-trips into the assistant message: it has no place in history.
+	Reasoning string     `json:"reasoning,omitempty"`
+	ToolCalls []toolCall `json:"tool_calls,omitempty"`
+}
+
+// Event is what the TUI consumes. One event per stream update.
+type Event struct {
+	Kind    EventKind
+	Content string
+	// ContextWindow is the server-authoritative context size from the
+	// X-Context-Window header, set only on EventDone when the server sent it.
+	// The TUI records it in a runtime-only per-profile map (tui.Model's
+	// liveContextSize) that outranks the profile's on-disk ContextSize, so the
+	// next ctx.Pack uses what the server allows without the live value ever
+	// reaching config.yaml. Zero means no live value in this response.
+	ContextWindow int
+	ToolCall      *chmctx.ToolCall
+	Final         *chmctx.Message
+	Tokens        int
+	// PromptTokens is the server-counted prompt size from usage.prompt_tokens,
+	// set only on EventDone when the server reported usage. Debug-log
+	// calibration only (actual vs the char/4 packing estimate); it drives no
+	// behavior. Zero means the server didn't report it.
+	PromptTokens int
+	Elapsed      time.Duration
+	Err          error
+}
+
+type EventKind int
+
+const (
+	EventContent EventKind = iota
+	EventToolCall
+	EventDone
+	EventError
+	// EventReasoning carries incremental reasoning text, kept out of history;
+	// it exists only so the UI can tick its live token estimate while thinking.
+	EventReasoning
+	// EventToolArgs carries an incremental tool-call arguments fragment (in
+	// Content), the bytes a write_file/edit_file/powershell call streams as it's
+	// generated. Like EventReasoning it never touches history (the resolved
+	// call still arrives whole as EventToolCall at stream end) and exists only
+	// so the UI's live token estimate keeps ticking while the model writes a
+	// file, instead of freezing until EventDone.
+	EventToolArgs
+	// EventRetry announces one transparent resend after a transient pre-stream
+	// failure (see retryable): Content carries a short status-bar hint
+	// ("retry 1/3 in 2s"), Err the failure that triggered it. Purely
+	// informational — it never touches history — and exists so the backoff
+	// wait doesn't read as a frozen turn.
+	EventRetry
+)
+
+// streamIdleTimeout bounds how long readSSE waits for the NEXT SSE frame before
+// treating the stream as dead. It is an inter-frame (idle) timeout, not an
+// end-to-end one: a slow-but-alive stream keeps arriving frames (content,
+// reasoning, even blank/keepalive lines), each resetting the watchdog, so only a
+// connection gone silent after 200 OK trips it. The silent window that matters is
+// the pre-first-token gap: a local model emits nothing while it prefills the
+// prompt (or cold-reloads after a keep_alive eviction), and a 27B on modest
+// hardware can stay silent well past two minutes there; a 120s value killed such
+// live streams mid-prefill. A big-context turn (2nd/3rd prompt on a complex
+// codebase) makes prefill scale with packed-history size, and an
+// OpenAI-compatible server typically streams nothing during it, so even 600s
+// can trip on a still-working model. 1h is the default so a user can walk away;
+// erring long is cheap on two counts. A genuinely dead socket is caught far
+// sooner by OS TCP keepalive (Go's default Dialer probes the peer), independent
+// of this timeout, so a long value means "patient with a live-but-slow stream",
+// not "frozen forever on a dead one". And it stays escapable instantly with
+// Ctrl+C (request-context cancel unblocks the read), whereas killing a live
+// stream loses the turn. This idle timeout is NOT the loop/stuck guard: a
+// looping model emits frames and resets the watchdog every time, so it slips
+// straight past; runaway/failure nudges and Ctrl+C own that. RECOMPHAMR_IDLE_TIMEOUT
+// overrides the default (Go duration like "90m", or a bare number = seconds).
+const streamIdleTimeout = time.Hour
+
+// idleTimeoutFromEnv resolves RECOMPHAMR_IDLE_TIMEOUT to a duration, falling back
+// to streamIdleTimeout when unset or unparseable. Accepts a Go duration string
+// ("45m", "1h30m") or a bare number read as seconds. Lives here, not in main's
+// applyEnvOverrides, because it's purely an llm concern and both Client call
+// sites (startup + /models switch) go through New.
+func idleTimeoutFromEnv() time.Duration {
+	v := strings.TrimSpace(os.Getenv("RECOMPHAMR_IDLE_TIMEOUT"))
+	if v == "" {
+		return streamIdleTimeout
+	}
+	if d, err := time.ParseDuration(v); err == nil && d > 0 {
+		return d
+	}
+	if n, err := strconv.Atoi(v); err == nil && n > 0 {
+		// Overflow check: a huge bare-seconds value (e.g. nanoseconds pasted
+		// where seconds were meant) can wrap the multiply to a small positive
+		// duration, silently killing every live-but-slow stream mid-prefill.
+		if d := time.Duration(n) * time.Second; d/time.Second == time.Duration(n) {
+			return d
+		}
+	}
+	return streamIdleTimeout
+}
+
+// defaultRetryBackoff paces the transparent resends after a transient
+// pre-stream failure (see retryable), one wait per retry. Rising steps: short
+// enough that a proxy hiccup heals invisibly, and a *permanently* failing
+// request (e.g. a genuinely wrong model name 404ing forever) still surfaces
+// after ~22s total instead of minutes.
+var defaultRetryBackoff = []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Second}
+
+type Client struct {
+	BaseURL string
+	Model   string
+	Token   string // optional; empty = no Authorization header
+	HTTP    *http.Client
+	// IdleTimeout caps the wait for the next SSE frame (see streamIdleTimeout).
+	// A field, not a bare const, only so tests can shorten it; New sets the
+	// default and nothing else writes it.
+	IdleTimeout time.Duration
+	// RetryBackoff spaces Chat's pre-stream retries on transient failures;
+	// len is the retry count, nil/empty disables. A field, not a bare const,
+	// only so tests can shorten it; New sets the default and nothing else
+	// writes it.
+	RetryBackoff []time.Duration
+	// noReasoningEffort goes true once the server 400s on reasoning for this
+	// model (newer OpenAI models reject tools + reasoning_effort here, pushing
+	// that combo onto /v1/responses; Ollama rejects it on non-thinking models).
+	// Sticky for the Client's lifetime so later turns skip
+	// to the supported shape; a `/models` switch builds a fresh Client and
+	// resets it, correctly, since the new endpoint may have different rules.
+	//
+	// atomic.Bool: Probe and Chat race on the same Client (startup probe still
+	// in flight when the first turn fires) and both read it via postChat; Chat
+	// may also write it. A plain bool would be a data race.
+	noReasoningEffort atomic.Bool
+}
+
+// New builds a Client governed by the caller's context, not http.Client.Timeout.
+// That timeout is end-to-end (it covers body reads) and would kill a slow but
+// legitimate SSE stream mid-flight on slow local backends. tui.Model's turnCtx
+// is the single cancellation source; connect-level safety (DNS/TCP) is already
+// bounded by Go's default Dialer (30s).
+func New(base, model, token string) *Client {
+	return &Client{
+		BaseURL:      strings.TrimRight(base, "/"),
+		Model:        model,
+		Token:        token,
+		HTTP:         &http.Client{},
+		IdleTimeout:  idleTimeoutFromEnv(),
+		RetryBackoff: defaultRetryBackoff,
+	}
+}
+
+// ProbeResult holds the optional live context-window hint returned by an
+// OpenAI-compatible endpoint.
+type ProbeResult struct {
+	ContextWindow int
+}
+
+// Probe sends a minimal chat request to validate URL, model, and credentials,
+// then records an optional X-Context-Window response header. No hosted-service
+// account or quota protocol is built into this client.
+func (c *Client) Probe(parent context.Context) (ProbeResult, error) {
+	resp, err := c.postChat(parent, chatRequest{
+		Model:    c.Model,
+		Messages: []wireMessage{{Role: "user", Content: "hi"}},
+		Stream:   true,
+	})
+	if err != nil {
+		return ProbeResult{}, err
+	}
+	defer resp.Body.Close()
+	return ProbeResult{ContextWindow: provider.ContextWindowFromHeaders(resp.Header)}, nil
+}
+
+// Chat streams an assistant response on the returned channel, closing it when
+// the stream ends. Reasoning runs at `high` effort by default; if the server
+// rejects the tools + reasoning_effort combo (newer OpenAI models do), postChat
+// drops reasoning_effort for this Client's lifetime so the model still works,
+// with tools but no reasoning. Staying on chat-completions is the product line;
+// we do not branch to /v1/responses to keep reasoning.
+func (c *Client) Chat(parent context.Context, messages []chmctx.Message, tools []Tool) <-chan Event {
+	out := make(chan Event, 32)
+	go c.run(parent, messages, tools, out)
+	return out
+}
+
+func (c *Client) run(parent context.Context, msgs []chmctx.Message, tools []Tool, out chan<- Event) {
+	defer close(out)
+	start := time.Now()
+
+	// Pre-stream retry: transient failures (proxy hiccups: 5xx, 429, LiteLLM's
+	// transient 404) are resent after a rising backoff instead of killing the
+	// turn. Only here, before any token has streamed — a mid-stream resend
+	// would duplicate content already in the transcript. Probe stays
+	// retry-free: its job is fast feedback on a misconfigured profile.
+	resp, errEvt := c.sendChat(parent, msgs, tools)
+	for attempt := 0; errEvt != nil && attempt < len(c.RetryBackoff) && retryable(errEvt.Err); attempt++ {
+		delay := c.RetryBackoff[attempt]
+		hint := fmt.Sprintf("retry %d/%d in %s", attempt+1, len(c.RetryBackoff), delay)
+		if !sendEvent(parent, out, Event{Kind: EventRetry, Content: hint, Err: errEvt.Err}) {
+			return
+		}
+		select {
+		case <-time.After(delay):
+		case <-parent.Done():
+			// Ctrl+C during the wait: unwind silently, exactly like a
+			// cancelled sendEvent — the TUI already aborted the turn.
+			return
+		}
+		resp, errEvt = c.sendChat(parent, msgs, tools)
+	}
+	if errEvt != nil {
+		sendEvent(parent, out, *errEvt)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Idle watchdog: bufio.Scanner.Scan() ignores context, so a server that
+	// stops sending after 200 OK would wedge readSSE forever. Closing the body
+	// from the timer unblocks the in-flight Read; readSSE then returns and we
+	// surface a stall. parent isn't cancelled, so (unlike Ctrl+C) the error
+	// reaches the user. readSSE resets the timer on every frame.
+	idle := c.IdleTimeout
+	if idle <= 0 {
+		idle = streamIdleTimeout
+	}
+	var stalled atomic.Bool
+	watchdog := time.AfterFunc(idle, func() {
+		stalled.Store(true)
+		resp.Body.Close()
+	})
+
+	ctxWindow := provider.ContextWindowFromHeaders(resp.Header)
+	final, tokens, promptTokens, err := readSSE(parent, resp.Body, out, func() { watchdog.Reset(idle) })
+	watchdog.Stop()
+	if err != nil {
+		if stalled.Load() {
+			err = fmt.Errorf("the server stopped sending data (no stream activity for %s)", idle)
+		}
+		sendEvent(parent, out, Event{Kind: EventError, Err: err})
+		return
+	}
+	sendEvent(parent, out, Event{
+		Kind:          EventDone,
+		Final:         final,
+		ContextWindow: ctxWindow,
+		Tokens:        tokens,
+		PromptTokens:  promptTokens,
+		Elapsed:       time.Since(start),
+	})
+}
+
+// sendEvent puts e on out, bailing if parent cancels first, so a slow or
+// vanished consumer after Ctrl+C can't wedge the stream goroutine on a full
+// buffer.
+func sendEvent(parent context.Context, out chan<- Event, e Event) bool {
+	select {
+	case out <- e:
+		return true
+	case <-parent.Done():
+		return false
+	}
+}
+
+// sendChat POSTs the request and returns the response on 200. On failure it
+// returns the Event the caller forwards, populated with Kind/Err. The
+// body is closed on every non-200 branch; 200 leaves it open for the caller.
+func (c *Client) sendChat(parent context.Context, msgs []chmctx.Message, tools []Tool) (*http.Response, *Event) {
+	resp, err := c.postChat(parent, chatRequest{
+		Model:           c.Model,
+		Messages:        toWire(msgs),
+		Tools:           tools,
+		Stream:          true,
+		StreamOptions:   &streamOptions{IncludeUsage: true},
+		ReasoningEffort: "high",
+	})
+	if err != nil {
+		return nil, &Event{Kind: EventError, Err: err}
+	}
+	return resp, nil
+}
+
+// postChat dispatches via doPost; on a 400 rejecting reasoning it drops
+// reasoning_effort for this Client's lifetime and retries once. Two wild
+// flavours, both caught by substring match: newer OpenAI models
+// ("reasoning_effort … not supported") and Ollama non-thinking models
+// ("<model> does not support thinking"). Each signal is the provider's own
+// phrase ("not support"+"reasoning_effort", or the literal "does not support
+// thinking") so an unrelated 400 that merely contains the word "thinking"
+// can't trip the fallback and latch reasoning off for the Client's whole life.
+// Probe never sets ReasoningEffort, so its 400 can't trip the flag.
+func (c *Client) postChat(parent context.Context, body chatRequest) (*http.Response, error) {
+	if c.noReasoningEffort.Load() {
+		body.ReasoningEffort = ""
+	}
+	resp, errBody, err := c.doPost(parent, body)
+	if err != nil && body.ReasoningEffort != "" &&
+		((bytes.Contains(errBody, []byte("not support")) &&
+			bytes.Contains(errBody, []byte("reasoning_effort"))) ||
+			bytes.Contains(errBody, []byte("does not support thinking"))) {
+		c.noReasoningEffort.Store(true)
+		body.ReasoningEffort = ""
+		resp, _, err = c.doPost(parent, body)
+	}
+	return resp, err
+}
+
+// doPost performs one generic OpenAI-compatible request. On success the caller
+// owns the response body; on failure the body is drained or read before close.
+func (c *Client) doPost(parent context.Context, body chatRequest) (*http.Response, []byte, error) {
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, nil, err
+	}
+	req, err := http.NewRequestWithContext(parent, http.MethodPost, c.BaseURL+"/v1/chat/completions", bytes.NewReader(buf))
+	if err != nil {
+		return nil, nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	if c.Token != "" {
+		req.Header.Set("Authorization", provider.AuthHeader(c.Token))
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, nil, provider.ErrUnreachable{Err: err}
+	}
+	if resp.StatusCode == http.StatusOK {
+		return resp, nil, nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		return nil, nil, provider.ErrUnauthorized
+	}
+	b, _ := io.ReadAll(resp.Body)
+	return nil, b, &httpStatusError{status: resp.StatusCode, msg: errorMessageFromBody(b)}
+}
+
+// httpStatusError preserves the HTTP status behind the user-facing message so
+// retryable can classify transience; Error() keeps the exact "status: message"
+// string the error banner has always shown.
+type httpStatusError struct {
+	status int
+	msg    string
+}
+
+func (e *httpStatusError) Error() string { return fmt.Sprintf("%d: %s", e.status, e.msg) }
+
+// retryable reports whether a pre-stream failure is worth resending: transport
+// errors and the statuses that signal a transient server state. 404 is
+// semantically permanent, but LiteLLM-style proxies emit it for transient
+// upstream misses (the Agnes-AI freeze in issue #7), and the rising backoff
+// bounds the cost of a truly permanent one. 401 arrives as a typed sentinel
+// the UI handles; 400 and other client errors fail identically on every
+// resend.
+func retryable(err error) bool {
+	var un provider.ErrUnreachable
+	if errors.As(err, &un) {
+		return true
+	}
+	var hs *httpStatusError
+	if errors.As(err, &hs) {
+		return hs.status == 404 || hs.status == 408 || hs.status == 429 || hs.status >= 500
+	}
+	return false
+}
+
+// errorMessageFromBody extracts the user-facing string from a non-2xx body.
+// Prefer a provider_hint when an endpoint supplies one, then the standard
+// error.message field, then the raw first line.
+func errorMessageFromBody(b []byte) string {
+	var env struct {
+		Error struct {
+			Message      string `json:"message"`
+			ProviderHint string `json:"provider_hint"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(b, &env) == nil {
+		if env.Error.ProviderHint != "" {
+			return env.Error.ProviderHint
+		}
+		if env.Error.Message != "" {
+			return env.Error.Message
+		}
+	}
+	return firstLine(string(b))
+}
+
+// readSSE reads OpenAI SSE frames until [DONE] or EOF, forwarding
+// content/reasoning/tool-call events to out. Returns the final assistant
+// message (content + accumulated tool calls), the server completion and prompt
+// token counts, and any scanner error. parent is threaded through so sends
+// abort on cancellation instead of blocking on an undrained buffer.
+func readSSE(parent context.Context, body io.Reader, out chan<- Event, onFrame func()) (*chmctx.Message, int, int, error) {
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 1<<16), 4<<20)
+
+	var (
+		fullContent  strings.Builder
+		slots        = map[int]*toolSlot{}
+		order        []int
+		tokens       int
+		promptTokens int
+	)
+
+	for scanner.Scan() {
+		// Any line (data, blank separator, or ": keepalive" comment) is
+		// liveness; reset the idle watchdog before inspecting it.
+		onFrame()
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 || !bytes.HasPrefix(line, []byte("data:")) {
+			continue
+		}
+		payload := bytes.TrimSpace(line[len("data:"):])
+		if bytes.Equal(payload, []byte("[DONE]")) {
+			break
+		}
+		var sc streamChunk
+		if err := json.Unmarshal(payload, &sc); err != nil {
+			continue
+		}
+		if sc.Error != nil {
+			msg := sc.Error.Message
+			if msg == "" {
+				msg = string(payload)
+			}
+			return nil, 0, 0, fmt.Errorf("the server reported a stream error: %s", msg)
+		}
+		for _, choice := range sc.Choices {
+			if !dispatchDelta(parent, choice.Delta, &fullContent, slots, &order, out) {
+				return nil, 0, 0, parent.Err()
+			}
+		}
+		if sc.Usage != nil {
+			tokens = sc.Usage.CompletionTokens
+			promptTokens = sc.Usage.PromptTokens
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, 0, 0, err
+	}
+
+	// Emit accumulated tool calls once at stream end, independent of
+	// finish_reason: Ollama's /v1 shim sometimes closes with "stop" even
+	// after streaming tool_calls, so dispatching here (not on
+	// finish_reason=="tool_calls") stays provider agnostic. Resolve every slot
+	// once, sharing the parsed payload between the events and the final message.
+	calls := make([]chmctx.ToolCall, 0, len(order))
+	for _, idx := range order {
+		calls = append(calls, slots[idx].resolve())
+	}
+	for i := range calls {
+		if !sendEvent(parent, out, Event{Kind: EventToolCall, ToolCall: &calls[i]}) {
+			return nil, 0, 0, parent.Err()
+		}
+	}
+	return &chmctx.Message{
+		Role:      chmctx.RoleAssistant,
+		Content:   fullContent.String(),
+		ToolCalls: calls,
+	}, tokens, promptTokens, nil
+}
+
+// dispatchDelta forwards reasoning and content as events, then accumulates
+// streamed tool-call fragments into index-keyed slots. Reasoning stays out of
+// fullContent (must not round-trip into the assistant message) but is forwarded
+// so the UI reflects thinking. Fragments key on the provider's `index`, not
+// slice position, since a call's fragments span chunks whose position need not
+// match the index. Returns false when parent cancelled mid-send.
+func dispatchDelta(parent context.Context, d streamDelta, fullContent *strings.Builder, slots map[int]*toolSlot, order *[]int, out chan<- Event) bool {
+	if d.Reasoning != "" {
+		if !sendEvent(parent, out, Event{Kind: EventReasoning, Content: d.Reasoning}) {
+			return false
+		}
+	}
+	if d.Content != "" {
+		fullContent.WriteString(d.Content)
+		if !sendEvent(parent, out, Event{Kind: EventContent, Content: d.Content}) {
+			return false
+		}
+	}
+	for _, tc := range d.ToolCalls {
+		slot, existed := slots[tc.Index]
+		if !existed {
+			slot = &toolSlot{}
+			slots[tc.Index] = slot
+			*order = append(*order, tc.Index)
+		}
+		// id/name usually arrive in the first fragment, but updating on any
+		// non-empty value tolerates a provider that ships them later;
+		// otherwise an empty tool_call_id round-trips into history and the
+		// next /v1 request 400s on the unpaired tool message.
+		if tc.ID != "" {
+			slot.id = tc.ID
+		}
+		if tc.Function.Name != "" {
+			slot.name = tc.Function.Name
+		}
+		slot.args.WriteString(tc.Function.Arguments)
+		// Forward the fragment so the UI's live token estimate ticks while the
+		// model streams file content into a tool call: the resolved call still
+		// arrives whole as EventToolCall at stream end, so this is UI-only.
+		if tc.Function.Arguments != "" {
+			if !sendEvent(parent, out, Event{Kind: EventToolArgs, Content: tc.Function.Arguments}) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// toolSlot accumulates one streamed tool call. OpenAI delivers `arguments` as
+// JSON fragmented across chunks, each fragment invalid alone; we append raw and
+// parse once, in resolve().
+type toolSlot struct {
+	id, name string
+	args     strings.Builder
+}
+
+func (t *toolSlot) resolve() chmctx.ToolCall {
+	parsed := map[string]any{}
+	if t.args.Len() > 0 {
+		if err := json.Unmarshal([]byte(t.args.String()), &parsed); err != nil {
+			// Malformed args surface as a sentinel key, not a silently empty
+			// map, so the log names what broke. Real args never use
+			// _parse_error, so collisions aren't a concern.
+			parsed["_parse_error"] = err.Error()
+		}
+	}
+	return chmctx.ToolCall{ID: t.id, Name: t.name, Arguments: parsed}
+}
+
+func toWire(msgs []chmctx.Message) []wireMessage {
+	out := make([]wireMessage, 0, len(msgs))
+	for _, m := range msgs {
+		om := wireMessage{
+			Role:       string(m.Role),
+			Content:    m.Content,
+			Name:       m.ToolName,
+			ToolCallID: m.ToolCallID,
+		}
+		for _, tc := range m.ToolCalls {
+			args, _ := json.Marshal(tc.Arguments)
+			om.ToolCalls = append(om.ToolCalls, toolCall{
+				ID:   tc.ID,
+				Type: "function",
+				Function: toolCallFunc{
+					Name:      tc.Name,
+					Arguments: string(args),
+				},
+			})
+		}
+		out = append(out, om)
+	}
+	return out
+}
+
+func firstLine(s string) string {
+	if i := strings.IndexAny(s, "\r\n"); i >= 0 {
+		return strings.TrimSpace(s[:i])
+	}
+	return strings.TrimSpace(s)
+}

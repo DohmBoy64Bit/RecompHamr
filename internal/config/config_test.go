@@ -1,0 +1,553 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// TestBootstrapWritesContextHintHeader pins the durable comment header that
+// writeYAML re-prepends on every write. yaml.Marshal drops comments, so this
+// test guards against silently losing the context-window guidance.
+func TestBootstrapWritesContextHintHeader(t *testing.T) {
+	dir := t.TempDir()
+	if _, created, err := Bootstrap(dir); err != nil || !created {
+		t.Fatalf("Bootstrap should create config on first run: created=%v err=%v", created, err)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, DirName, "config.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"recomphamr configuration", "context_size is what recomphamr packs to"} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("config.yaml header missing %q:\n%s", want, raw)
+		}
+	}
+}
+
+func TestBootstrapCreatesLayout(t *testing.T) {
+	dir := t.TempDir()
+	cfg, created, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !created {
+		t.Fatal("should report created=true on first bootstrap")
+	}
+	if _, err := os.Stat(filepath.Join(dir, DirName, "config.yaml")); err != nil {
+		t.Errorf("missing config.yaml: %v", err)
+	}
+	// PROMPT_SYS is embedded, it must never touch disk.
+	if _, err := os.Stat(filepath.Join(dir, DirName, "PROMPT_SYS.md")); err == nil {
+		t.Errorf("embedded PROMPT_SYS.md must not be written to disk")
+	}
+	if cfg.Active != "local" {
+		t.Fatalf("default Active = %q, want local", cfg.Active)
+	}
+	p, ok := cfg.Models["local"]
+	if !ok {
+		t.Fatal("default should include a 'local' profile")
+	}
+	if p.URL != "http://localhost:11434" || p.LLM != "qwen3.6:27b" || p.ContextSize != 32768 {
+		t.Fatalf("default local profile mismatch: %+v", p)
+	}
+}
+
+// TestBootstrapDoesNotRestoreRenamedLocal: renaming `local` (e.g. to `ollama`)
+// must not resurrect a duplicate `local` on next start. Same invariant as the
+// deleted-default-profile case, for the other managed profile.
+func TestBootstrapDoesNotRestoreRenamedLocal(t *testing.T) {
+	dir := t.TempDir()
+	cdir := filepath.Join(dir, DirName)
+	if err := os.MkdirAll(cdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	yaml := []byte(`active: ollama
+models:
+  ollama:
+    llm: local-model
+    url: http://localhost:11434
+    key: ""
+    context_size: 65536
+`)
+	if err := os.WriteFile(filepath.Join(cdir, "config.yaml"), yaml, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := cfg.Models["local"]; ok {
+		t.Fatal("renamed-away `local` must not be restored")
+	}
+	if len(cfg.Models) != 1 || cfg.Active != "ollama" {
+		t.Fatalf("expected single 'ollama' profile active, got Active=%q models=%+v", cfg.Active, cfg.Models)
+	}
+}
+
+// TestBootstrapLoadsMultipleProfiles: a two-profile config round-trips and
+// Bootstrap picks the declared `active`.
+func TestBootstrapLoadsMultipleProfiles(t *testing.T) {
+	dir := t.TempDir()
+	cdir := filepath.Join(dir, DirName)
+	if err := os.MkdirAll(cdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	yaml := []byte(`active: work
+models:
+  home:
+    llm: local-model
+    url: http://llm:11434
+    key: ""
+    context_size: 65536
+  work:
+    llm: cloud-model
+    url: https://api.example/v1
+    key: sk-abc
+    context_size: 200000
+`)
+	if err := os.WriteFile(filepath.Join(cdir, "config.yaml"), yaml, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Active != "work" {
+		t.Fatalf("Active = %q, want work", cfg.Active)
+	}
+	// Bootstrap must not inject local profile on top of the declared profiles.
+	if len(cfg.Models) != 2 {
+		t.Fatalf("expected exactly the two declared profiles, got %d: %+v", len(cfg.Models), cfg.Models)
+	}
+	for _, name := range []string{"home", "work"} {
+		if _, ok := cfg.Models[name]; !ok {
+			t.Fatalf("expected profile %q in loaded config", name)
+		}
+	}
+	p := cfg.ActiveProfile()
+	if p.LLM != "cloud-model" || p.URL != "https://api.example/v1" || p.Key != "sk-abc" {
+		t.Fatalf("active profile wrong: %+v", p)
+	}
+}
+
+// TestConfigFilePermissionsAreOwnerOnly: fresh-bootstrap and post-Save paths must
+// both write config.yaml at 0o600. No key-bearing file should be world-readable.
+func TestConfigFilePermissionsAreOwnerOnly(t *testing.T) {
+	dir := t.TempDir()
+	cfg, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfgPath := filepath.Join(dir, DirName, "config.yaml")
+	st, err := os.Stat(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Mode().Perm(); got != 0o600 {
+		t.Fatalf("fresh config.yaml perms = %v, want 0o600 (key may leak to other local users)", got)
+	}
+
+	// Save() must keep 0o600; set a key on the active profile to exercise
+	// the same key-bearing code path.
+	cfg.Models["local"].Key = "sk-12345678"
+	if err := cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	st2, err := os.Stat(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := st2.Mode().Perm(); got != 0o600 {
+		t.Fatalf("Save() widened config.yaml perms to %v (must stay 0o600)", got)
+	}
+
+	// The .rehamr/ dir mustn't be world-listable either: even with a 0o600
+	// config.yaml, a listable parent leaks the key's existence and invites probing.
+	parentSt, err := os.Stat(filepath.Join(dir, DirName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := parentSt.Mode().Perm(); got&0o077 != 0 {
+		t.Fatalf(".rehamr/ dir perms = %v - must not grant any other-user bits", got)
+	}
+}
+
+// TestBootstrapTightensLooseDirPerms: a .rehamr/ created loose (older
+// release, or by hand at 0o755) must be tightened on the next Bootstrap, the
+// directory counterpart of Save's fresh-temp-inode fix for config.yaml.
+func TestBootstrapTightensLooseDirPerms(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, DirName)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o755); err != nil { // bypass umask
+		t.Fatal(err)
+	}
+	if _, _, err := Bootstrap(root); err != nil {
+		t.Fatal(err)
+	}
+	st, err := os.Stat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Mode().Perm(); got != 0o700 {
+		t.Fatalf("pre-existing loose .rehamr/ = %v after Bootstrap, want 0o700", got)
+	}
+}
+
+// TestSaveIsAtomicAndLeavesNoTemp: writeYAML writes a sibling temp then renames
+// it over config.yaml so a torn write can't brick the next launch. Pin that the
+// rename leaves no leftover .config-*.yaml temp and the result still decodes.
+// A regression here would mean the atomic-write path leaks temps or wrote junk.
+func TestSaveIsAtomicAndLeavesNoTemp(t *testing.T) {
+	dir := t.TempDir()
+	cfg, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cdir := filepath.Join(dir, DirName)
+	// Save a few times, each must rename cleanly with no temp accumulation.
+	for i := range 3 {
+		cfg.Models["local"].URL = fmt.Sprintf("http://llm-%d:11434", i)
+		if err := cfg.Save(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	entries, err := os.ReadDir(cdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".config-") {
+			t.Fatalf("Save left a temp file behind: %s", e.Name())
+		}
+	}
+	// The committed file must still be a valid, re-decodable config.
+	reloaded, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatalf("config.yaml not decodable after atomic Save: %v", err)
+	}
+	if reloaded.Models["local"].URL != "http://llm-2:11434" {
+		t.Fatalf("last Save not durable: URL = %q", reloaded.Models["local"].URL)
+	}
+}
+
+// TestSetActivePersists: SetActive flips Active and writes config.yaml.
+func TestSetActivePersists(t *testing.T) {
+	dir := t.TempDir()
+	cfg, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// add a second profile so SetActive has somewhere to go
+	cfg.Models["other"] = &Profile{LLM: "m", URL: "http://x", ContextSize: 1}
+	if err := cfg.SetActive("other"); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Active != "other" {
+		t.Fatalf("Active = %q, want other", cfg.Active)
+	}
+	reloaded, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.Active != "other" {
+		t.Fatal("Active did not persist")
+	}
+}
+
+// TestSetActiveRejectsUnknown: SetActive returns an error for an unknown name.
+func TestSetActiveRejectsUnknown(t *testing.T) {
+	cfg := &Config{Active: "a", Models: map[string]*Profile{"a": {}}}
+	if err := cfg.SetActive("nope"); err == nil {
+		t.Fatal("expected error for unknown model")
+	}
+}
+
+// TestSetActiveRevertsOnSaveFailure guards in-memory/on-disk drift on Save
+// failure. If SetActive mutates Active before a failed Save, ActiveProfile()
+// reads the wrong endpoint while config.yaml still names the old profile, and
+// restart silently undoes the switch. SetActive must roll back on Save failure
+// so both views stay in lockstep.
+func TestSetActiveRevertsOnSaveFailure(t *testing.T) {
+	cfg := &Config{
+		Active: "a",
+		Models: map[string]*Profile{
+			"a": {LLM: "ma"},
+			"b": {LLM: "mb"},
+		},
+		// Dir intentionally empty so Save() fails with "Dir not set".
+	}
+	err := cfg.SetActive("b")
+	if err == nil {
+		t.Fatal("precondition: Save with empty Dir must fail")
+	}
+	if cfg.Active != "a" {
+		t.Fatalf("Active mutated to %q despite Save failure - in-memory state diverges from on-disk", cfg.Active)
+	}
+}
+
+// TestActiveProfileResolvesByName: the helper returns the right struct.
+func TestActiveProfileResolvesByName(t *testing.T) {
+	cfg := &Config{
+		Active: "b",
+		Models: map[string]*Profile{
+			"a": {LLM: "m-a"},
+			"b": {LLM: "m-b"},
+		},
+	}
+	if cfg.ActiveProfile().LLM != "m-b" {
+		t.Fatalf("ActiveProfile().LLM = %q, want m-b", cfg.ActiveProfile().LLM)
+	}
+}
+
+// TestBootstrapCoercesUnknownActive: an unknown `active:` is coerced to the
+// first profile in sorted order so ActiveProfile never returns nil.
+func TestBootstrapCoercesUnknownActive(t *testing.T) {
+	dir := t.TempDir()
+	cdir := filepath.Join(dir, DirName)
+	if err := os.MkdirAll(cdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	yaml := []byte(`active: ghost
+models:
+  zulu:
+    llm: m
+    url: http://z
+    key: ""
+    context_size: 1
+  alpha:
+    llm: m
+    url: http://a
+    key: ""
+    context_size: 1
+`)
+	if err := os.WriteFile(filepath.Join(cdir, "config.yaml"), yaml, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Active != "alpha" {
+		t.Fatalf("unknown active should coerce to first sorted, got %q", cfg.Active)
+	}
+}
+
+// TestBootstrapRejectsEmptyModels: an empty `models:` block leaves Active
+// nothing to point at; Bootstrap must error readably (how to recover) rather
+// than panic in the Active coercer.
+func TestBootstrapRejectsEmptyModels(t *testing.T) {
+	dir := t.TempDir()
+	cdir := filepath.Join(dir, DirName)
+	if err := os.MkdirAll(cdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	yaml := []byte("active: none\nmodels: {}\n")
+	if err := os.WriteFile(filepath.Join(cdir, "config.yaml"), yaml, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := Bootstrap(dir)
+	if err == nil {
+		t.Fatal("empty models map must be rejected, not silently coerced")
+	}
+	if !strings.Contains(err.Error(), "no profiles configured") {
+		t.Fatalf("error should explain the problem, got: %v", err)
+	}
+}
+
+// TestStrictYAMLRejectsUnknownKey: unknown top-level keys in config.yaml
+// must fail loud, not be silently ignored: surfaces typos immediately.
+func TestStrictYAMLRejectsUnknownKey(t *testing.T) {
+	dir := t.TempDir()
+	cdir := filepath.Join(dir, DirName)
+	if err := os.MkdirAll(cdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	bad := []byte("active: local\nmodels: {local: {llm: m, url: http://x, key: '', context_size: 1}}\nmystery_key: 7\n")
+	if err := os.WriteFile(filepath.Join(cdir, "config.yaml"), bad, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Bootstrap(dir); err == nil {
+		t.Fatal("expected Bootstrap to reject unknown top-level key")
+	}
+}
+
+// TestBootstrapCoercesBogusContextSize: context_size 0 (or missing) is coerced
+// to the default rather than degrading Pack() to "newest message only".
+func TestBootstrapCoercesBogusContextSize(t *testing.T) {
+	dir := t.TempDir()
+	cdir := filepath.Join(dir, DirName)
+	if err := os.MkdirAll(cdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	yaml := []byte(`active: local
+models:
+  local:
+    llm: m
+    url: http://x
+    key: ""
+    context_size: 0
+`)
+	if err := os.WriteFile(filepath.Join(cdir, "config.yaml"), yaml, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ActiveProfile().ContextSize != defaultContextSize {
+		t.Fatalf("context_size=0 should be coerced to %d, got %d",
+			defaultContextSize, cfg.ActiveProfile().ContextSize)
+	}
+}
+
+// TestBootstrapRejectsNilProfile: `models: { local: ~ }` decodes to a nil
+// *Profile the ContextSize coercion loop would deref-panic on. Bootstrap must
+// reject it with a readable error instead.
+func TestBootstrapRejectsNilProfile(t *testing.T) {
+	dir := t.TempDir()
+	cdir := filepath.Join(dir, DirName)
+	if err := os.MkdirAll(cdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	yaml := []byte("active: local\nmodels:\n  local: ~\n")
+	if err := os.WriteFile(filepath.Join(cdir, "config.yaml"), yaml, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := Bootstrap(dir)
+	if err == nil {
+		t.Fatal("nil YAML profile must be rejected (not panic on deref)")
+	}
+	if !strings.Contains(err.Error(), "local") {
+		t.Fatalf("error should name the offending profile, got: %v", err)
+	}
+}
+
+// TestBootstrapRefusesSymlinkedDir: a co-tenant could plant .rehamr → an
+// attacker-controlled dir before first run. Bootstrap must Lstat (not Stat) and
+// refuse any symlink: even with a 0o600 config.yaml, the attacker owns the
+// parent and can swap or read what recomphamr writes. Same defence for a planted
+// config.yaml symlink.
+func TestBootstrapRefusesSymlinkedDir(t *testing.T) {
+	root := t.TempDir()
+	target := t.TempDir()
+	link := filepath.Join(root, DirName)
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlink unsupported: %v", err)
+	}
+	_, _, err := Bootstrap(root)
+	if err == nil {
+		t.Fatal("Bootstrap accepted a symlinked .rehamr - config-injection vector left open")
+	}
+	if !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("error should name the symlink defence: %v", err)
+	}
+	// Target must stay untouched, nothing dropped into the attacker-controlled dir.
+	if _, err := os.Stat(filepath.Join(target, "config.yaml")); err == nil {
+		t.Fatal("Bootstrap wrote into the symlink target despite the rejection")
+	}
+}
+
+func TestBootstrapRefusesSymlinkedConfigYAML(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, DirName)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	// Plant config.yaml as a symlink pointing outside the project.
+	target := filepath.Join(t.TempDir(), "external.yaml")
+	cfgPath := filepath.Join(dir, "config.yaml")
+	if err := os.Symlink(target, cfgPath); err != nil {
+		t.Skipf("symlink unsupported: %v", err)
+	}
+	_, _, err := Bootstrap(root)
+	if err == nil {
+		t.Fatal("Bootstrap accepted a symlinked config.yaml")
+	}
+	// Attacker target must not be clobbered with the seed.
+	if _, err := os.Stat(target); err == nil {
+		t.Fatal("Bootstrap wrote through the config.yaml symlink - seed bytes landed at attacker target")
+	}
+}
+
+func TestBootstrapRefusesNonDirectoryAtRehamrPath(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, DirName), []byte("oops"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := Bootstrap(root)
+	if err == nil || !strings.Contains(err.Error(), "not a directory") {
+		t.Fatalf("Bootstrap should refuse a regular-file at .rehamr, got %v", err)
+	}
+}
+
+// TestURLOverrideDoesNotPersist: a RECOMPHAMR_URL override lives in
+// cfg.URLOverride and ActiveURL reflects it, but Save writes only the stored
+// URL, so re-bootstrapping without the env var restores the original endpoint.
+func TestURLOverrideDoesNotPersist(t *testing.T) {
+	dir := t.TempDir()
+	cfg, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalURL := cfg.ActiveProfile().URL
+	cfg.URLOverride = "http://override:9999"
+	if got := cfg.ActiveURL(); got != "http://override:9999" {
+		t.Fatalf("ActiveURL() ignored override: %q", got)
+	}
+	if got := cfg.ActiveProfile().URL; got != originalURL {
+		t.Fatalf("override leaked into stored profile: %q", got)
+	}
+	if err := cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.ActiveProfile().URL != originalURL {
+		t.Fatalf("Save persisted the override: %q", reloaded.ActiveProfile().URL)
+	}
+	if reloaded.URLOverride != "" {
+		t.Fatalf("URLOverride round-tripped through YAML: %q", reloaded.URLOverride)
+	}
+}
+
+// TestSaveTightensPreexistingLoosePerms: a config.yaml from an older world-readable
+// recomphamr (or a hand-edit) starts at 0o644, and os.WriteFile preserves an existing
+// file's mode, so Save would rewrite the bytes while leaving it world-readable.
+// Save must tighten a pre-existing loose file to 0o600.
+func TestSaveTightensPreexistingLoosePerms(t *testing.T) {
+	dir := t.TempDir()
+	cdir := filepath.Join(dir, DirName)
+	if err := os.MkdirAll(cdir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	cfgPath := filepath.Join(cdir, "config.yaml")
+	// World-readable file an older recomphamr would have written.
+	loose := []byte("active: local\nmodels:\n  local:\n    llm: m\n    url: http://x\n    key: \"\"\n    context_size: 1\n")
+	if err := os.WriteFile(cfgPath, loose, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, err := Bootstrap(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Set a key on the active profile to exercise the key-bearing code path.
+	cfg.Models["local"].Key = "sk-1234567890abcdef"
+	if err := cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	st, err := os.Stat(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Mode().Perm(); got != 0o600 {
+		t.Fatalf("Save() must tighten a pre-existing 0o644 config.yaml to 0o600, got %v - key stays world-readable across an upgrade", got)
+	}
+}

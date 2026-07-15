@@ -1,0 +1,211 @@
+{
+  "required": [
+    "AGENTS.md",
+    "BASELINE.lock",
+    "README.md",
+    "docs/README.md",
+    "docs/documentation-contract.json",
+    "docs/dev/architecture/current-baseline.md",
+    "docs/dev/architecture/target-separation.md",
+    "docs/dev/governance/definition-of-done.md",
+    "docs/dev/governance/evidence-policy.md",
+    "docs/dev/governance/scope-control.md",
+    "docs/dev/memory/decisions.md",
+    "docs/dev/memory/repository-lineage.md",
+    "docs/dev/reference/legacy-feature-holding-pen.md",
+    "docs/dev/reference/source-inputs.md",
+    "docs/dev/reference/strip-manifest.md",
+    "docs/dev/roadmap/integration-order.md",
+    "docs/dev/verification/baseline-status.md",
+    "docs/dev/verification/verification-contract.md",
+    "docs/dev/verification/behavioral-surface-coverage.md",
+    "docs/dev/workflows/baseline-gate.md",
+    "docs/dev/workflows/change-control.md",
+    "docs/user/configuration.md",
+    "docs/user/tools.md",
+    "docs/AGENTS.md",
+    "internal/tui/AGENTS.md",
+    "docs/dev/governance/engineering-workflow-rules.md",
+    "docs/dev/roadmap/legacy-parity-policy.md",
+    "docs/dev/roadmap/agent-skills-standard.md",
+    "docs/dev/workflows/work-packet-template.md"
+  ],
+  "required_content": {
+    "README.md": [
+      "RecompHamr",
+      "85409d167b97bec64ee330d51872d358d3ce2d57",
+      "./cmd/recomphamr",
+      ".rehamr/config.yaml",
+      "powershell",
+      "read_file",
+      "write_file",
+      "edit_file",
+      "no Bubble Tea v2 migration"
+    ],
+    "AGENTS.md": [
+      "Stage A: fresh-source barebones baseline",
+      "Do not upgrade Bubble Tea, Bubbles, Lip Gloss, or Glamour.",
+      "Do not redesign, rearrange, modernize, restyle, or recompose the TUI.",
+      "Legacy parity is behavioral, not structural",
+      "https://agentskills.io/client-implementation/adding-skills-support",
+      "pwsh -NoProfile -File ./scripts/verify.ps1",
+      "100% statement coverage",
+      "100% behavioral surface coverage",
+      "100% meaningful documentation coverage",
+      "No old surface is grandfathered and no new surface is exempt."
+    ],
+    "go.mod": [
+      "module github.com/DohmBoy64Bit/RecompHamr",
+      "github.com/charmbracelet/bubbletea v1.2.4",
+      "github.com/charmbracelet/bubbles v0.20.0",
+      "github.com/charmbracelet/glamour v0.8.0",
+      "github.com/charmbracelet/lipgloss v1.0.0"
+    ],
+    "Makefile": [
+      "verify:",
+      "baselinecheck:",
+      "docscheck:",
+      "coveragecheck:",
+      "archcheck:",
+      "fmtcheck:",
+      "./cmd/recomphamr"
+    ],
+    "docs/dev/reference/strip-manifest.md": [
+      "internal/cloud/",
+      "internal/update/",
+      "bash",
+      "powershell",
+      ".rehamr",
+      "RECOMPHAMR_"
+    ],
+    "docs/dev/roadmap/integration-order.md": [
+      "Stage A",
+      "Stage B",
+      "Stage C",
+      "Separation of concerns",
+      "Agent Skills",
+      "MCP",
+      "Source-code similarity is not a release criterion."
+    ],
+    "docs/dev/verification/baseline-status.md": [
+      "OPEN — NOT YET MANUALLY ACCEPTED",
+      "85409d167b97bec64ee330d51872d358d3ce2d57",
+      "pwsh -NoProfile -File ./scripts/verify.ps1",
+      "100% statement coverage"
+    ],
+    "docs/dev/verification/verification-contract.md": [
+      "documentation contract",
+      "documentation-link checks",
+      "100% statement coverage",
+      "go build ./cmd/recomphamr",
+      "CLI help smoke test",
+      "Behavioral surface coverage contract",
+      "100% behavioral surface coverage",
+      "100% meaningful documentation coverage"
+    ],
+    "docs/dev/workflows/baseline-gate.md": [
+      "pwsh -NoProfile -File ./scripts/verify.ps1",
+      "All automated checks must pass",
+      "100% statement coverage",
+      "Visual acceptance",
+      "100% behavioral surface coverage",
+      "100% meaningful documentation coverage"
+    ],
+    "docs/user/configuration.md": [
+      "active:",
+      "models:",
+      "llm:",
+      "url:",
+      "key:",
+      "context_size:",
+      ".rehamr/config.yaml",
+      "RECOMPHAMR_URL",
+      "RECOMPHAMR_IDLE_TIMEOUT",
+      "/models"
+    ],
+    "docs/user/tools.md": [
+      "powershell",
+      "script",
+      "timeout_seconds",
+      "3600",
+      "pwsh",
+      "Windows PowerShell",
+      "read_file",
+      "write_file",
+      "edit_file"
+    ],
+    "docs/dev/governance/engineering-workflow-rules.md": [
+      "Work packets and stage discipline",
+      "Truthfulness and evidence",
+      "No placeholders or fake completion",
+      "Documentation drift gate",
+      "Legacy feature parity and modernization",
+      "Agent Skills migration",
+      "100% statement coverage",
+      "100% behavioral surface coverage",
+      "100% meaningful documentation coverage",
+      "every exported function, method, type, constant, and variable",
+      "No retained or historical behavior is grandfathered"
+    ],
+    "docs/dev/roadmap/legacy-parity-policy.md": [
+      "capability parity or an explicitly documented better replacement",
+      "equivalent",
+      "improved",
+      "intentionally changed",
+      "Agent Skills standard",
+      "100% behavioral surface coverage",
+      "100% meaningful documentation coverage",
+      "no old surface is grandfathered and no new surface is exempt"
+    ],
+    "docs/dev/roadmap/agent-skills-standard.md": [
+      "https://agentskills.io/client-implementation/adding-skills-support",
+      "https://agentskills.io/skill-creation/quickstart",
+      "https://agentskills.io/skill-creation/best-practices",
+      "https://agentskills.io/skill-creation/optimizing-descriptions",
+      "https://agentskills.io/skill-creation/evaluating-skills",
+      "https://agentskills.io/skill-creation/using-scripts",
+      "https://agentskills.io/specification",
+      "https://developers.openai.com/codex/build-skills",
+      "Progressive disclosure is mandatory",
+      "No mechanical one-to-one conversion",
+      "Per-skill evaluations"
+    ],
+    "docs/dev/workflows/work-packet-template.md": [
+      "Outcome",
+      "In scope",
+      "Out of scope",
+      "Authorities",
+      "Verification",
+      "Documentation impact",
+      "Security impact",
+      "Stop condition",
+      "Behavioral surface inventory",
+      "100% behavioral surface coverage",
+      "100% meaningful documentation coverage"
+    ],
+    "docs/AGENTS.md": [
+      "Treat current source and tests as stronger evidence than historical prose.",
+      "docs/documentation-contract.json",
+      "Agent Skills"
+    ],
+    "internal/tui/AGENTS.md": [
+      "Stage A freeze",
+      "do not upgrade Bubble Tea, Bubbles, Lip Gloss, or Glamour",
+      "Do not add new filesystem, process, networking, persistence, MCP, or skills lifecycle responsibilities to the TUI."
+    ],
+    "docs/dev/governance/definition-of-done.md": [
+      "100% behavioral surface coverage",
+      "100% meaningful documentation coverage"
+    ],
+    "docs/dev/verification/behavioral-surface-coverage.md": [
+      "100% behavioral surface coverage",
+      "No old surface is grandfathered and no new surface is exempt.",
+      "Required inventory fields",
+      "100% meaningful documentation coverage"
+    ],
+    "docs/README.md": [
+      "behavioral-surface-coverage.md",
+      "100% old-and-new behavioral surface coverage"
+    ]
+  }
+}

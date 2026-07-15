@@ -1,0 +1,12 @@
+# recomphamr configuration
+#
+# context_size is what recomphamr packs to. Set it to the context window your
+# active server actually accepts, not merely the model's theoretical maximum.
+
+active: local
+models:
+    local:
+        llm: qwen3.6:27b
+        url: http://localhost:11434
+        key: ""
+        context_size: 32768

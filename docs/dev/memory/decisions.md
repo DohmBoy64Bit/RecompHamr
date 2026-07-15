@@ -1,0 +1,46 @@
+# Decisions
+
+## D-001 — Fresh upstream source is the code base
+
+RecompHamr-Legacy is not the reconstruction base. The stripped template starts from pinned CodeHamr upstream source.
+
+## D-002 — No TUI framework upgrade
+
+Bubble Tea, Bubbles, Lip Gloss, and Glamour remain at the pinned upstream versions. The original Bubble Tea v2 migration phase is removed from the active plan.
+
+## D-003 — No TUI redesign during reconstruction
+
+The inherited screen composition and interaction contract are frozen through baseline acceptance and separation work.
+
+## D-004 — Baseline before separation
+
+Do not refactor orchestration ownership until the stripped application is proven to work. This avoids mixing strip regressions with architectural refactoring.
+
+## D-005 — Separation before RecompHamr feature integration
+
+After baseline acceptance, move runtime orchestration out of the TUI before adding Legacy feature families.
+
+## D-006 — Windows-first command execution
+
+The retained command tool is `powershell`, not `bash`. Generic OpenAI-compatible model support remains provider-neutral.
+
+## D-007 — Verification gates are executable contracts
+
+The canonical verification pipeline keeps the existing baseline, architecture, formatting, build, smoke, and Markdown-link checks and adds two explicit Go verification commands:
+
+- `cmd/docscheck` enforces required durable documentation and mandatory contract terms defined in `docs/documentation-contract.json`;
+- `cmd/coveragecheck` rejects any Go coverage profile below 100% statement coverage.
+
+The documentation contract is stored outside active Go source so it can name removed subsystems without weakening the forbidden-reference scan over executable code.
+
+## D-008 — Codex instructions are layered and routed
+
+Keep the root `AGENTS.md` compact enough to act as the always-on repository contract. Put detailed workflow, documentation, TUI, parity, and skills rules in durable or subtree-specific instructions so Codex loads the closest relevant guidance without bloating every task.
+
+## D-009 — Legacy parity permits evidence-backed modernization
+
+RecompHamr-Legacy defines feature evidence and required compatibility, not internal architecture. A feature may be adapted, rewritten, fixed, simplified, or upgraded when the required capability is preserved or an intentional contract change is explicitly approved, tested, and documented.
+
+## D-010 — Future skills use the Agent Skills standard
+
+Stage G must implement standards-based Agent Skills support rather than restore the Legacy skills system one-to-one. The Agent Skills client-implementation guide is mandatory before client work, and every migrated Legacy skill must be converted and evaluated under the current Agent Skills authority set documented in `docs/dev/roadmap/agent-skills-standard.md`.

@@ -1,0 +1,16 @@
+upstream_repository=https://github.com/codehamr/codehamr
+upstream_commit=85409d167b97bec64ee330d51872d358d3ce2d57
+upstream_uploaded_snapshot_commit=40c7cca098b8d53d97d1b4fe4b343a68f063be1e
+product=recomphamr
+executable=recomphamr
+config_directory=.rehamr
+environment_prefix=RECOMPHAMR_
+bubbletea=1.2.4
+bubbles=0.20.0
+lipgloss=1.0.0
+glamour=0.8.0
+baseline_stage=A
+baseline_accepted=false
+tui_framework_upgrade_allowed=false
+tui_layout_redesign_allowed=false
+legacy_feature_integration_allowed=false
