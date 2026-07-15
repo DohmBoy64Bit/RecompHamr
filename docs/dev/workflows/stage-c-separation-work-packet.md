@@ -250,3 +250,63 @@ The TUI no longer opens model streams, executes tools, stores turn contexts, pac
 - Security: cancellation removes the unresolved side-effect instruction from model-facing history without deleting visible transcript or prompt recall; no prompt, key, raw log, or unrelated data was copied to the report or repository.
 - Evidence: sanitized report and three reviewed screenshots at `E:\ReProject\StageA-Acceptance\StageC-Agent-Slice2`, generated 2026-07-15 with LM Studio `google/gemma-4-12b-qat` and the exact canonical build.
 - Known limits: none within Slice 2. Later Stage C slices still own configuration/client/persistence extraction.
+
+## Slice 3 — session, configuration, and persistence ownership
+
+### Outcome
+
+An application-composed runtime outside `internal/tui` owns configuration reload and profile activation, concrete model-client construction/replacement, backend reachability/probing, and prompt-history filesystem persistence. The TUI consumes immutable non-secret snapshots, emits typed intents, and preserves the accepted `/models`, `/clear`, startup, footer, popover, history, and error behavior exactly.
+
+### In scope
+
+- A neutral `internal/session` runtime composed by `internal/app`, avoiding an `app`/presentation import cycle.
+- Immutable active-profile/model-list snapshots that exclude resolved keys.
+- Existing config bootstrap reload semantics, process-only URL override preservation, atomic active-profile persistence, and concrete client replacement when the resolved URL/model/key triple changes.
+- Startup reachability/probe behavior, keyed-profile activation probes, context-window results, stale-result identity, and accepted diagnostic strings.
+- Existing `.rehamr/history` load, append, trim, malformed/oversized-entry recovery, security tightening, concurrency, clear, and failure behavior.
+- Focused equivalence tests, architecture enforcement, synchronized documentation, canonical verification, and exact-build Windows Terminal profile/persistence acceptance.
+
+### Out of scope
+
+Configuration schema/default changes, new profile commands, provider or transport changes, agent-loop changes, Legacy capabilities, MCP, skills, TUI redesign, Charm upgrades, and changes to user-owned config/history contents outside disposable tests.
+
+### Evidence before editing
+
+- `internal/tui.Model` stores `*config.Config` and `*llm.Client`; rendering, popovers, request startup, and diagnostics read those concrete values.
+- `internal/tui/slash.go` re-runs `config.Bootstrap`, preserves `URLOverride`, persists `/models <name>`, compares resolved endpoint/model/key triples, and constructs replacement clients.
+- `internal/tui/model.go` and `probe.go` execute `provider.Reachable` and `llm.Client.Probe` through Bubble Tea commands and apply profile-tagged results.
+- `internal/tui/history_store.go` directly opens, scans, locks, trims, secures, rewrites, and removes `.rehamr/history`; `/clear` and submit call it directly.
+- Retained interaction, state-machine, history-store, configuration, rendering, and acceptance tests encode the required observable contracts.
+
+### Implementation approach
+
+Move one owner at a time behind an app-composed runtime. First relocate the history implementation without changing its format or failure policy. Then move config/profile/client state as one atomic service so a persisted selection and the client used by the agent cannot diverge. Finally move reachability/probe execution and replace presentation reads with immutable non-secret snapshots. Temporary adapters are allowed only between passing checkpoints and must be deleted before closure.
+
+### Verification
+
+- Focused `internal/session`, `internal/app`, `internal/config`, `internal/agent`, and TUI adapter tests at 100% statements.
+- Architecture checks forbidding production TUI imports of `internal/config`, `internal/llm`, and `internal/provider`, direct config/history filesystem calls, and concrete client construction.
+- Canonical `pwsh -NoProfile -File ./scripts/verify.ps1` at exactly 100% statements.
+- Exact-build Windows Terminal evidence for startup profile, `/models` listing/switch, keyed or keyless activation result as applicable, persisted selection after restart, history recall/clear, real model response, screenshots, clean exit, and restored shell.
+
+### Documentation impact
+
+Update current architecture, decisions if the new ownership boundary is durable, active Stage C inventory, harness/scenario documentation, package/exported-symbol Go documentation, user configuration/history contracts if behavior requires clarification, and this completion record in the same checkpoints as implementation.
+
+### Security impact
+
+Resolved credentials must remain inside the session/client boundary and never enter snapshots, messages, reports, or screenshots. Preserve Windows current-user-only DACLs, POSIX owner-only modes, symlink/reparse refusal, atomic config persistence, private history permissions, process-only URL overrides, and sanitized runtime evidence.
+
+### Stop condition
+
+Production `internal/tui` no longer imports config, LLM, or provider packages; does not bootstrap, save, reload, or resolve configuration; does not construct or replace clients; does not execute backend probes; and performs no history filesystem I/O. All retained Slice 3 rows are verified with exact tests, documentation, canonical coverage, and required runtime evidence.
+
+### Completion evidence
+
+- Changed: open.
+- Documented: pre-edit contract recorded here and in the active inventory.
+- Verified: open.
+- Coverage: open.
+- Security: open.
+- Evidence: current source/tests inventoried; implementation and runtime evidence remain open.
+- Known limits: no implementation checkpoint has started.
