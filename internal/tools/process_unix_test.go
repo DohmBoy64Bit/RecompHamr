@@ -3,12 +3,13 @@
 package tools
 
 import (
+	"context"
 	"os/exec"
 	"testing"
 )
 
 func TestConfigureProcessTreeCancellation(t *testing.T) {
-	cmd := exec.Command("pwsh", "-NoProfile", "-Command", "Start-Sleep -Seconds 30")
+	cmd := exec.CommandContext(context.Background(), "pwsh", "-NoProfile", "-Command", "Start-Sleep -Seconds 30")
 	configureProcessTree(cmd)
 	if cmd.SysProcAttr == nil || !cmd.SysProcAttr.Setpgid || cmd.Cancel == nil {
 		t.Fatal("process-group cancellation was not configured")
