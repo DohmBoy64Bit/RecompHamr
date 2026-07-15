@@ -175,7 +175,7 @@ type Model struct {
 
 }
 
-func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model {
+func New(cfg *config.Config, cli *llm.Client, runtime agent.Runtime, projectDir, version string) Model {
 	ta := newPromptInput()
 
 	// Fixed dark style: WithAutoStyle queries the terminal (OSC 11) before
@@ -201,9 +201,10 @@ func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model 
 		scroll:    new(strings.Builder),
 		reasoning: new(strings.Builder),
 		histIdx:   -1,
-		turn:      agent.NewTurnState(nil),
-		runtime:   agent.NewStreamState(),
-		executor:  agent.LocalToolExecutor(),
+		turn:      runtime.Turn,
+		runtime:   runtime.Stream,
+		loop:      runtime.Loop,
+		executor:  runtime.Executor,
 	}
 	// Record the active backend once, before any turn, so a shared log
 	// names exactly which model/endpoint/context window produced the behaviour.
@@ -663,9 +664,6 @@ func (m *Model) applyDoneEffect(e llm.Event, effect agent.StreamEffect) {
 // drop the pending queue, reset turn state.
 func (m *Model) applyError(e llm.Event) tea.Cmd {
 	dbgWritef("error", "%v", e.Err)
-	if isUnreachable(e.Err) {
-		m.runtime.Connected = false
-	}
 	m.abortTurn(styleError.Render(m.errorMessage(e)))
 	return nil
 }

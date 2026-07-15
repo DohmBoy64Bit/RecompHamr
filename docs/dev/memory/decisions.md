@@ -48,3 +48,7 @@ Stage G must implement standards-based Agent Skills support rather than restore 
 ## D-011 — Stage C is ownership movement, not a rewrite
 
 Separation preserves every accepted Stage A behavior. Move existing responsibilities behind narrow typed boundaries in small slices; do not redesign the TUI, replace the agent policy, alter persistence, or opportunistically modernize behavior. Slice 1 makes `internal/app` the composition root while keeping the existing TUI model intact.
+
+## D-012 — Application composition constructs the agent runtime
+
+`internal/app` constructs the agent runtime and injects its model and tool dependencies before selecting the concrete frontend. The runtime aggregate is a transitional mechanical boundary: it preserves the Bubble Tea value-model behavior while later checkpoints encapsulate mutable orchestration state and narrow presentation access to typed events and immutable facts.

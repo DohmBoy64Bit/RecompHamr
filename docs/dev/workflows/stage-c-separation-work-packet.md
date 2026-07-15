@@ -170,3 +170,13 @@ The TUI no longer opens model streams, executes tools, stores turn contexts, pac
 - Security: presentation receives bounded inline status and tool result messages but no executable call arguments or process handle; cancellation retains the existing tool cleanup implementation.
 - Evidence: production dispatch/result/close paths call `LoopState.NextTool`, `ToolWork.Run`, `LoopState.ApplyToolResult`, and `LoopState.DecideClose`.
 - Known limits: app-composed typed frontend ownership, provider diagnostic mapping, agent logging, architecture enforcement, and new real-model tool-loop runtime evidence remain open.
+
+#### Checkpoint 2E — application-composed runtime and diagnostics
+
+- Changed: added a typed `agent.Runtime` aggregate; `internal/app` now constructs it with the selected model client and local-tool executor before frontend construction, and provider-specific stream/probe error classification moved from TUI helpers into `internal/agent`.
+- Documented: the current architecture and decision D-012 identify this as a transitional composition checkpoint, not the final encapsulated frontend boundary.
+- Verified: focused `internal/agent`, `internal/app`, and `internal/tui` tests prove dependency preservation, idle runtime initialization, unchanged frontend construction, and every retained diagnostic branch.
+- Coverage: focused packages pass; the canonical repository gate and runtime evidence are required before this checkpoint is committed and before behavioral rows can be verified.
+- Security: the runtime constructor receives the already-resolved client and executor without exposing credentials or tool arguments in a new presentation fact; diagnostic strings retain only the previously accepted profile name, endpoint, and error detail.
+- Evidence: production application composition calls `agent.NewRuntime` exactly once and passes the result to `tui.New`; TUI diagnostic adapters call `agent.StreamErrorMessage` and `agent.ProbeErrorMessage`.
+- Known limits: the Bubble Tea value adapter still unpacks mutable runtime components, orchestration logging is still emitted by TUI code, typed delivery state remains wider than the final snapshot/event contract, and exact-build tool-loop runtime evidence remains open.

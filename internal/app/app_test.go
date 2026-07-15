@@ -11,6 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 )
@@ -21,12 +22,12 @@ func (w failingWriter) Write([]byte) (int, error) { return 0, w.err }
 
 func restoreAppHooks(t *testing.T) {
 	origCwd, origBootstrap, origAbs, origEnv := getWorkingDirectory, bootstrapConfig, absolutePath, getEnvironment
-	origClient, origFrontend := newClient, newFrontend
+	origClient, origRuntime, origFrontend := newClient, newAgentRuntime, newFrontend
 	origOpen, origClose, origHelp := openDebugLog, closeDebugLog, printFrontendHelp
 	origRun, origNew := runTeaProgram, newTeaProgram
 	t.Cleanup(func() {
 		getWorkingDirectory, bootstrapConfig, absolutePath, getEnvironment = origCwd, origBootstrap, origAbs, origEnv
-		newClient, newFrontend = origClient, origFrontend
+		newClient, newAgentRuntime, newFrontend = origClient, origRuntime, origFrontend
 		openDebugLog, closeDebugLog, printFrontendHelp = origOpen, origClose, origHelp
 		runTeaProgram, newTeaProgram = origRun, origNew
 	})
@@ -66,9 +67,9 @@ func TestRunCompositionAndLogging(t *testing.T) {
 		return llm.New(baseURL, model, key)
 	}
 	frontendCreated := false
-	newFrontend = func(gotCfg *config.Config, client *llm.Client, projectDir, version string) tea.Model {
+	newFrontend = func(gotCfg *config.Config, client *llm.Client, runtime agent.Runtime, projectDir, version string) tea.Model {
 		frontendCreated = true
-		if gotCfg != cfg || client == nil || projectDir != root || version != "test" {
+		if gotCfg != cfg || client == nil || runtime.Client != client || projectDir != root || version != "test" {
 			t.Fatalf("frontend args = %p %v %q %q", gotCfg, client, projectDir, version)
 		}
 		return inertModel{}
@@ -125,7 +126,7 @@ func TestRunFailuresAndNoLogging(t *testing.T) {
 			cfg := config.Default()
 			cfg.Dir = root
 			bootstrapConfig = func(string) (*config.Config, bool, error) { return cfg, false, nil }
-			newFrontend = func(*config.Config, *llm.Client, string, string) tea.Model { return inertModel{} }
+			newFrontend = func(*config.Config, *llm.Client, agent.Runtime, string, string) tea.Model { return inertModel{} }
 			tc.configure()
 			writer := io.Writer(io.Discard)
 			if tc.name == "output" {
@@ -169,7 +170,8 @@ func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
 
 func TestTeaProgramBoundary(t *testing.T) {
 	restoreAppHooks(t)
-	if model := newFrontend(config.Default(), llm.New("http://localhost", "model", ""), t.TempDir(), "test"); model == nil {
+	client := llm.New("http://localhost", "model", "")
+	if model := newFrontend(config.Default(), client, newAgentRuntime(client), t.TempDir(), "test"); model == nil {
 		t.Fatal("default frontend factory returned nil")
 	}
 	if createTeaProgram(inertModel{}) == nil {

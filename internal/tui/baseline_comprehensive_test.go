@@ -24,7 +24,8 @@ func baselineModel(t *testing.T) Model {
 	if err := os.Mkdir(cfg.Dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	return New(cfg, llm.New(cfg.ActiveURL(), cfg.ActiveProfile().LLM, ""), t.TempDir(), "test")
+	client := llm.New(cfg.ActiveURL(), cfg.ActiveProfile().LLM, "")
+	return New(cfg, client, agent.NewRuntime(client, agent.LocalToolExecutor()), t.TempDir(), "test")
 }
 
 func TestCommandBoundariesAndErrorHints(t *testing.T) {
@@ -52,7 +53,7 @@ func TestCommandBoundariesAndErrorHints(t *testing.T) {
 		t.Fatalf("auth = %q", got)
 	}
 	un := provider.ErrUnreachable{Err: errors.New("offline")}
-	if !isUnreachable(un) || !strings.Contains(m.errorMessage(llm.Event{Err: un}), "unreachable") {
+	if !agent.IsUnreachable(un) || !strings.Contains(m.errorMessage(llm.Event{Err: un}), "unreachable") {
 		t.Fatal("unreachable mapping failed")
 	}
 	if got := m.errorMessage(llm.Event{Err: errors.New("bad")}); !strings.Contains(got, "bad") {

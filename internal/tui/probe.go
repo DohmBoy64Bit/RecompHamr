@@ -2,14 +2,13 @@ package tui
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
 )
 
 // probeTimeout caps the activation hello-world request: long enough for a cold
@@ -95,12 +94,5 @@ func (m Model) handleProbe(msg probeMsg) (tea.Model, tea.Cmd) {
 // probeErrorMessage maps provider errors to human hints for the
 // activation line. Falls back to the raw error string for anything else.
 func probeErrorMessage(err error) string {
-	switch {
-	case errors.Is(err, provider.ErrUnauthorized):
-		return "key rejected"
-	}
-	if un, ok := errors.AsType[provider.ErrUnreachable](err); ok {
-		return "unreachable (" + un.Err.Error() + ")"
-	}
-	return err.Error()
+	return agent.ProbeErrorMessage(err)
 }

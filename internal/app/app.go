@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/tui"
@@ -21,8 +22,11 @@ var (
 	absolutePath        = filepath.Abs
 	getEnvironment      = os.Getenv
 	newClient           = llm.New
-	newFrontend         = func(cfg *config.Config, client *llm.Client, projectDir, version string) tea.Model {
-		return tui.New(cfg, client, projectDir, version)
+	newAgentRuntime     = func(client *llm.Client) agent.Runtime {
+		return agent.NewRuntime(client, agent.LocalToolExecutor())
+	}
+	newFrontend = func(cfg *config.Config, client *llm.Client, runtime agent.Runtime, projectDir, version string) tea.Model {
+		return tui.New(cfg, client, runtime, projectDir, version)
 	}
 	openDebugLog      = tui.OpenDebugLog
 	closeDebugLog     = tui.CloseDebugLog
@@ -55,11 +59,12 @@ func Run(stdout io.Writer, version string) error {
 
 	profile := cfg.ActiveProfile()
 	client := newClient(cfg.ActiveURL(), profile.LLM, profile.ResolvedKey())
+	runtime := newAgentRuntime(client)
 	projectDir, err := absolutePath(cwd)
 	if err != nil {
 		projectDir = cwd
 	}
-	frontend := newFrontend(cfg, client, projectDir, version)
+	frontend := newFrontend(cfg, client, runtime, projectDir, version)
 
 	// Preserve the accepted inline behavior: no alternate screen, and terminal
 	// scrollback is still owned by Bubble Tea through tea.Println.

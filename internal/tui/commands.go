@@ -1,13 +1,10 @@
 package tui
 
 import (
-	"errors"
-
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
 )
 
 // streamEventMsg and streamClosedMsg tag their originating channel so the model
@@ -61,20 +58,5 @@ func runToolCall(work *agent.ToolWork) tea.Cmd {
 // errorMessage maps a stream error into a one-line TUI hint, same format across
 // all profiles.
 func (m Model) errorMessage(e llm.Event) string {
-	if e.Err == nil {
-		return ""
-	}
-	switch {
-	case errors.Is(e.Err, provider.ErrUnauthorized):
-		return "⚠ key rejected · check models." + m.cfg.Active + ".key in .rehamr/config.yaml"
-	case isUnreachable(e.Err):
-		return "⚠ unreachable: " + m.cfg.ActiveURL() + " · /models to switch profile"
-	default:
-		return "⚠ " + e.Err.Error()
-	}
-}
-
-func isUnreachable(err error) bool {
-	_, ok := errors.AsType[provider.ErrUnreachable](err)
-	return ok
+	return agent.StreamErrorMessage(e.Err, m.cfg.Active, m.cfg.ActiveURL())
 }
