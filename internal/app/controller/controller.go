@@ -1,4 +1,5 @@
-package app
+// Package controller owns the application/frontend orchestration boundary.
+package controller
 
 import (
 	"context"
@@ -48,6 +49,10 @@ func (c *Controller) Snapshot() frontend.Snapshot {
 			ContextSize: profile.ContextSize, Active: profile.Active, Keyed: profile.Keyed,
 		})
 	}
+	contextSize := sessionSnapshot.ContextSize
+	if live, ok := c.agent.LiveContextSize(sessionSnapshot.Active); ok {
+		contextSize = live
+	}
 	return frontend.Snapshot{
 		Phase:             frontend.Phase(agentSnapshot.Phase),
 		Connected:         agentSnapshot.Connected,
@@ -57,7 +62,7 @@ func (c *Controller) Snapshot() frontend.Snapshot {
 		Active:            sessionSnapshot.Active,
 		ActiveURL:         sessionSnapshot.ActiveURL,
 		ActiveModel:       sessionSnapshot.ActiveModel,
-		ContextSize:       sessionSnapshot.ContextSize,
+		ContextSize:       contextSize,
 		ActiveKeyed:       sessionSnapshot.ActiveKeyed,
 		Profiles:          profiles,
 	}

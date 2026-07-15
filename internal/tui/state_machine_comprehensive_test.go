@@ -3,8 +3,6 @@ package tui
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +13,7 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
@@ -28,12 +27,16 @@ func (m Model) handleStream(event llm.Event) (tea.Model, tea.Cmd) {
 	if !m.runtime.Phase.Active() {
 		return m, readEvent(m.runtime.Stream)
 	}
-	effect := m.agentRuntime.ApplyEvent(m.sessionRuntime.Snapshot().Active, m.activeContextSize(), event)
+	effect := m.agentRuntime.ApplyEvent(m.controller.Snapshot().Active, m.activeContextSize(), event)
 	return m.applyStreamEffect(effect)
 }
 
+type frontendWorkFunc func() frontend.Completion
+
+func (f frontendWorkFunc) Run() frontend.Completion { return f() }
+
 func (m *Model) applyDone(event llm.Event) {
-	effect := m.agentRuntime.ApplyEvent(m.sessionRuntime.Snapshot().Active, m.activeContextSize(), event)
+	effect := m.agentRuntime.ApplyEvent(m.controller.Snapshot().Active, m.activeContextSize(), event)
 	m.applyDoneEffect(effect)
 }
 
@@ -54,11 +57,11 @@ func TestPhaseOutcomeContextAndInitContracts(t *testing.T) {
 	keyedCfg.Dir = t.TempDir()
 	keyedCfg.ActiveProfile().Key = "secret"
 	keyedRuntime := session.NewRuntime(keyedCfg)
-	keyed := New(keyedRuntime, agent.NewRuntime(keyedRuntime, agent.LocalToolExecutor()), "test system", "test")
+	keyed := newModelWithRuntime(keyedRuntime, agent.NewRuntime(keyedRuntime, agent.LocalToolExecutor()), "test system", "test")
 	if keyed.Init() == nil {
 		t.Fatal("keyed init command missing")
 	}
-	active := m.sessionRuntime.Snapshot().Active
+	active := m.controller.Snapshot().Active
 	m.runtime.LiveContextSize[active] = 1234
 	if m.activeContextSize() != 1234 {
 		t.Fatal("live context")
@@ -68,7 +71,7 @@ func TestPhaseOutcomeContextAndInitContracts(t *testing.T) {
 	fallbackCfg.Dir = t.TempDir()
 	fallbackCfg.ActiveProfile().ContextSize = 0
 	fallbackRuntime := session.NewRuntime(fallbackCfg)
-	fallback := New(fallbackRuntime, agent.NewRuntime(fallbackRuntime, agent.LocalToolExecutor()), "test system", "test")
+	fallback := newModelWithRuntime(fallbackRuntime, agent.NewRuntime(fallbackRuntime, agent.LocalToolExecutor()), "test system", "test")
 	if fallback.activeContextSize() != defaultPackFallback {
 		t.Fatal("fallback context")
 	}
@@ -121,7 +124,7 @@ func TestStreamEventStateMachine(t *testing.T) {
 	final := chmctx.Message{Role: chmctx.RoleAssistant, Content: "done", ToolCalls: []chmctx.ToolCall{call}}
 	next, _ = m.handleStream(llm.Event{Kind: llm.EventDone, Final: &final, Tokens: 9, PromptTokens: 4000, ContextWindow: 4096})
 	m = next.(Model)
-	if m.runtime.TurnTokens != 9 || m.runtime.LiveContextSize[m.sessionRuntime.Snapshot().Active] != 4096 || len(m.turn.History) == 0 {
+	if m.runtime.TurnTokens != 9 || m.runtime.LiveContextSize[m.controller.Snapshot().Active] != 4096 || len(m.turn.History) == 0 {
 		t.Fatal("done accounting")
 	}
 	next, cmd := m.handleStreamClosed()
@@ -178,19 +181,9 @@ func TestUpdateTypedMessagesAndClosedOutcomes(t *testing.T) {
 	if _, cmd := m.update(streamClosedMsg{stream: stale, delivery: stale.Read()}); cmd != nil {
 		t.Fatal("stale close acted")
 	}
-	next, _ := m.update(pingMsg{ok: false, baseURL: "http://stale"})
-	m = next.(Model)
-	if !m.runtime.Connected {
-		t.Fatal("stale ping")
-	}
-	next, _ = m.update(pingMsg{ok: false, baseURL: m.sessionRuntime.Snapshot().ActiveURL})
-	m = next.(Model)
-	if m.runtime.Connected {
-		t.Fatal("live ping")
-	}
 	m.quitArmedAt = time.Now().Add(-time.Second)
 	m.status = quitArmText
-	next, _ = m.update(quitArmResetMsg{})
+	next, _ := m.update(quitArmResetMsg{})
 	m = next.(Model)
 	if m.status != "" {
 		t.Fatal("quit reset")
@@ -228,44 +221,20 @@ func TestUpdateTypedMessagesAndClosedOutcomes(t *testing.T) {
 
 func TestProbeSuccessFailureAndBackendCommands(t *testing.T) {
 	m := baselineModel(t)
-	active := m.sessionRuntime.Snapshot().Active
-	next, _ := m.handleProbe(probeMsg{profile: active, err: provider.ErrUnauthorized})
+	active := m.controller.Snapshot().Active
+	next, _ := m.applyFrontendTransition(frontend.Transition{Snapshot: m.controller.Snapshot(), Events: []frontend.Event{{Kind: frontend.EventProbe, Profile: active, Text: "key rejected"}}})
 	m = next.(Model)
-	if m.runtime.Connected {
-		t.Fatal("failed probe connected")
-	}
-	next, _ = m.handleProbe(probeMsg{profile: active, silent: true, err: errors.New("quiet")})
+	next, _ = m.applyFrontendTransition(frontend.Transition{Snapshot: m.controller.Snapshot(), Events: []frontend.Event{{Kind: frontend.EventProbe, Profile: "vanished", OK: true, ContextWindow: 10}}})
 	m = next.(Model)
-	next, _ = m.handleProbe(probeMsg{profile: "vanished", contextWindow: 10})
+	next, _ = m.applyFrontendTransition(frontend.Transition{Snapshot: m.controller.Snapshot(), Events: []frontend.Event{{Kind: frontend.EventProbe, Profile: active, OK: true, ContextWindow: 8192}}})
 	m = next.(Model)
-	next, _ = m.handleProbe(probeMsg{profile: active, contextWindow: 8192})
-	m = next.(Model)
-	if !m.runtime.Connected || m.runtime.LiveContextSize[active] != 8192 {
-		t.Fatal("probe success")
+	if !strings.Contains(m.scroll.String(), "ctx: 8,192") {
+		t.Fatal("probe presentation")
 	}
 	if probeErrorMessage(provider.ErrUnauthorized) != "key rejected" || !strings.Contains(probeErrorMessage(provider.ErrUnreachable{Err: errors.New("down")}), "unreachable") || probeErrorMessage(errors.New("raw")) != "raw" {
 		t.Fatal("probe hints")
 	}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/v1/models") {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"completion_tokens":1}}`))
-	}))
-	defer srv.Close()
-	cfg := config.Default()
-	cfg.Dir = t.TempDir()
-	cfg.ActiveProfile().URL = srv.URL
-	sessionRuntime := session.NewRuntime(cfg)
-	if got := pingBackend(sessionRuntime.Reachability())().(pingMsg); !got.ok {
-		t.Fatal("ping failed")
-	}
-	if got := probeBackend(sessionRuntime.Probe("p"), false)().(probeMsg); got.err != nil {
-		t.Fatalf("probe command = %v", got.err)
-	}
 }
 
 func TestRemainingStateBranches(t *testing.T) {
@@ -276,7 +245,21 @@ func TestRemainingStateBranches(t *testing.T) {
 	if len(m.promptHistory) != 0 {
 		t.Fatal("unexpected history")
 	}
-	next, _ := m.update(probeMsg{profile: m.sessionRuntime.Snapshot().Active, silent: true})
+	if runFrontendWork(nil) != nil {
+		t.Fatal("nil frontend work")
+	}
+	completionCmd := runFrontendWork(frontendWorkFunc(func() frontend.Completion { return "foreign" }))
+	next, _ := m.update(completionCmd())
+	m = next.(Model)
+	next, _ = m.applyFrontendTransition(frontend.Transition{Snapshot: m.controller.Snapshot(), Events: []frontend.Event{
+		{Kind: frontend.EventWarning, Text: "warning"},
+		{Kind: frontend.EventProfileActivated, Profile: "p", Model: "m", URL: "u"},
+	}})
+	m = next.(Model)
+	if !strings.Contains(m.scroll.String(), "warning") || !strings.Contains(m.scroll.String(), "active: p") {
+		t.Fatal("frontend events")
+	}
+	next, _ = m.applyFrontendTransition(frontend.Transition{Snapshot: m.controller.Snapshot()})
 	m = next.(Model)
 	m.runtime.Pending = []chmctx.ToolCall{{Name: tools.ReadFileName}, {Name: tools.ReadFileName}}
 	m.turn.Begin(context.Background(), time.Now())

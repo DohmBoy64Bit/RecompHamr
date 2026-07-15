@@ -26,7 +26,7 @@ func baselineModel(t *testing.T) Model {
 		t.Fatal(err)
 	}
 	sessionRuntime := session.NewRuntime(cfg)
-	return New(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), "test system", "test")
+	return newModelWithRuntime(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), "test system", "test")
 }
 
 func TestCommandBoundariesAndErrorHints(t *testing.T) {

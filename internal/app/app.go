@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
+	appcontroller "github.com/DohmBoy64Bit/RecompHamr/internal/app/controller"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
@@ -27,7 +28,7 @@ var (
 		return agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver())
 	}
 	newFrontend = func(sessionRuntime *session.Runtime, runtime agent.Runtime, system, version string) tea.Model {
-		return tui.New(sessionRuntime, runtime, system, version)
+		return tui.New(appcontroller.NewController(sessionRuntime, runtime, system, version), runtime, system, version)
 	}
 	openDebugLog      = logging.Open
 	closeDebugLog     = logging.Close

@@ -281,7 +281,7 @@ func (m Model) View() string {
 // splashLines builds the identity block for tea.Println. Below wordmarkWidth
 // the ASCII art soft-wraps into garbage, so collapse to plain text.
 func (m Model) splashLines() []string {
-	facts := m.sessionRuntime.Snapshot()
+	facts := m.controller.Snapshot()
 	const wordmarkWidth = 70 // same wide-banner threshold as the pinned upstream TUI
 	if m.width >= wordmarkWidth {
 		lines := []string{""}
@@ -313,7 +313,7 @@ func (m Model) splashLines() []string {
 func (m Model) renderStatusBar() string {
 	sep := styleStatus.Render(" · ")
 	snapshot := m.agentRuntime.Snapshot()
-	segs := []string{backendLabel(m.sessionRuntime.Snapshot().Active, snapshot.Connected)}
+	segs := []string{backendLabel(m.controller.Snapshot().Active, snapshot.Connected)}
 
 	if live := snapshot.SessionTokens + snapshot.StreamingEstimate; live > 0 {
 		segs = appendStatus(segs, humanTokens(live))

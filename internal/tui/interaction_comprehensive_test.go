@@ -13,6 +13,7 @@ import (
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
 )
 
@@ -206,7 +207,7 @@ func TestSlashCommandsModelSwitchAndHelp(t *testing.T) {
 		t.Fatal(err)
 	}
 	sessionRuntime := session.NewRuntime(cfg)
-	m := New(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()), "test system", "test")
+	m := newModelWithRuntime(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()), "test system", "test")
 	if commandByName("/clear") == nil || commandByName("/missing") != nil {
 		t.Fatal("command lookup")
 	}
@@ -227,7 +228,7 @@ func TestSlashCommandsModelSwitchAndHelp(t *testing.T) {
 	}
 	next, cmd := m.cmdModel([]string{"other"})
 	m = next.(Model)
-	if m.sessionRuntime.Snapshot().Active != "other" || cmd == nil || m.sessionRuntime.Snapshot().ActiveModel != "other-model" {
+	if m.controller.Snapshot().Active != "other" || cmd == nil || m.controller.Snapshot().ActiveModel != "other-model" {
 		t.Fatal("switch")
 	}
 	next, _ = m.runSlash("/unknown")
@@ -235,16 +236,11 @@ func TestSlashCommandsModelSwitchAndHelp(t *testing.T) {
 	if !strings.Contains(m.scroll.String(), "unknown command") {
 		t.Fatal("unknown slash")
 	}
-	if _, err := m.sessionRuntime.Activate("keyed"); err != nil {
-		t.Fatal(err)
-	}
 	if cmd := m.confirmActive("keyed"); cmd == nil || !strings.Contains(m.scroll.String(), "probing") {
 		t.Fatal("keyed confirm")
 	}
 	// A hand-edited endpoint must rebuild the client on reload.
-	if _, err := m.sessionRuntime.Activate("other"); err != nil {
-		t.Fatal(err)
-	}
+	m.controller.Dispatch(frontend.Activate("other"))
 	rawPath := filepath.Join(cfg.Dir, "config.yaml")
 	raw, err := os.ReadFile(rawPath)
 	if err != nil {
@@ -253,8 +249,8 @@ func TestSlashCommandsModelSwitchAndHelp(t *testing.T) {
 	if err := os.WriteFile(rawPath, []byte(strings.Replace(string(raw), "http://other", "http://changed", 1)), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := m.reloadConfigFromDisk(); err != nil || m.sessionRuntime.Snapshot().ActiveURL != "http://changed" {
-		t.Fatalf("reload = %v url=%s", err, m.sessionRuntime.Snapshot().ActiveURL)
+	if err := m.reloadConfigFromDisk(); err != nil || m.controller.Snapshot().ActiveURL != "http://changed" {
+		t.Fatalf("reload = %v url=%s", err, m.controller.Snapshot().ActiveURL)
 	}
 	if err := os.WriteFile(rawPath, []byte("not: [valid"), 0o600); err != nil {
 		t.Fatal(err)
@@ -353,12 +349,12 @@ func TestHandleEnterSelectionAndSlashCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	sessionRuntime := session.NewRuntime(cfg)
-	m = New(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()), "test system", "test")
+	m = newModelWithRuntime(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()), "test system", "test")
 	m.ta.SetValue("/models")
 	m.setPopover([]argOption{{value: "other"}}, true, "/models")
 	next, _ = m.handleEnter(tea.KeyMsg{Type: tea.KeyEnter})
 	m = next.(Model)
-	if m.sessionRuntime.Snapshot().Active != "other" {
+	if m.controller.Snapshot().Active != "other" {
 		t.Fatal("argument selection not committed")
 	}
 	m.ta.SetValue("   ")

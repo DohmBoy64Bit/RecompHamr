@@ -414,3 +414,13 @@ Production TUI imports only `internal/frontend` among project runtime packages a
 - Security: frontend types contain only display-safe fields; opaque work retains backend values in unexported app implementations, and the controller rejects completions it did not issue or already consumed.
 - Evidence: the accepted TUI path is unchanged while the new controller is independently tested; no frontend source imports a project backend or Bubble Tea.
 - Known limits: production TUI still uses agent/session façades directly; agent-turn intents, terminal isolation, architecture enforcement, deletion proof, and runtime evidence remain open.
+
+#### Checkpoint 4C — session lifecycle migration
+
+- Changed: moved the application controller into the import-cycle-free `internal/app/controller` owner and routed TUI startup/history seeding, best-effort append, slash observation, reload, activation, keyed probe, keyless reachability, context-window facts, and conversation-history clearing through frontend intents, events, snapshots, and opaque work/completions.
+- Documented: current architecture and this packet record the live boundary; existing user help, persistence format, command text, and visible layout are unchanged.
+- Verified: focused TUI/app/controller tests and `pwsh -NoProfile -File ./scripts/verify.ps1` pass; the repository profile is exactly 100.0% statements. Source inspection finds no production TUI import or stored capability for `internal/session` or `internal/ctx`.
+- Coverage: retained model-list ordering, reload warnings, keyed/keyless activation banners, startup silence, stale/duplicate completion rejection, history recall/clear, context fallback, and rendering/input suites remain exercised. Slice 4 closure rows remain unverified until agent migration, deletion proof, and exact-build runtime acceptance.
+- Security: presentation sees only display-safe profile facts and opaque work; endpoint/client/key/history-file capabilities remain inside application/session owners. Existing silent history failures and profile rollback behavior remain unchanged.
+- Evidence: canonical build and CLI smoke pass with the frozen TUI suite; no runtime or screenshot evidence is claimed for this checkpoint.
+- Known limits: production TUI still imports and invokes `internal/agent`; terminal composition, final architecture enforcement, deletion proof, and Slice 4 runtime acceptance remain open.

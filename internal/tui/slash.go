@@ -1,11 +1,13 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"text/tabwriter"
 
+	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -38,7 +40,7 @@ var commands = []command{
 		description: "list · <name> set (Tab cycles in the popover)",
 		handler:     (Model).cmdModel,
 		args: func(m Model) []argOption {
-			facts := m.sessionRuntime.Snapshot()
+			facts := m.controller.Snapshot()
 			out := make([]argOption, 0, len(facts.Profiles))
 			for _, p := range facts.Profiles {
 				out = append(out, argOption{
@@ -85,15 +87,20 @@ func (m Model) runSlash(text string) (tea.Model, tea.Cmd) {
 // (runSlash warns on submit; the popover-refresh path ignores it so a broken
 // file doesn't spam a warning on every keystroke).
 func (m *Model) reloadConfigFromDisk() error {
-	_, _, err := m.sessionRuntime.Reload()
-	return err
+	transition := m.controller.Dispatch(frontend.Reload())
+	for _, event := range transition.Events {
+		if event.Kind == frontend.EventWarning {
+			return errors.New(event.Text)
+		}
+	}
+	return nil
 }
 
 // PrintHelp writes the canonical human-readable command list. Used by --help.
 func PrintHelp(out io.Writer) {
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	for _, c := range commands {
-		fmt.Fprintf(w, "  %s\t%s\n", c.name, c.description)
+	for _, c := range frontend.Commands() {
+		fmt.Fprintf(w, "  %s\t%s\n", c.Name, c.Description)
 	}
 	w.Flush()
 }
@@ -107,17 +114,20 @@ func (m Model) cmdModel(args []string) (tea.Model, tea.Cmd) {
 		m.printModelList()
 		return m, nil
 	}
-	if _, err := m.sessionRuntime.Activate(args[0]); err != nil {
-		m.appendLine(styleError.Render("⚠ " + err.Error()))
-		return m, nil
+	transition := m.controller.Dispatch(frontend.Activate(args[0]))
+	for _, event := range transition.Events {
+		if event.Kind == frontend.EventWarning {
+			m.appendLine(styleError.Render("⚠ " + event.Text))
+			return m, nil
+		}
 	}
-	return m, m.confirmActive(args[0])
+	return m.applyFrontendTransition(transition)
 }
 
 // printModelList writes the "▸ active, name, llm @ url" rollup to scroll.
 func (m *Model) printModelList() {
 	m.appendLine(styleDim.Render("models (▸ active, /models <name> to switch):"))
-	for _, p := range m.sessionRuntime.Snapshot().Profiles {
+	for _, p := range m.controller.Snapshot().Profiles {
 		mark := "  "
 		if p.Active {
 			mark = "▸ "
@@ -132,19 +142,14 @@ func (m *Model) printModelList() {
 // and an optional live context window are validated; keyless profiles use the
 // cheaper reachability ping.
 func (m *Model) confirmActive(profile string) tea.Cmd {
-	facts := m.sessionRuntime.Snapshot()
-	// ActiveURL, not p.URL: under a RECOMPHAMR_URL override the banner must name
-	// the endpoint actually dialed, not the config value the override displaced.
-	if facts.ActiveKeyed {
-		m.appendLine(styleDim.Render(fmt.Sprintf("▶ probing %s · %s @ %s", profile, facts.ActiveModel, facts.ActiveURL)))
-		return probeBackend(m.sessionRuntime.Probe(profile), false)
-	}
-	m.appendLine(styleOK.Render(fmt.Sprintf("✓ active: %s · %s @ %s", profile, facts.ActiveModel, facts.ActiveURL)))
-	return pingBackend(m.sessionRuntime.Reachability())
+	transition := m.controller.Dispatch(frontend.Activate(profile))
+	next, cmd := m.applyFrontendTransition(transition)
+	*m = next.(Model)
+	return cmd
 }
 
 func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
-	m.agentRuntime.ResetConversation()
+	m.controller.Dispatch(frontend.ClearConversation())
 	m.scroll.Reset()
 	// Drop any queued follow-up: it targeted the conversation just wiped.
 	m.queued = nil
@@ -153,7 +158,6 @@ func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
 	// or leftover history would contradict the "fresh start" promise.
 	m.promptHistory = nil
 	m.histIdx = -1
-	_ = m.sessionRuntime.ClearHistory()
 	// Full wipe (unlike Ctrl+L, which redraws but keeps scrollback).
 	// tea.ClearScreen emits \x1b[2J, which only wipes the viewport; the
 	// saved-lines buffer needs eraseScrollback (DECSED 3) too, or old replies

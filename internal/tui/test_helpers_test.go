@@ -9,11 +9,16 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
+	appcontroller "github.com/DohmBoy64Bit/RecompHamr/internal/app/controller"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
 )
+
+func newModelWithRuntime(sessionRuntime *session.Runtime, runtime agent.Runtime, system, version string) Model {
+	return New(appcontroller.NewController(sessionRuntime, runtime, system, version), runtime, system, version)
+}
 
 // newTestModel wires a model against a mock OpenAI-compatible SSE server so
 // focused TUI tests can exercise submit -> stream -> done without a real backend.
@@ -31,7 +36,7 @@ func newTestModel(t *testing.T, handler http.HandlerFunc) Model {
 		t.Fatal(err)
 	}
 	sessionRuntime := session.NewRuntime(cfg)
-	m := New(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), "test system", "test")
+	m := newModelWithRuntime(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), "test system", "test")
 	sized, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	return sized.(Model)
 }
@@ -91,7 +96,7 @@ func testModel(t *testing.T, cfg *config.Config, client *llm.Client) Model {
 	cfg.ActiveProfile().URL = client.BaseURL
 	cfg.ActiveProfile().LLM = client.Model
 	sessionRuntime := session.NewRuntime(cfg)
-	return New(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), "test system", "test")
+	return newModelWithRuntime(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), "test system", "test")
 }
 
 func TestNewLoadsInjectedPromptHistory(t *testing.T) {
@@ -104,7 +109,7 @@ func TestNewLoadsInjectedPromptHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	sessionRuntime := session.NewRuntime(cfg)
-	m := New(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()), "test system", "test")
+	m := newModelWithRuntime(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()), "test system", "test")
 	if len(m.promptHistory) != 1 || m.promptHistory[0].display != "persisted\nUnicode 🐹" {
 		t.Fatalf("loaded history = %#v", m.promptHistory)
 	}
