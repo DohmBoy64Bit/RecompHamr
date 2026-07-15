@@ -188,7 +188,7 @@ func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
 	// or leftover history would contradict the "fresh start" promise.
 	m.promptHistory = nil
 	m.histIdx = -1
-	_ = clearPromptHistory(m.cfg.Dir)
+	_ = m.history.Clear()
 	// Full wipe (unlike Ctrl+L, which redraws but keeps scrollback).
 	// tea.ClearScreen emits \x1b[2J, which only wipes the viewport; the
 	// saved-lines buffer needs eraseScrollback (DECSED 3) too, or old replies

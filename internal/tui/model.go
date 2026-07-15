@@ -17,6 +17,7 @@ import (
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
 )
 
 const (
@@ -83,6 +84,7 @@ type Model struct {
 	loop         *agent.LoopState   // test-visible alias; production paths use agentRuntime methods
 	executor     agent.ToolExecutor // test-visible injected executor alias
 	agentRuntime agent.Runtime
+	history      session.History
 	system       string // embedded system prompt + working-directory anchor
 
 	// streaming is the live raw token buffer for the current content block,
@@ -169,7 +171,7 @@ type Model struct {
 
 }
 
-func New(cfg *config.Config, cli *llm.Client, runtime agent.Runtime, projectDir, version string) Model {
+func New(cfg *config.Config, cli *llm.Client, runtime agent.Runtime, history session.History, projectDir, version string) Model {
 	ta := newPromptInput()
 
 	// Fixed dark style: WithAutoStyle queries the terminal (OSC 11) before
@@ -199,6 +201,7 @@ func New(cfg *config.Config, cli *llm.Client, runtime agent.Runtime, projectDir,
 		loop:         runtime.Loop,
 		executor:     runtime.Executor,
 		agentRuntime: runtime,
+		history:      history,
 	}
 	// Record the active backend once, before any turn, so a shared log
 	// names exactly which model/endpoint/context window produced the behaviour.
@@ -208,7 +211,9 @@ func New(cfg *config.Config, cli *llm.Client, runtime agent.Runtime, projectDir,
 	// earlier sessions. Loaded entries carry no chip metadata (the on-disk
 	// format stores expanded text only), so a recalled multi-line paste
 	// appears uncollapsed, the right tradeoff for a cat-friendly history file.
-	m.promptHistory = loadPromptHistory(cfg.Dir)
+	for _, value := range history.Load() {
+		m.promptHistory = append(m.promptHistory, promptEntry{display: value})
+	}
 	return m
 }
 
@@ -479,7 +484,7 @@ func (m Model) submit(sendText, echoText string, entry promptEntry) (tea.Model, 
 	// Persist the (redacted) prompt so ↑ finds it after a restart. Errors are
 	// swallowed: a transient failure isn't worth derailing submit, and a
 	// permanent one (read-only .rehamr/) would just be noise on every prompt.
-	_ = appendPromptHistory(m.cfg.Dir, safeText)
+	_ = m.history.Append(safeText)
 
 	if strings.HasPrefix(sendText, "/") {
 		m.agentRuntime.ObserveSlash(safeText)

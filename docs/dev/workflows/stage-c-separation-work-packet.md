@@ -309,4 +309,14 @@ Production `internal/tui` no longer imports config, LLM, or provider packages; d
 - Coverage: open.
 - Security: open.
 - Evidence: current source/tests inventoried; implementation and runtime evidence remain open.
-- Known limits: no implementation checkpoint has started.
+- Known limits: history ownership is implemented at Checkpoint 3A; configuration/client/probe ownership and all Slice 3 runtime evidence remain open.
+
+#### Checkpoint 3A — prompt-history persistence
+
+- Changed: moved the retained `.rehamr/history` implementation from `internal/tui` into `internal/session.History`; `internal/app` constructs the store, and presentation maps typed strings to its existing prompt-entry state while preserving submit and `/clear` behavior.
+- Documented: current architecture, package/exported-symbol documentation, architecture enforcement, and this checkpoint identify session ownership without changing the user-facing format or policy.
+- Verified: focused session/app/TUI tests pass; relocated tests cover missing/unreadable files, Unicode and multiline round trips, malformed-line skipping, empty/oversized/scanner-incompatible omission, exact cap/trim direction, concurrent append preservation, protection/open/write/close/count/remove failures, idempotent clear, and adapter startup/submit/clear paths.
+- Coverage: `internal/session` passes at exactly 100.0% focused statement coverage; repository coverage and Slice 3 behavioral rows remain open until later checkpoints and runtime evidence complete.
+- Security: path protection still delegates to `config.RestrictPrivatePath`; the app injects only an immutable directory-backed store, and no history content is added to snapshots, logs, reports, or config state.
+- Evidence: production TUI has no history filesystem helper or direct file operation for recall; architecture enforcement rejects the removed helper names and prevents `internal/session` from importing presentation.
+- Known limits: config/profile/client and backend probe ownership remain in TUI; `SESSION-03` remains `unverified` until exact-build restart recall and `/clear` evidence is recorded.

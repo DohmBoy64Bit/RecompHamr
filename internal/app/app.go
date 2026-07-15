@@ -14,6 +14,7 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/tui"
 )
 
@@ -26,8 +27,8 @@ var (
 	newAgentRuntime     = func(client *llm.Client) agent.Runtime {
 		return agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver())
 	}
-	newFrontend = func(cfg *config.Config, client *llm.Client, runtime agent.Runtime, projectDir, version string) tea.Model {
-		return tui.New(cfg, client, runtime, projectDir, version)
+	newFrontend = func(cfg *config.Config, client *llm.Client, runtime agent.Runtime, history session.History, projectDir, version string) tea.Model {
+		return tui.New(cfg, client, runtime, history, projectDir, version)
 	}
 	openDebugLog      = logging.Open
 	closeDebugLog     = logging.Close
@@ -61,11 +62,12 @@ func Run(stdout io.Writer, version string) error {
 	profile := cfg.ActiveProfile()
 	client := newClient(cfg.ActiveURL(), profile.LLM, profile.ResolvedKey())
 	runtime := newAgentRuntime(client)
+	history := session.NewHistory(cfg.Dir)
 	projectDir, err := absolutePath(cwd)
 	if err != nil {
 		projectDir = cwd
 	}
-	frontend := newFrontend(cfg, client, runtime, projectDir, version)
+	frontend := newFrontend(cfg, client, runtime, history, projectDir, version)
 
 	// Preserve the accepted inline behavior: no alternate screen, and terminal
 	// scrollback is still owned by Bubble Tea through tea.Println.

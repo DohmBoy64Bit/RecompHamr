@@ -10,7 +10,7 @@ function Fail([string]$Message) {
 # Stage C still permits inherited TUI -> runtime coupling while it is extracted,
 # but backend packages must never depend on the TUI. internal/app is the sole
 # composition root allowed to construct the concrete presentation.
-$BackendRoots = @('internal/agent', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/logging', 'internal/provider', 'internal/tools')
+$BackendRoots = @('internal/agent', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/logging', 'internal/provider', 'internal/session', 'internal/tools')
 foreach ($Relative in $BackendRoots) {
     $Dir = Join-Path $Root $Relative
     if (-not (Test-Path $Dir)) { continue }
@@ -27,7 +27,7 @@ foreach ($Relative in $BackendRoots) {
 # tool execution, provider-error policy, or construct parallel agent roots.
 $TuiProduction = Get-ChildItem -Path (Join-Path $Root 'internal/tui') -File -Filter '*.go' |
     Where-Object { $_.Name -notlike '*_test.go' }
-foreach ($Pattern in @('internal/tools', 'internal/logging', 'tools.Execute', 'tools.InlineStatus', 'provider.ErrUnauthorized', 'provider.ErrUnreachable', 'agent.LocalToolExecutor', 'agent.NewTurnState', 'agent.NewStreamState', 'turn.Context', 'turn.CancelFunc', 'm.turn.', 'm.runtime.', 'm.loop.')) {
+foreach ($Pattern in @('internal/tools', 'internal/logging', 'tools.Execute', 'tools.InlineStatus', 'provider.ErrUnauthorized', 'provider.ErrUnreachable', 'agent.LocalToolExecutor', 'agent.NewTurnState', 'agent.NewStreamState', 'turn.Context', 'turn.CancelFunc', 'm.turn.', 'm.runtime.', 'm.loop.', 'appendPromptHistory', 'loadPromptHistory', 'clearPromptHistory', 'history_store')) {
     $Hit = $TuiProduction | Select-String -SimpleMatch $Pattern | Select-Object -First 1
     if ($null -ne $Hit) {
         Fail "presentation owns agent orchestration at $($Hit.Path):$($Hit.LineNumber): $Pattern"

@@ -15,6 +15,7 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/tools"
 )
 
@@ -26,7 +27,7 @@ func baselineModel(t *testing.T) Model {
 		t.Fatal(err)
 	}
 	client := llm.New(cfg.ActiveURL(), cfg.ActiveProfile().LLM, "")
-	return New(cfg, client, agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), t.TempDir(), "test")
+	return New(cfg, client, agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), session.NewHistory(cfg.Dir), t.TempDir(), "test")
 }
 
 func TestCommandBoundariesAndErrorHints(t *testing.T) {
