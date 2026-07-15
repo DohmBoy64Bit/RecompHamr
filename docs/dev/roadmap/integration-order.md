@@ -2,7 +2,7 @@
 
 ## Stage A — Fresh barebones upstream strip
 
-Current stage.
+Accepted.
 
 Prove the stripped CodeHamr-derived application with the inherited TUI and four retained tools.
 
@@ -13,6 +13,8 @@ Pass automated checks and complete real Windows/TUI/manual acceptance.
 ## Stage C — Separation of concerns
 
 Extract application orchestration and agent-loop ownership from the TUI without changing accepted behavior or layout.
+
+Accepted at implementation commit `72e6b43215cc14f91eb6547de15a7386bc77b927`. Stage D is next but has not begun.
 
 Required outcome:
 

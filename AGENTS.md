@@ -11,7 +11,7 @@ Order of work:
 3. integrate RecompHamr capabilities one coherent subsystem at a time;
 4. verify each capability against evidence, tests, docs, and runtime behavior.
 
-**Stage A: fresh-source barebones baseline** is accepted. The repository is currently in **Stage C: separation of concerns**. Preserve every accepted behavior while moving application and agent ownership out of presentation; do not add Legacy feature families, MCP, skills, new command families, project memory, diagnostics systems, reverse-engineering helpers, or a TUI redesign during separation.
+**Stage A: fresh-source barebones baseline** and **Stage C: separation of concerns** are accepted. Stage D is the next permitted work and has not begun. Preserve every accepted behavior and the established ownership boundary; do not add Legacy feature families, MCP, skills, new command families, project memory, diagnostics systems, reverse-engineering helpers, or a TUI redesign outside an approved later-stage work packet.
 
 ## Codex reading route
 

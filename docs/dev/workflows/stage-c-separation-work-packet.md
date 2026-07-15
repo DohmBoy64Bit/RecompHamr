@@ -57,13 +57,13 @@ Deleting `internal/tui` from a separated build removes presentation only: applic
 
 ## Completion evidence
 
-- Changed: open.
-- Documented: open.
-- Verified: open.
-- Coverage: open.
-- Security: open.
-- Evidence: open.
-- Known limits: Stage C remains open until all ownership slices meet the stop condition.
+- Changed: accepted. Application, session, agent, asynchronous-work, persistence, and probe ownership sit behind the neutral frontend controller; the TUI is presentation/input translation and the terminal adapter is the sole concrete wiring edge.
+- Documented: decisions through D-015, current/accepted architecture, behavioral inventory, package/exported-symbol contracts, harness, documentation map, roadmap/status, and all four slice records agree.
+- Verified: focused suites, architecture/deletion checks, documentation/link checks, formatting, tests, build, CLI smoke, exact-build Windows Terminal acceptance, and GitHub Actions run `29447373333` pass.
+- Coverage: exactly 100.0% statements (2193/2193), every Stage C surface verified, and meaningful documentation audited with no stale Stage C claim.
+- Security: credentials, histories, reasoning, contexts/cancellation, raw transport/tool/process/log values, and backend capabilities remain outside presentation; private-path, rollback, cancellation cleanup, stale rejection, and non-disclosure contracts remain proven.
+- Evidence: implementation commit `72e6b43215cc14f91eb6547de15a7386bc77b927`; sanitized reports and reviewed screenshots under `E:\ReProject\StageA-Acceptance\StageC-Slice4-Final\72e6b43215cc14f91eb6547de15a7386bc77b927`.
+- Known limits: none within Stage C. Stage D is permitted but has not begun.
 
 ## Slice 1 — application composition
 
@@ -387,13 +387,13 @@ Production TUI imports only `internal/frontend` among project runtime packages a
 
 ### Completion evidence
 
-- Changed: open.
-- Documented: pre-edit contract and inventory recorded.
-- Verified: open.
-- Coverage: open.
-- Security: open.
-- Evidence: accepted Slices 1 through 3 and current source/tests frozen as the equivalence baseline.
-- Known limits: all Slice 4 implementation, deletion-boundary proof, and runtime acceptance remain open.
+- Changed: accepted. The neutral contract, controller, complete session/agent migration, and terminal isolation satisfy the Slice 4 stop condition with no compatibility adapter remaining.
+- Documented: D-015, accepted current/target architecture, behavioral rows `APP-02`, `FRONTEND-01`, and `TUI-06`, harness contract, roadmap/status, and this packet agree.
+- Verified: canonical local gate, positive deletion graph, exact-build Gemma scenarios/checklist, reviewed screenshots, restored shell, and CI run `29447373333` pass.
+- Coverage: exactly 100.0% statements (2193/2193); all Slice 4 behavioral categories and meaningful documentation are complete.
+- Security: only immutable display-safe facts cross the frontend boundary; backend identities/capabilities stay private and cancellation/stale cleanup is proven at runtime.
+- Evidence: implementation commit `72e6b43215cc14f91eb6547de15a7386bc77b927` and its commit-named external evidence directory.
+- Known limits: none within Slice 4.
 
 #### Checkpoint 4A — work packet and evidence freeze
 
@@ -444,3 +444,13 @@ Production TUI imports only `internal/frontend` among project runtime packages a
 - Security: the adapter receives no backend capability beyond `frontend.Controller`; credentials, logs, contexts, transports, model history, and tool/process values remain private. Cleanup remains application-owned and executes on terminal write/program failure.
 - Evidence: source/import graph, positive dependency graph, focused tests, canonical build, and CLI smoke. No new manual runtime claim is needed for this ownership-only checkpoint; exact-commit closure reruns remain required.
 - Known limits: final documentation/decision/inventory audit, exact implementation-commit runtime reruns, three representative closure sizes, CI, acceptance record, and final Stage C status remain open.
+
+#### Checkpoint 4F — final Stage C closure
+
+- Changed: deleted no accepted behavior and closed the typed frontend boundary established in 4B through 4E. Added Ctrl+L only to the external acceptance harness key allow-list so restart/history clearing could be exercised without production hooks.
+- Documented: decision D-015, current/accepted architecture, Stage A next-work status, integration order, documentation map, Slice 4 and overall completion evidence, and all Stage C inventory rows now agree.
+- Verified: `pwsh -NoProfile -File ./scripts/verify.ps1` passes at the implementation commit; GitHub Actions run `29447373333` passes independently on `ubuntu-latest` and `windows-latest`. Exact-build Windows Terminal runs pass for all three committed scenarios and the additional frontend checklist with LM Studio `google/gemma-4-12b-qat`.
+- Coverage: exactly 100.0% statements (2193/2193); architecture enforcement proves the core/backend deletion graph excludes TUI and Bubble Tea; no Stage C row is blocked or unverified.
+- Security: reviewed reports contain categories only and reviewed screenshots contain synthetic prompts without credentials. Configuration, debug log, and history stayed in the disposable private fixture; artifacts remained outside the repository.
+- Evidence: implementation commit `72e6b43215cc14f91eb6547de15a7386bc77b927`, CI run `29447373333`, and `E:\ReProject\StageA-Acceptance\StageC-Slice4-Final\72e6b43215cc14f91eb6547de15a7386bc77b927` including the three representative smoke images and sanitized scenario reports. The first tool attempt truthfully remains as a failed report for an extra model-generated call; the clean retry passed.
+- Known limits: none within Stage C. Stage D has not begun.

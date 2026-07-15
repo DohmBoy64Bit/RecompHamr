@@ -1,6 +1,6 @@
-# Target Separation of Concerns
+# Accepted Separation of Concerns
 
-This architecture becomes the next implementation target **after** the barebones baseline is accepted.
+This architecture was accepted in Stage C at implementation commit `72e6b43215cc14f91eb6547de15a7386bc77b927`.
 
 ```text
 cmd/recomphamr
