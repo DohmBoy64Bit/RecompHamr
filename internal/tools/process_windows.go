@@ -9,3 +9,5 @@ import "os/exec"
 // with a Windows integration test before the baseline gate can claim child-tree
 // cancellation. The baseline does not claim that stronger behavior.
 func configureProcessTree(_ *exec.Cmd) {}
+
+func powerShellCandidates() []string { return []string{"pwsh", "powershell.exe", "powershell"} }

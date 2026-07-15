@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -82,11 +81,7 @@ func finishPowerShellResult(text string, runErr, commandContextErr, parentErr er
 }
 
 func findPowerShell() (string, error) {
-	candidates := []string{"pwsh"}
-	if runtime.GOOS == "windows" {
-		candidates = append(candidates, "powershell.exe", "powershell")
-	}
-	for _, name := range candidates {
+	for _, name := range powerShellCandidates() {
 		if path, err := lookPath(name); err == nil {
 			return path, nil
 		}
