@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -165,9 +166,7 @@ func TestQueueAutoSubmitsAfterTurn(t *testing.T) {
 // orphan-fire after the next turn.
 func TestQueueRestoredOnCtrlC(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	ctx, cancel := context.WithCancel(context.Background())
-	m.turn.Context = ctx
-	m.turn.CancelFunc = cancel
+	m.turn.Begin(context.Background(), time.Now())
 	m.runtime.Phase = phaseThinking
 	m.queued = &queuedPrompt{send: "later task", echo: "later task"}
 
@@ -190,9 +189,7 @@ func TestQueueRestoredOnCtrlC(t *testing.T) {
 // clobbering the in-progress text.
 func TestQueueRestoreKeepsExistingDraft(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	ctx, cancel := context.WithCancel(context.Background())
-	m.turn.Context = ctx
-	m.turn.CancelFunc = cancel
+	m.turn.Begin(context.Background(), time.Now())
 	m.runtime.Phase = phaseThinking
 	m.queued = &queuedPrompt{send: "queued one", echo: "queued one"}
 	m.ta.SetValue("a fresh draft")

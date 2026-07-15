@@ -18,12 +18,12 @@ type TurnID uint64
 // can move incrementally; presentation must treat Context and CancelFunc as
 // opaque and must not expose them in snapshots or logs.
 type TurnState struct {
-	History    []chmctx.Message
-	Context    context.Context
-	CancelFunc context.CancelFunc
-	StartedAt  time.Time
-	ID         TurnID
-	nextID     TurnID
+	History   []chmctx.Message
+	context   context.Context
+	cancel    context.CancelFunc
+	StartedAt time.Time
+	ID        TurnID
+	nextID    TurnID
 }
 
 // NewTurnState constructs an idle turn root with optional existing history.
@@ -40,14 +40,14 @@ func (s *TurnState) Begin(parent context.Context, now time.Time) TurnID {
 	}
 	s.nextID++
 	s.ID = s.nextID
-	s.Context, s.CancelFunc = context.WithCancel(parent)
+	s.context, s.cancel = context.WithCancel(parent)
 	s.StartedAt = now
 	return s.ID
 }
 
 // Active reports whether a turn context is installed.
 func (s *TurnState) Active() bool {
-	return s.CancelFunc != nil
+	return s.cancel != nil
 }
 
 // Append adds a model-facing conversation message in causal order.
@@ -58,11 +58,11 @@ func (s *TurnState) Append(message chmctx.Message) {
 // End cancels and releases the active context while retaining history and the
 // last identity for stale-result comparison.
 func (s *TurnState) End() {
-	if s.CancelFunc != nil {
-		s.CancelFunc()
+	if s.cancel != nil {
+		s.cancel()
 	}
-	s.Context = nil
-	s.CancelFunc = nil
+	s.context = nil
+	s.cancel = nil
 	s.StartedAt = time.Time{}
 }
 

@@ -31,7 +31,7 @@ func TestToolWorkAndSequentialPairing(t *testing.T) {
 	stream.Pending = append(stream.Pending, calls...)
 	var executed []string
 	executor := NewToolExecutor(func(ctx context.Context, call chmctx.ToolCall) chmctx.Message {
-		if ctx != turn.Context {
+		if ctx != turn.context {
 			t.Fatal("wrong context")
 		}
 		executed = append(executed, call.ID)

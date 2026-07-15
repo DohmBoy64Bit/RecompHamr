@@ -46,9 +46,9 @@ func TestPhaseOutcomeContextAndInitContracts(t *testing.T) {
 		t.Fatal("fallback context")
 	}
 	m.installTurnContext()
-	first := m.turn.CancelFunc
+	first := m.turn.ID
 	m.installTurnContext()
-	if first == nil || m.turn.CancelFunc == nil {
+	if first == m.turn.ID || !m.turn.Active() {
 		t.Fatal("turn context")
 	}
 	m.status = queueSlashHint
@@ -175,9 +175,7 @@ func TestUpdateTypedMessagesAndClosedOutcomes(t *testing.T) {
 	m = baselineModel(t)
 	m.runtime.Phase = phaseThinking
 	m.turnStart = time.Now().Add(-time.Second)
-	closedCtx, closeCancel := context.WithCancel(context.Background())
-	closeCancel()
-	m.turn.Context = closedCtx
+	m.turn.Begin(context.Background(), time.Now())
 	m.turn.History = []chmctx.Message{{Role: chmctx.RoleAssistant}}
 	next, cmd := m.handleStreamClosed()
 	m = next.(Model)

@@ -81,7 +81,7 @@ func (s *LoopState) NextTool(turn *TurnState, stream *StreamState, executor Tool
 	s.LastToolKey = ToolTargetKey(call)
 	s.ToolRounds++
 	stream.Phase = PhaseRunning
-	return &ToolWork{turnID: turn.ID, context: turn.Context, call: call, executor: executor, status: tools.InlineStatus(call)}, true
+	return &ToolWork{turnID: turn.ID, context: turn.context, call: call, executor: executor, status: tools.InlineStatus(call)}, true
 }
 
 // ToolResultEffect records the accepted result and any policy notes injected

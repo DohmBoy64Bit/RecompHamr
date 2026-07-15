@@ -15,7 +15,7 @@ func TestTurnStateLifecycle(t *testing.T) {
 	}
 	now := time.Unix(10, 0)
 	first := s.Begin(nil, now)
-	firstContext := s.Context
+	firstContext := s.context
 	if first == 0 || !s.Active() || s.StartedAt != now {
 		t.Fatal("first begin")
 	}
@@ -24,9 +24,9 @@ func TestTurnStateLifecycle(t *testing.T) {
 	if second == first || firstContext.Err() != context.Canceled || len(s.History) != 2 {
 		t.Fatal("replacement begin")
 	}
-	secondContext := s.Context
+	secondContext := s.context
 	s.End()
-	if s.Active() || s.Context != nil || !s.StartedAt.IsZero() || secondContext.Err() != context.Canceled || s.ID != second {
+	if s.Active() || s.context != nil || !s.StartedAt.IsZero() || secondContext.Err() != context.Canceled || s.ID != second {
 		t.Fatal("end")
 	}
 	s.End()

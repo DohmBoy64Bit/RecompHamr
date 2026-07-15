@@ -381,8 +381,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// drop, the orphan tool message gets appended to the live turn's history
 		// (no preceding assistant.tool_calls → the next /v1 request 400s) and
 		// startChat would abandon the in-flight stream. The turnCtx tag was
-		// captured at runToolCall time; endTurn nils m.turn.Context and a fresh
-		// beginTurn installs a new one that can't match.
+		// captured at runToolCall time; endTurn deactivates that identity and a
+		// fresh beginTurn installs a new one that cannot match.
 		effect := m.loop.ApplyToolResult(m.turn, m.runtime, msg.delivery)
 		if !effect.Accepted {
 			return m, nil
@@ -522,15 +522,15 @@ func (m *Model) startChat() tea.Cmd {
 }
 
 // installTurnContext cancels any in-flight turn context and installs a fresh
-// per-turn root on m.turn.Context / m.turn.CancelFunc. Cancel-old-then-install-new keeps
-// Ctrl+C consistent: one m.turn.CancelFunc() always unwinds the whole current cascade.
+// opaque per-turn root. Cancel-old-then-install-new keeps Ctrl+C consistent:
+// one agent-owned cancellation capability unwinds the whole current cascade.
 func (m *Model) installTurnContext() {
 	m.turn.Begin(context.Background(), time.Now())
 }
 
 // beginTurn installs a fresh per-turn context, flips phase to thinking, and
 // returns the chat stream-reader Cmd. Every path starting a new LLM round
-// funnels through here so one m.turn.CancelFunc() cancels the whole cascade.
+// funnels through here so one agent-owned cancellation root cancels the cascade.
 func (m *Model) beginTurn() tea.Cmd {
 	m.installTurnContext()
 	m.turnStart = time.Now()

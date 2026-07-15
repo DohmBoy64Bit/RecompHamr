@@ -67,7 +67,7 @@ func TestPhaseAndStreamState(t *testing.T) {
 		t.Fatal("end stream")
 	}
 	client := &fakeChatClient{events: make(chan llm.Event)}
-	started := s.StartRound(&TurnState{ID: 8, Context: context.Background()}, client, []chmctx.Message{{Content: "m"}}, []llm.Tool{{Type: "function"}})
+	started := s.StartRound(&TurnState{ID: 8, context: context.Background()}, client, []chmctx.Message{{Content: "m"}}, []llm.Tool{{Type: "function"}})
 	if !s.Current(started) || client.ctx == nil || len(client.messages) != 1 || len(client.tools) != 1 {
 		t.Fatal("start round")
 	}

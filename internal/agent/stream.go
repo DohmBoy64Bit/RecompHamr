@@ -95,7 +95,7 @@ func (s *StreamState) BeginStream(turnID TurnID, events <-chan llm.Event) *Strea
 // StartRound opens one model request against the active turn and installs its
 // opaque stream reader.
 func (s *StreamState) StartRound(turn *TurnState, client ChatClient, messages []chmctx.Message, tools []llm.Tool) *Stream {
-	return s.BeginStream(turn.ID, client.Chat(turn.Context, messages, tools))
+	return s.BeginStream(turn.ID, client.Chat(turn.context, messages, tools))
 }
 
 // Current reports whether stream is the active turn/round reader.

@@ -21,8 +21,8 @@ type streamClosedMsg struct {
 }
 
 // toolResultMsg carries one finished tool call back to Update, tagged with the
-// turnCtx it was dispatched against. Update drops it when that ctx no longer
-// matches m.turn.Context: the originating turn was Ctrl+C'd and superseded.
+// turn identity it was dispatched against. Update drops it when that turn is
+// no longer active: the originating work was Ctrl+C'd or superseded.
 // Otherwise the orphan result appends to the new turn's history with no
 // preceding assistant.tool_calls and abandons that turn's live stream.
 type toolResultMsg struct {

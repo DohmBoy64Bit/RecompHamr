@@ -200,3 +200,13 @@ The TUI no longer opens model streams, executes tools, stores turn contexts, pac
 - Security: the scenario uses only synthetic prompts and disposable relative fixture paths; reports contain event categories, never bodies, and the protected debug log is not copied to artifacts.
 - Evidence: `agent-tool-loop-cancel.json` waits for explicit bounded `tool_start` records, requires exactly paired successful results, asserts the cancelled result count does not advance, proves the delayed side-effect file is absent, and verifies recovery plus restored shell control.
 - Known limits: exact-build Windows Terminal execution requires LM Studio to listen on the configured local endpoint with the acceptance model loaded.
+
+#### Checkpoint 2H — private cancellation capability
+
+- Changed: `TurnState` no longer exports its `context.Context` or `CancelFunc`; model-round and tool-work construction consume those capabilities only inside `internal/agent`, while TUI cancellation checks the typed active lifecycle state and ends the turn through agent methods.
+- Documented: current architecture and the architecture guard distinguish a presentation-visible lifecycle fact from the private cancellation capability that enforces it.
+- Verified: focused lifecycle, stream, loop, cancellation, queue, and TUI state-machine tests pass; after clearing only the rebuildable Go build cache to recover linker space, the canonical gate passes every automated check and validates all three scenarios.
+- Coverage: the canonical repository profile passes at exactly 100.0% (1988/1988 statements); real-model behavioral evidence remains blocked independently of automated coverage.
+- Security: contexts and cancellation functions cannot be read, stored, logged, or invoked directly by presentation; opaque tool work remains the only carrier into tool execution.
+- Evidence: production TUI code contains no turn-context or cancel-function access, and the architecture check rejects either access pattern if reintroduced.
+- Known limits: exact-build runtime evidence remains blocked after three LM Studio load attempts failed for `google/gemma-4-12b-qat`: automatic settings failed at 52%, 4,096 context/50% GPU failed at 45%, and 2,048 context/full GPU failed at 53%, each with LM Studio's unknown model-load error. Agent-event logging and broader application/configuration ownership remain later Stage C slices.

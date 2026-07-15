@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -302,7 +303,7 @@ func TestHandleKeyAllInteractionBranches(t *testing.T) {
 	m.setPopover([]argOption{{value: "/clear"}, {value: "/models"}}, false, "")
 	_, _ = m.handleTab(tea.KeyMsg{Type: tea.KeyTab})
 
-	m.turn.CancelFunc = func() {}
+	m.turn.Begin(context.Background(), time.Now())
 	m.runtime.Phase = phaseThinking
 	m.turnStart = time.Now().Add(-time.Second)
 	next, _ = m.handleCtrlC()
