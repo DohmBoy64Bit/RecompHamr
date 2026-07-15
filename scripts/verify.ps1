@@ -8,6 +8,7 @@ Set-Location $Root
 & (Join-Path $PSScriptRoot 'check-docs.ps1')
 & (Join-Path $PSScriptRoot 'check-architecture.ps1')
 & (Join-Path $PSScriptRoot 'check-format.ps1')
+& (Join-Path $PSScriptRoot 'check-tui-acceptance.ps1')
 & (Join-Path $PSScriptRoot 'check-coverage.ps1')
 
 New-Item -ItemType Directory -Force -Path (Join-Path $Root 'dist') | Out-Null

@@ -32,6 +32,8 @@
     "docs/dev/roadmap/agent-skills-standard.md",
     "docs/dev/workflows/work-packet-template.md"
     ,"docs/dev/workflows/stage-a-acceptance-work-packet.md"
+    ,"docs/dev/workflows/tui-acceptance-harness.md"
+    ,"docs/dev/workflows/tui-acceptance-harness-work-packet.md"
   ],
   "required_content": {
     "README.md": [
@@ -219,6 +221,20 @@
       "29423037990"
     ],
     "docs/dev/workflows/stage-a-acceptance-work-packet.md": [
+      "Outcome",
+      "In scope",
+      "Out of scope",
+      "Stop condition"
+    ],
+    "docs/dev/workflows/tui-acceptance-harness.md": [
+      "Control",
+      "State",
+      "Observation",
+      "ValidateOnly",
+      "report.json",
+      "never copy event bodies"
+    ],
+    "docs/dev/workflows/tui-acceptance-harness-work-packet.md": [
       "Outcome",
       "In scope",
       "Out of scope",

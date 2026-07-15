@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "name": "invalid-version",
+  "terminal": { "columns": 80, "rows": 24 },
+  "steps": [
+    { "type": "launch", "label": "must not validate" }
+  ]
+}

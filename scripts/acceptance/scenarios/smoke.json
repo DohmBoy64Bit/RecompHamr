@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "name": "startup-resize-exit-smoke",
+  "app_path": "../../../../dist/recomphamr.exe",
+  "workspace": "../../../../.acceptance-fixture",
+  "artifact_directory": "../../../../artifacts/tui-acceptance/smoke",
+  "debug_log": ".rehamr/log.txt",
+  "terminal": {
+    "columns": 80,
+    "rows": 24
+  },
+  "steps": [
+    { "type": "launch", "label": "launch application", "timeout_seconds": 20 },
+    { "type": "wait_event", "label": "wait for debug session", "category": "session", "minimum": 2, "timeout_seconds": 20 },
+    { "type": "screenshot", "label": "capture standard layout", "file": "standard.png" },
+    { "type": "resize", "label": "resize constrained", "columns": 50, "rows": 16 },
+    { "type": "screenshot", "label": "capture constrained layout", "file": "constrained.png" },
+    { "type": "key", "label": "exit application", "key": "ctrl_d" },
+    { "type": "sleep", "label": "allow terminal restoration", "milliseconds": 500 },
+    { "type": "type_text", "label": "write shell restoration sentinel", "text": "Set-Content -LiteralPath '.harness-shell-restored' -Value 'restored' -NoNewline" },
+    { "type": "key", "label": "execute restoration probe", "key": "enter" },
+    { "type": "assert_file", "label": "verify restored shell command", "path": ".harness-shell-restored", "text": "restored", "timeout_seconds": 10 },
+    { "type": "remove_file", "label": "remove restoration sentinel", "path": ".harness-shell-restored" },
+    { "type": "close_window", "label": "close restored shell", "timeout_seconds": 10 }
+  ]
+}

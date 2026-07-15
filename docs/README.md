@@ -44,6 +44,8 @@ Repository-wide always-on instructions live in [`../AGENTS.md`](../AGENTS.md). C
 - [`dev/workflows/change-control.md`](dev/workflows/change-control.md)
 - [`dev/workflows/work-packet-template.md`](dev/workflows/work-packet-template.md)
 - [`dev/workflows/stage-a-acceptance-work-packet.md`](dev/workflows/stage-a-acceptance-work-packet.md)
+- [`dev/workflows/tui-acceptance-harness.md`](dev/workflows/tui-acceptance-harness.md) — state-aware Windows Terminal scenario runner, evidence channels, security, and usage
+- [`dev/workflows/tui-acceptance-harness-work-packet.md`](dev/workflows/tui-acceptance-harness-work-packet.md)
 
 ### Roadmap
 
