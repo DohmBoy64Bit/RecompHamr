@@ -114,7 +114,7 @@ func (m Model) handleCtrlC() (tea.Model, tea.Cmd) {
 		// visible, drains turn stats for a clean next banner, then unwinds
 		// the per-turn context.
 		m.agentRuntime.ObserveCancel()
-		m.abortTurn(styleWarn.Render("✗ cancelled"))
+		m.abortTurn(styleWarn.Render("✗ cancelled"), true)
 		m.quitArmedAt = time.Time{}
 		m.status = ""
 		return m, nil

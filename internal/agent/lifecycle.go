@@ -55,6 +55,19 @@ func (s *TurnState) Append(message chmctx.Message) {
 	s.History = append(s.History, message)
 }
 
+// discardCurrentGoal removes the newest user goal and everything the model
+// produced for it. It is used only when cancellation interrupts a running tool:
+// retaining that unresolved instruction would invite the next model turn to
+// execute the cancelled side effect again.
+func (s *TurnState) discardCurrentGoal() {
+	for i := len(s.History) - 1; i >= 0; i-- {
+		if s.History[i].Role == chmctx.RoleUser {
+			s.History = s.History[:i]
+			return
+		}
+	}
+}
+
 // End cancels and releases the active context while retaining history and the
 // last identity for stale-result comparison.
 func (s *TurnState) End() {

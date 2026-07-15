@@ -107,6 +107,8 @@ public static class TuiHarnessWin32 {
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
     [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr hWnd, int x, int y, int width, int height, bool repaint);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] public static extern void keybd_event(byte virtualKey, byte scanCode, uint flags, UIntPtr extraInfo);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int command);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 }
@@ -150,7 +152,13 @@ function Wait-WindowClosed([IntPtr]$Handle, [int]$TimeoutSeconds = 10) {
 
 function Focus-Window([IntPtr]$Handle) {
     [void][TuiHarnessWin32]::ShowWindow($Handle, 9)
-    if (-not [TuiHarnessWin32]::SetForegroundWindow($Handle)) {
+    [void][TuiHarnessWin32]::SetForegroundWindow($Handle)
+    if ([TuiHarnessWin32]::GetForegroundWindow() -ne $Handle) {
+        [TuiHarnessWin32]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero)
+        [TuiHarnessWin32]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+        [void][TuiHarnessWin32]::SetForegroundWindow($Handle)
+    }
+    if ([TuiHarnessWin32]::GetForegroundWindow() -ne $Handle) {
         throw 'could not focus the acceptance window'
     }
     Start-Sleep -Milliseconds 150

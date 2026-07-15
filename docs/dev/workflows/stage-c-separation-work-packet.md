@@ -123,13 +123,13 @@ The TUI no longer opens model streams, executes tools, stores turn contexts, pac
 
 ### Completion evidence
 
-- Changed: open.
-- Documented: this work packet and the active Stage C inventory establish the pre-edit contract.
-- Verified: open.
-- Coverage: open.
-- Security: open.
-- Evidence: source and accepted tests inventoried; implementation and runtime evidence remain open.
-- Known limits: configuration persistence and model-client replacement remain later Stage C ownership slices except for the atomic runtime handoff required by this slice.
+- Changed: accepted. Turn lifecycle, model streaming, sequential tools, cancellation, accounting, loop policy, diagnostics, and causal logging are agent-owned behind the app-composed runtime façade; cancellation during a running tool removes the incomplete model-facing goal so it cannot be reissued.
+- Documented: current/target architecture, decisions D-012/D-013, active Stage C inventory, harness contract, package/exported-symbol documentation, and checkpoints 2A through 2L agree with the accepted implementation.
+- Verified: focused agent/app/TUI/logging tests, architecture enforcement, the canonical repository gate, and the strengthened exact-build Windows Terminal Gemma scenario all pass.
+- Coverage: exactly 100.0% statements (2028/2028), every Slice 2 behavioral row verified, and affected documentation audited with no stale open claim.
+- Security: contexts, cancellation functions, credentials, reasoning, raw tool arguments/results, and log handles remain outside presentation snapshots; cancelled process cleanup, absent side effects, stale-result rejection, cancelled-goal non-reissue, and report non-disclosure are proven.
+- Evidence: commit containing this record; `E:\ReProject\StageA-Acceptance\StageC-Agent-Slice2\report.json` and reviewed `tools-complete.png`, `powershell-running.png`, and `recovered.png` from 2026-07-15 against `google/gemma-4-12b-qat` at 16,384 context tokens.
+- Known limits: configuration persistence and model-client replacement remain later Stage C ownership slices and are not Slice 2 debt.
 
 #### Checkpoint 2A — pure request and policy contracts
 
@@ -240,3 +240,13 @@ The TUI no longer opens model streams, executes tools, stores turn contexts, pac
 - Security: three acceptance launches failed before any synthetic prompt was delivered. Reports remain sanitized, the private log was not copied, and no fixture tool or process side effect ran.
 - Evidence: LM Studio reports `google/gemma-4-12b-qat` loaded at 16,384 tokens on port 1234. Normal foreground activation with verification retries, attached-input activation, and direct window switching were each denied by the Codex desktop host; the sanitized report records failure at the first `type_text` step.
 - Known limits: run the committed `agent-tool-loop-cancel.json` scenario from an interactive desktop PowerShell/Windows Terminal session against the same build, then review its report and screenshots before changing `AGENT-01`, `AGENT-02`, or `TUI-04` to verified.
+
+#### Checkpoint 2L — cancellation non-reissue and runtime acceptance
+
+- Changed: runtime review exposed that rejecting a cancelled tool result was insufficient: the unresolved user instruction remained in model history and Gemma reissued it during recovery. `Runtime.CancelTurn` now discards only the incomplete model-facing goal when cancellation interrupts `PhaseRunning`; streaming cancellations retain their prior history. The harness now verifies foreground ownership after a bounded Alt activation fallback and asserts tool counts again after recovery.
+- Documented: current architecture, the active inventory, harness contract, and Slice 2 completion evidence record the corrected cancellation invariant and exact artifacts.
+- Verified: `TestRuntimeCancelTurnDropsOnlyRunningToolGoal` proves running-tool removal and non-tool retention. Focused agent/TUI tests, scenario validation, and the canonical gate pass. The strengthened real-model scenario passes in Windows Terminal: four ordered fixture calls/results, a fifth cancelled PowerShell start, exactly four total accepted results, no reissued sixth tool, no side-effect file, `RECOVERED`, clean exit, and restored shell.
+- Coverage: canonical atomic profile is exactly 100.0% (2028/2028 statements); `AGENT-01`, `AGENT-02`, and `TUI-04` are verified with source, tests, and runtime evidence.
+- Security: cancellation removes the unresolved side-effect instruction from model-facing history without deleting visible transcript or prompt recall; no prompt, key, raw log, or unrelated data was copied to the report or repository.
+- Evidence: sanitized report and three reviewed screenshots at `E:\ReProject\StageA-Acceptance\StageC-Agent-Slice2`, generated 2026-07-15 with LM Studio `google/gemma-4-12b-qat` and the exact canonical build.
+- Known limits: none within Slice 2. Later Stage C slices still own configuration/client/persistence extraction.

@@ -6,7 +6,7 @@ The Windows-only harness at `scripts/acceptance/Invoke-TuiAcceptance.ps1` drives
 
 The harness combines three independent channels:
 
-1. **Control** — a newly created Windows Terminal top-level window is identified by its Win32 handle. Named keys, clipboard paste, focus, movement, and resize actions target only that handle.
+1. **Control** — a newly created Windows Terminal top-level window is identified by its Win32 handle. Named keys, clipboard paste, focus, movement, and resize actions target only that handle. If Windows foreground locking rejects the first activation, the harness emits one Alt press/release and retries the same bound handle; it still fails closed unless that handle becomes the actual foreground window.
 2. **State** — steps wait on category-only records from `.rehamr/log.txt`, such as `session`, `request`, `assistant`, `cancel`, and `turn_end`. Fixed sleeps are used only where visual settling is the behavior under observation.
 3. **Observation** — exact-window screenshots, file/hash/content assertions, event ordering, window lifecycle, and a command executed after Ctrl+D independently prove visible and external effects.
 
@@ -26,7 +26,7 @@ pwsh -NoProfile -File ./scripts/acceptance/Invoke-TuiAcceptance.ps1 `
 
 Use `-ValidateOnly` to check a scenario on any platform without opening a terminal. The canonical repository gate validates every committed scenario.
 
-The `smoke.json` scenario proves startup, event readiness, pinned screenshots, resize handling, Ctrl+D terminal restoration, a command in the restored PowerShell shell, cleanup, and window closure. `model-stream-cancel.json` additionally exercises a real model turn, streaming screenshots, cancellation, recovery ordering, and clean exit. `agent-tool-loop-cancel.json` requires exactly four ordered fixture tool starts/results, verifies both files, cancels a long PowerShell call, proves its result and side effect stay absent, then proves recovery and terminal restoration. Real-model scenario endpoints must already be running.
+The `smoke.json` scenario proves startup, event readiness, pinned screenshots, resize handling, Ctrl+D terminal restoration, a command in the restored PowerShell shell, cleanup, and window closure. `model-stream-cancel.json` additionally exercises a real model turn, streaming screenshots, cancellation, recovery ordering, and clean exit. `agent-tool-loop-cancel.json` requires exactly four ordered fixture tool starts/results, verifies both files, cancels a long PowerShell call, proves its result and side effect stay absent, and then requires the total tool-start/result counts to remain unchanged through recovery so the cancelled instruction cannot be reissued. It also proves terminal restoration. Real-model scenario endpoints must already be running.
 
 ## Scenario contract
 

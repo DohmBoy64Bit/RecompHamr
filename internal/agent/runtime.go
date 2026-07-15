@@ -147,6 +147,17 @@ func (r Runtime) EndTurn() bool {
 	return wasRetrying
 }
 
+// CancelTurn ends an interrupted turn. When a local tool was running, it also
+// removes that incomplete model-facing goal so a later request cannot reissue
+// the cancelled side effect. Visible transcript and prompt recall are owned by
+// presentation and remain unchanged.
+func (r Runtime) CancelTurn() bool {
+	if r.Stream.Phase == PhaseRunning {
+		r.Turn.discardCurrentGoal()
+	}
+	return r.EndTurn()
+}
+
 // ResetConversation clears agent history, accounting, and failure state.
 func (r Runtime) ResetConversation() {
 	r.Turn.Reset()

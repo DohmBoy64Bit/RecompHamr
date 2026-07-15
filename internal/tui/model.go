@@ -531,7 +531,10 @@ func (m *Model) appendUserTurn(content string) tea.Cmd {
 // whose tool_call_id no longer pairs the latest assistant message. Does NOT
 // touch scrollback; callers decide whether to flush streaming or emit a banner.
 func (m *Model) endTurn() {
-	wasRetrying := m.agentRuntime.EndTurn()
+	m.finishTurnReset(m.agentRuntime.EndTurn())
+}
+
+func (m *Model) finishTurnReset(wasRetrying bool) {
 	// The queue-refusal hint says "send it when the turn ends"; that moment is
 	// now, so the advice would be stale from the next render on.
 	if m.status == queueSlashHint {
@@ -574,7 +577,7 @@ func (m *Model) applyDoneEffect(effect agent.StreamEffect) {
 // before the error (so the user keeps failure context), emit the one-line hint,
 // drop the pending queue, reset turn state.
 func (m *Model) applyError(err error) tea.Cmd {
-	m.abortTurn(styleError.Render(m.errorMessage(err)))
+	m.abortTurn(styleError.Render(m.errorMessage(err)), false)
 	return nil
 }
 
@@ -582,7 +585,7 @@ func (m *Model) applyError(err error) tea.Cmd {
 // text so the partial block lands in scrollback, post the explanatory banner,
 // drop pending tool calls, reset per-turn counters and context. Pair to
 // applyDone for the happy path.
-func (m *Model) abortTurn(banner string) {
+func (m *Model) abortTurn(banner string, cancelled bool) {
 	m.flushStreaming()
 	if banner != "" {
 		m.appendLine(banner)
@@ -601,6 +604,11 @@ func (m *Model) abortTurn(banner string) {
 	// finalizeTurn folds the in-flight estimate into the counters and zeroes it,
 	// so the avg counts what was generated up to the interrupt; don't drop it here.
 	m.finalizeTurn(outcomeStopped)
+	if cancelled {
+		wasRetrying := m.agentRuntime.CancelTurn()
+		m.finishTurnReset(wasRetrying)
+		return
+	}
 	m.endTurn() // drops pending tool calls along with the rest of the turn state
 }
 

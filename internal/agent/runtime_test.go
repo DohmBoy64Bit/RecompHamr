@@ -41,3 +41,27 @@ func TestRuntimeStartsPackedRound(t *testing.T) {
 		t.Fatalf("packed token summary = %#v", summary)
 	}
 }
+
+func TestRuntimeCancelTurnDropsOnlyRunningToolGoal(t *testing.T) {
+	runtime := NewRuntime(&fakeChatClient{}, NewToolExecutor(nil))
+	prior := chmctx.Message{Role: chmctx.RoleAssistant, Content: "prior answer"}
+	runtime.Turn.History = []chmctx.Message{prior}
+	runtime.BeginTurn(time.Now())
+	runtime.AppendUser("run a delayed side effect")
+	runtime.Turn.Append(chmctx.Message{Role: chmctx.RoleAssistant, ToolCalls: []chmctx.ToolCall{{ID: "call-1", Name: "powershell"}}})
+	runtime.Stream.Phase = PhaseRunning
+	if runtime.CancelTurn() {
+		t.Fatal("cancel unexpectedly reported a retry")
+	}
+	if runtime.Active() || runtime.Stream.Phase != PhaseIdle || len(runtime.Turn.History) != 1 || runtime.Turn.History[0].Content != prior.Content {
+		t.Fatalf("running-tool cancellation retained an incomplete goal: %#v", runtime.Turn.History)
+	}
+
+	runtime.BeginTurn(time.Now())
+	runtime.AppendUser("keep an interrupted streaming goal")
+	runtime.Stream.Phase = PhaseStreaming
+	runtime.CancelTurn()
+	if len(runtime.Turn.History) != 2 || runtime.Turn.History[1].Content != "keep an interrupted streaming goal" {
+		t.Fatalf("non-tool cancellation discarded retained history: %#v", runtime.Turn.History)
+	}
+}
