@@ -1,0 +1,12 @@
+# recomphamr configuration
+#
+# context_size is what recomphamr packs to. Set it to the context window your
+# active server actually accepts, not merely the model's theoretical maximum.
+
+active: local
+models:
+    local:
+        llm: google/gemma-4-12b-qat
+        url: http://localhost:1234
+        key: ""
+        context_size: 16177

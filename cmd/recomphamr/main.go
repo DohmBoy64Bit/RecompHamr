@@ -7,14 +7,14 @@ import (
 	"log"
 	"os"
 
-	"github.com/DohmBoy64Bit/RecompHamr/internal/app"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/app/terminal"
 )
 
 var version = "dev"
 
 var (
-	startApplication     = app.Run
-	printApplicationHelp = app.PrintHelp
+	startApplication     = terminal.Run
+	printApplicationHelp = terminal.PrintHelp
 	exitProcess          = os.Exit
 )
 

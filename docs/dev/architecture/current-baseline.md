@@ -6,6 +6,9 @@ Stage A is accepted. Stage C slices 1 through 3 are accepted.
 cmd/recomphamr
     |
     v
+internal/app/terminal --> internal/tui --> internal/frontend
+    |
+    v
 internal/app
     +--> internal/config
     +--> internal/agent
@@ -13,9 +16,6 @@ internal/app
     +--> internal/session
     +--> internal/frontend
     +--> internal/app/controller
-    +--> internal/tui
-              |
-              +--> internal/frontend
 
 internal/agent
     +--> internal/ctx
@@ -45,6 +45,6 @@ Stage C slice 2 is accepted. `internal/agent` owns request packing/tool definiti
 
 Stage C slice 3 is accepted. Checkpoint 3A moved the complete prompt-history filesystem implementation into `internal/session`. Checkpoint 3B added one app-composed `session.Runtime` that owns configuration reload, active-profile persistence, resolved credential use, concrete client replacement, and captured reachability/probe work. The TUI receives immutable non-secret snapshots and opaque bounded work, and production TUI code no longer imports config, LLM, or provider packages or performs history/config filesystem I/O. Focused/canonical verification and the complete user-confirmed Windows Terminal checklist preserve model switching, real response, persistence, history, representative rendering, clean exit, and shell restoration.
 
-Stage C slice 4 is in progress. Checkpoints 4B through 4D add backend-neutral `internal/frontend` contracts and an independently tested controller under `internal/app/controller`, then route every session and agent action through that boundary. The controller now owns model reads, stream reduction, sequential tools, close policy, cancellation, stale work draining/rejection, and final accounting. Production TUI code imports only `internal/frontend` among project runtime packages and retains only rendering, transcript/editor/popover/queue/timing state, input translation, opaque-work scheduling, and event presentation. The remaining work is terminal-adapter isolation, strengthened deletion-boundary enforcement, final documentation/audit, and exact-commit closure evidence.
+Stage C slice 4 is in progress. Checkpoints 4B through 4E add backend-neutral `internal/frontend` contracts, route every session and agent action through `internal/app/controller`, and isolate concrete terminal composition in `internal/app/terminal`. The controller owns model reads, stream reduction, sequential tools, close policy, cancellation, stale work draining/rejection, and final accounting. Production TUI code imports only `internal/frontend` among project runtime packages. Core `internal/app` imports neither TUI nor Bubble Tea and exposes only a neutral controller plus idempotent cleanup; deleting the terminal adapter removes the runnable presentation target without removing buildable application/backend behavior. The remaining work is final documentation/audit, exact-commit runtime and CI evidence, and Stage C status closure.
 
-Backend packages must not import `internal/tui`. `internal/app` is the sole current exception because a composition root must select the concrete frontend. Later slices replace that concrete runtime coupling with typed frontend contracts while preserving the accepted layout and behavior.
+Backend packages do not import `internal/tui`. `internal/app/terminal` is the sole concrete TUI/Bubble Tea wiring edge.

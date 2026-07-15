@@ -6,6 +6,9 @@ This architecture becomes the next implementation target **after** the barebones
 cmd/recomphamr
         |
         v
+internal/app/terminal --> internal/tui
+        |
+        v
    internal/app
     /    |     \
    v     v      v
@@ -27,6 +30,10 @@ Process entrypoint only. Parse process-level flags and delegate application comp
 ### `internal/app`
 
 Compose concrete services, own application lifecycle, translate frontend intents into exactly-once application actions, and provide immutable/runtime snapshots to presentation.
+
+### `internal/app/terminal`
+
+Own the sole concrete TUI and Bubble Tea wiring edge, inline terminal lifecycle, focus reporting, and terminal help formatting.
 
 ### `internal/tui`
 
@@ -54,4 +61,4 @@ The separation stage must preserve the accepted baseline behavior and layout. Mo
 
 ## Closure condition
 
-Deleting `internal/tui` from a separated build should remove presentation only, not tool execution, model orchestration, configuration persistence, or application lifecycle behavior.
+Deleting `internal/app/terminal` and `internal/tui` removes the runnable presentation target only. Core application composition, tool execution, model orchestration, configuration persistence, and controller behavior remain buildable and testable without TUI or Bubble Tea dependencies.

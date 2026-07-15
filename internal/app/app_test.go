@@ -1,49 +1,35 @@
 package app
 
 import (
-	"bytes"
 	"errors"
-	"io"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
 )
 
-type failingWriter struct{ err error }
+type fakeController struct{}
 
-func (w failingWriter) Write([]byte) (int, error) { return 0, w.err }
+func (fakeController) Bootstrap() frontend.Transition               { return frontend.Transition{} }
+func (fakeController) Dispatch(frontend.Intent) frontend.Transition { return frontend.Transition{} }
+func (fakeController) Snapshot() frontend.Snapshot                  { return frontend.Snapshot{} }
 
 func restoreAppHooks(t *testing.T) {
 	origCwd, origBootstrap, origAbs, origEnv := getWorkingDirectory, bootstrapConfig, absolutePath, getEnvironment
-	origSession, origRuntime, origFrontend := newSessionRuntime, newAgentRuntime, newFrontend
-	origOpen, origClose, origHelp := openDebugLog, closeDebugLog, printFrontendHelp
-	origRun, origNew := runTeaProgram, newTeaProgram
+	origSession, origAgent, origController := newSessionRuntime, newAgentRuntime, newController
+	origOpen, origClose := openDebugLog, closeDebugLog
 	t.Cleanup(func() {
 		getWorkingDirectory, bootstrapConfig, absolutePath, getEnvironment = origCwd, origBootstrap, origAbs, origEnv
-		newSessionRuntime, newAgentRuntime, newFrontend = origSession, origRuntime, origFrontend
-		openDebugLog, closeDebugLog, printFrontendHelp = origOpen, origClose, origHelp
-		runTeaProgram, newTeaProgram = origRun, origNew
+		newSessionRuntime, newAgentRuntime, newController = origSession, origAgent, origController
+		openDebugLog, closeDebugLog = origOpen, origClose
 	})
 }
 
-type inertModel struct{}
-
-func (inertModel) Init() tea.Cmd                         { return tea.Quit }
-func (m inertModel) Update(tea.Msg) (tea.Model, tea.Cmd) { return m, nil }
-func (inertModel) View() string                          { return "" }
-
-type fakeProgram struct{ err error }
-
-func (p fakeProgram) Run() (tea.Model, error) { return inertModel{}, p.err }
-
-func TestRunCompositionAndLogging(t *testing.T) {
+func TestBootstrapCompositionAndClose(t *testing.T) {
 	restoreAppHooks(t)
 	root := t.TempDir()
 	getWorkingDirectory = func() (string, error) { return root, nil }
@@ -58,138 +44,66 @@ func TestRunCompositionAndLogging(t *testing.T) {
 		return ""
 	}
 	absolutePath = func(string) (string, error) { return "", errors.New("abs") }
-	sessionCreated := false
+	createdSession := false
 	newSessionRuntime = func(got *config.Config) *session.Runtime {
-		sessionCreated = true
-		if got != cfg || got.ActiveURL() != "http://override" {
-			t.Fatalf("session config = %p %q", got, got.ActiveURL())
+		createdSession = true
+		if got.ActiveURL() != "http://override" {
+			t.Fatalf("override = %q", got.ActiveURL())
 		}
 		return session.NewRuntime(got)
 	}
-	frontendCreated := false
-	newFrontend = func(sessionRuntime *session.Runtime, runtime agent.Runtime, system, version string) tea.Model {
-		frontendCreated = true
-		if sessionRuntime == nil || runtime.Client != sessionRuntime || !strings.Contains(system, "Working directory: "+root) || version != "test" {
-			t.Fatalf("frontend args = %p %q %q", sessionRuntime, system, version)
-		}
-		return inertModel{}
+	newAgentRuntime = func(client agent.ChatClient) agent.Runtime {
+		return agent.NewRuntime(client, agent.LocalToolExecutor())
+	}
+	createdController := false
+	newController = func(sessionRuntime *session.Runtime, runtime agent.Runtime, system, version string) frontend.Controller {
+		createdController = sessionRuntime != nil && runtime.Client == sessionRuntime && strings.Contains(system, "Working directory: "+root) && version == "test"
+		return fakeController{}
 	}
 	opened, closed := "", 0
 	openDebugLog = func(dir string) { opened = dir }
 	closeDebugLog = func() { closed++ }
-	runTeaProgram = func(model tea.Model) error {
-		if model == nil {
-			t.Fatal("nil frontend")
-		}
-		return nil
+	runtime, err := Bootstrap("test")
+	if err != nil || !createdSession || !createdController || opened != cfg.Dir || runtime.Controller() == nil {
+		t.Fatalf("bootstrap runtime=%#v err=%v session=%v controller=%v open=%q", runtime, err, createdSession, createdController, opened)
 	}
-	var out bytes.Buffer
-	if err := Run(&out, "test"); err != nil {
-		t.Fatal(err)
-	}
-	if !sessionCreated || !frontendCreated || opened != cfg.Dir || closed != 1 {
-		t.Fatalf("composition = session:%v frontend:%v open:%q close:%d", sessionCreated, frontendCreated, opened, closed)
-	}
-	if !strings.Contains(out.String(), "\x1b[2J") {
-		t.Fatalf("clear sequence = %q", out.String())
+	runtime.Close()
+	runtime.Close()
+	if closed != 1 {
+		t.Fatalf("close count = %d", closed)
 	}
 }
 
-func TestRunFailuresAndNoLogging(t *testing.T) {
+func TestBootstrapFailuresAndNoLogging(t *testing.T) {
 	boom := errors.New("boom")
 	t.Run("cwd", func(t *testing.T) {
 		restoreAppHooks(t)
 		getWorkingDirectory = func() (string, error) { return "", boom }
-		if err := Run(io.Discard, "test"); !errors.Is(err, boom) {
-			t.Fatalf("error = %v", err)
+		if runtime, err := Bootstrap("test"); runtime != nil || !errors.Is(err, boom) {
+			t.Fatalf("runtime=%#v err=%v", runtime, err)
 		}
 	})
-	t.Run("bootstrap", func(t *testing.T) {
+	t.Run("config", func(t *testing.T) {
 		restoreAppHooks(t)
 		getWorkingDirectory = func() (string, error) { return t.TempDir(), nil }
 		bootstrapConfig = func(string) (*config.Config, bool, error) { return nil, false, boom }
-		if err := Run(io.Discard, "test"); !errors.Is(err, boom) {
-			t.Fatalf("error = %v", err)
+		if runtime, err := Bootstrap("test"); runtime != nil || !errors.Is(err, boom) {
+			t.Fatalf("runtime=%#v err=%v", runtime, err)
 		}
 	})
-	for _, tc := range []struct {
-		name      string
-		configure func()
-	}{
-		{"output", func() { runTeaProgram = func(tea.Model) error { return nil } }},
-		{"program", func() { runTeaProgram = func(tea.Model) error { return boom } }},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			restoreAppHooks(t)
-			root := t.TempDir()
-			getWorkingDirectory = func() (string, error) { return root, nil }
-			cfg := config.Default()
-			cfg.Dir = root
-			bootstrapConfig = func(string) (*config.Config, bool, error) { return cfg, false, nil }
-			newFrontend = func(*session.Runtime, agent.Runtime, string, string) tea.Model {
-				return inertModel{}
-			}
-			tc.configure()
-			writer := io.Writer(io.Discard)
-			if tc.name == "output" {
-				writer = failingWriter{boom}
-			}
-			if err := Run(writer, "test"); !errors.Is(err, boom) {
-				t.Fatalf("error = %v", err)
-			}
-		})
-	}
-}
-
-func TestPrintHelp(t *testing.T) {
-	restoreAppHooks(t)
-	printFrontendHelp = func(w io.Writer) { _, _ = io.WriteString(w, "commands\n") }
-	var out bytes.Buffer
-	if err := PrintHelp(&out); err != nil || !strings.Contains(out.String(), "Slash commands:\ncommands") || !strings.Contains(out.String(), "RECOMPHAMR_URL") {
-		t.Fatalf("help = %q %v", out.String(), err)
-	}
-	boom := errors.New("boom")
-	if err := PrintHelp(failingWriter{boom}); !errors.Is(err, boom) {
-		t.Fatalf("first write = %v", err)
-	}
-	printFrontendHelp = func(io.Writer) {}
-	writes := 0
-	writer := writerFunc(func(p []byte) (int, error) {
-		writes++
-		if writes == 2 {
-			return 0, boom
+	t.Run("no logging", func(t *testing.T) {
+		restoreAppHooks(t)
+		root := t.TempDir()
+		getWorkingDirectory = func() (string, error) { return root, nil }
+		cfg := config.Default()
+		cfg.Dir = root
+		bootstrapConfig = func(string) (*config.Config, bool, error) { return cfg, false, nil }
+		opened := false
+		openDebugLog = func(string) { opened = true }
+		runtime, err := Bootstrap("test")
+		if err != nil || opened {
+			t.Fatalf("err=%v opened=%v", err, opened)
 		}
-		return len(p), nil
+		runtime.Close()
 	})
-	if err := PrintHelp(writer); !errors.Is(err, boom) {
-		t.Fatalf("second write = %v", err)
-	}
 }
-
-type writerFunc func([]byte) (int, error)
-
-func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
-
-func TestTeaProgramBoundary(t *testing.T) {
-	restoreAppHooks(t)
-	cfg := config.Default()
-	cfg.Dir = t.TempDir()
-	sessionRuntime := session.NewRuntime(cfg)
-	if model := newFrontend(sessionRuntime, newAgentRuntime(sessionRuntime), "system", "test"); model == nil {
-		t.Fatal("default frontend factory returned nil")
-	}
-	if createTeaProgram(inertModel{}) == nil {
-		t.Fatal("factory returned nil")
-	}
-	newTeaProgram = func(tea.Model) teaProgram { return fakeProgram{} }
-	if err := executeTeaProgram(inertModel{}); err != nil {
-		t.Fatal(err)
-	}
-	boom := errors.New("tea")
-	newTeaProgram = func(tea.Model) teaProgram { return fakeProgram{err: boom} }
-	if err := executeTeaProgram(inertModel{}); !errors.Is(err, boom) {
-		t.Fatalf("error = %v", err)
-	}
-}
-
-func TestMain(m *testing.M) { os.Exit(m.Run()) }

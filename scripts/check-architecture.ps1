@@ -7,9 +7,7 @@ function Fail([string]$Message) {
     throw "architecture check failed: $Message"
 }
 
-# Stage C still permits inherited TUI -> runtime coupling while it is extracted,
-# but backend packages must never depend on the TUI. internal/app is the sole
-# composition root allowed to construct the concrete presentation.
+# Backend packages must never depend on the concrete presentation.
 $BackendRoots = @('internal/agent', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/logging', 'internal/provider', 'internal/session', 'internal/tools')
 foreach ($Relative in $BackendRoots) {
     $Dir = Join-Path $Root $Relative
@@ -22,33 +20,60 @@ foreach ($Relative in $BackendRoots) {
     }
 }
 
-# Slice 2 owns model/tool orchestration in internal/agent. Presentation may
-# schedule opaque work and render typed effects, but it must not recover direct
-# tool execution, provider-error policy, or construct parallel agent roots.
-$TuiProduction = Get-ChildItem -Path (Join-Path $Root 'internal/tui') -File -Filter '*.go' |
+# The core application package is independently buildable without Bubble Tea
+# or the concrete TUI. Only internal/app/terminal may own that wiring edge.
+$CoreAppProduction = Get-ChildItem -Path (Join-Path $Root 'internal/app') -File -Filter '*.go' |
     Where-Object { $_.Name -notlike '*_test.go' }
-foreach ($Pattern in @('internal/tools', 'internal/logging', 'tools.Execute', 'tools.InlineStatus', 'provider.ErrUnauthorized', 'provider.ErrUnreachable', 'agent.LocalToolExecutor', 'agent.NewTurnState', 'agent.NewStreamState', 'turn.Context', 'turn.CancelFunc', 'm.turn.', 'm.runtime.', 'm.loop.', 'appendPromptHistory', 'loadPromptHistory', 'clearPromptHistory', 'history_store')) {
-    $Hit = $TuiProduction | Select-String -SimpleMatch $Pattern | Select-Object -First 1
+foreach ($Pattern in @('internal/tui', 'charmbracelet/bubbletea')) {
+    $Hit = $CoreAppProduction | Select-String -SimpleMatch $Pattern | Select-Object -First 1
     if ($null -ne $Hit) {
-        Fail "presentation owns agent orchestration at $($Hit.Path):$($Hit.LineNumber): $Pattern"
+        Fail "core app imports terminal presentation at $($Hit.Path):$($Hit.LineNumber): $Pattern"
     }
 }
 
-# Slice 3 owns configuration, concrete clients, probes, and persistence in the
-# session boundary. Presentation may consume session snapshots/work only.
-foreach ($Pattern in @('internal/config', 'internal/llm', 'internal/provider', 'llm.New', 'provider.Reachable', 'os.Open', 'os.ReadFile', 'os.WriteFile', 'os.Remove', 'filepath.')) {
+# Presentation may import only the neutral frontend contract among project
+# runtime packages and may only schedule opaque Work values.
+$TuiProduction = Get-ChildItem -Path (Join-Path $Root 'internal/tui') -File -Filter '*.go' |
+    Where-Object { $_.Name -notlike '*_test.go' }
+foreach ($Pattern in @('internal/agent', 'internal/session', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/provider', 'internal/tools', 'internal/logging', '.ApplyDelivery(', '.ApplyToolResult(', '.StartRound(', '.NextTool(', '.DecideClose(', '.CancelTurn(', '.ResetConversation(', '.Reachability(', 'ProbeWork', 'ToolDelivery', 'StreamDelivery', 'TurnState', 'StreamState', 'LoopState', 'cancelFunc', 'processHandle')) {
     $Hit = $TuiProduction | Select-String -SimpleMatch $Pattern | Select-Object -First 1
     if ($null -ne $Hit) {
-        Fail "presentation owns session lifecycle at $($Hit.Path):$($Hit.LineNumber): $Pattern"
+        Fail "presentation imports backend lifecycle at $($Hit.Path):$($Hit.LineNumber): $Pattern"
+    }
+}
+
+# The neutral contract must import neither backend packages nor Bubble Tea.
+$FrontendProduction = Get-ChildItem -Path (Join-Path $Root 'internal/frontend') -File -Filter '*.go' |
+    Where-Object { $_.Name -notlike '*_test.go' }
+foreach ($Pattern in @('internal/agent', 'internal/app', 'internal/session', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/provider', 'internal/tools', 'internal/logging', 'charmbracelet/bubbletea')) {
+    $Hit = $FrontendProduction | Select-String -SimpleMatch $Pattern | Select-Object -First 1
+    if ($null -ne $Hit) {
+        Fail "frontend contract imports concrete runtime at $($Hit.Path):$($Hit.LineNumber): $Pattern"
     }
 }
 
 $Entrypoint = Join-Path $Root 'cmd/recomphamr/main.go'
-foreach ($Pattern in @('internal/config', 'internal/ctx', 'internal/llm', 'internal/provider', 'internal/tools', 'internal/tui')) {
+foreach ($Pattern in @('internal/config', 'internal/ctx', 'internal/llm', 'internal/provider', 'internal/tools', 'internal/tui', 'internal/agent', 'internal/session')) {
     $Hit = Select-String -Path $Entrypoint -SimpleMatch $Pattern | Select-Object -First 1
     if ($null -ne $Hit) {
         Fail "process entrypoint bypasses internal/app at $($Hit.Path):$($Hit.LineNumber): $Pattern"
     }
+}
+if (-not (Select-String -Path $Entrypoint -SimpleMatch 'internal/app/terminal' -Quiet)) {
+    Fail 'process entrypoint does not delegate through internal/app/terminal'
+}
+$DirectAppImport = Select-String -Path $Entrypoint -Pattern 'internal/app"' | Select-Object -First 1
+if ($null -ne $DirectAppImport) {
+    Fail "process entrypoint bypasses terminal adapter at $($DirectAppImport.Path):$($DirectAppImport.LineNumber)"
+}
+
+# go list is the positive deletion-boundary proof: core application and all
+# backend owners resolve without either concrete TUI or Bubble Tea dependencies.
+$CorePackages = @('./internal/app', './internal/app/controller', './internal/frontend', './internal/agent', './internal/session', './internal/config', './internal/ctx', './internal/llm', './internal/provider', './internal/tools', './internal/logging')
+$Deps = & go list -deps @CorePackages
+if ($LASTEXITCODE -ne 0) { Fail 'core/backend package graph does not build' }
+foreach ($Pattern in @('github.com/DohmBoy64Bit/RecompHamr/internal/tui', 'github.com/charmbracelet/bubbletea')) {
+    if ($Deps -contains $Pattern) { Fail "core/backend deletion graph contains $Pattern" }
 }
 
 # Removed feature packages must not be imported under a different file layout.
@@ -60,5 +85,5 @@ foreach ($Pattern in @('/mcp', '/skills', '/update', '/classifier', '/doctor', '
     }
 }
 
-Write-Host 'architecture (Stage C transition): PASS'
-Write-Host 'note: internal/app composes agent and session runtimes; Slice 3 runtime acceptance remains open.'
+Write-Host 'architecture (Stage C frontend boundary): PASS'
+Write-Host 'core/backend deletion graph excludes internal/tui and Bubble Tea.'

@@ -1,21 +1,16 @@
-// Package app composes RecompHamr services and owns the application lifecycle.
+// Package app composes RecompHamr backend services and owns their lifecycle.
 package app
 
 import (
-	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"strings"
-
-	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	appcontroller "github.com/DohmBoy64Bit/RecompHamr/internal/app/controller"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/tui"
 )
 
 var (
@@ -27,96 +22,63 @@ var (
 	newAgentRuntime     = func(client agent.ChatClient) agent.Runtime {
 		return agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver())
 	}
-	newFrontend = func(sessionRuntime *session.Runtime, runtime agent.Runtime, system, version string) tea.Model {
-		return tui.New(appcontroller.NewController(sessionRuntime, runtime, system, version), version)
+	newController = func(sessionRuntime *session.Runtime, runtime agent.Runtime, system, version string) frontend.Controller {
+		return appcontroller.NewController(sessionRuntime, runtime, system, version)
 	}
-	openDebugLog      = logging.Open
-	closeDebugLog     = logging.Close
-	printFrontendHelp = tui.PrintHelp
-	runTeaProgram     = executeTeaProgram
-	newTeaProgram     = createTeaProgram
+	openDebugLog  = logging.Open
+	closeDebugLog = logging.Close
 )
 
-type teaProgram interface {
-	Run() (tea.Model, error)
+// Runtime is the application-owned backend lifetime exposed to concrete
+// frontend adapters. It reveals only the neutral controller and idempotent
+// cleanup, never concrete session, agent, logging, or credential capabilities.
+type Runtime struct {
+	controller frontend.Controller
+	close      func()
 }
 
-// Run bootstraps configuration and services, constructs the terminal frontend,
-// and owns its logging and Bubble Tea lifecycle until the program exits.
-func Run(stdout io.Writer, version string) error {
+// Controller returns the backend-neutral presentation boundary.
+func (r *Runtime) Controller() frontend.Controller { return r.controller }
+
+// Close releases application-owned resources. Calling Close more than once is
+// safe and closes the private debug log at most once.
+func (r *Runtime) Close() {
+	if r.close != nil {
+		r.close()
+		r.close = nil
+	}
+}
+
+// Bootstrap loads configuration, applies process overrides, composes session
+// and agent services, and returns their neutral controller lifetime.
+func Bootstrap(version string) (*Runtime, error) {
 	cwd, err := getWorkingDirectory()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	cfg, _, err := bootstrapConfig(cwd)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	applyEnvOverrides(cfg)
 
+	close := func() {}
 	if cfg.Logging {
 		openDebugLog(cfg.Dir)
-		defer closeDebugLog()
+		close = closeDebugLog
 	}
-
 	sessionRuntime := newSessionRuntime(cfg)
-	runtime := newAgentRuntime(sessionRuntime)
+	agentRuntime := newAgentRuntime(sessionRuntime)
 	projectDir, err := absolutePath(cwd)
 	if err != nil {
 		projectDir = cwd
 	}
 	system := config.DefaultSystemPrompt + "\n\nWorking directory: " + projectDir
-	frontend := newFrontend(sessionRuntime, runtime, system, version)
-
-	// Preserve the accepted inline behavior: no alternate screen, and terminal
-	// scrollback is still owned by Bubble Tea through tea.Println.
-	if _, err := io.WriteString(stdout, "\x1b[2J\x1b[3J\x1b[H"); err != nil {
-		return err
-	}
-	return runTeaProgram(frontend)
-}
-
-// PrintHelp writes the application-owned command, key, configuration, and
-// environment contract used by the process entrypoint.
-func PrintHelp(stdout io.Writer) error {
-	if _, err := fmt.Fprintln(stdout, strings.TrimSpace(`
-recomphamr - barebones local-first coding-agent baseline
-
-Usage:
-  recomphamr             start the inherited TUI
-  recomphamr --version   print version
-
-Slash commands:`)); err != nil {
-		return err
-	}
-	printFrontendHelp(stdout)
-	_, err := fmt.Fprintln(stdout, strings.TrimSpace(`
-
-Keys:
-  ctrl+l   clear the screen while keeping the conversation
-  ctrl+c   cancel an active turn; press again while idle to quit
-  ctrl+d   quit on empty input
-
-Config:
-  .rehamr/config.yaml
-
-Environment:
-  RECOMPHAMR_URL           override the active profile URL for this process
-  RECOMPHAMR_IDLE_TIMEOUT  stream idle timeout, e.g. 90m or 1h`))
-	return err
+	return &Runtime{controller: newController(sessionRuntime, agentRuntime, system, version), close: close}, nil
 }
 
 func applyEnvOverrides(cfg *config.Config) {
 	if envURL := getEnvironment("RECOMPHAMR_URL"); envURL != "" {
 		cfg.URLOverride = envURL
 	}
-}
-
-func executeTeaProgram(model tea.Model) error {
-	_, err := newTeaProgram(model).Run()
-	return err
-}
-
-func createTeaProgram(model tea.Model) teaProgram {
-	return tea.NewProgram(model, tea.WithReportFocus())
 }
