@@ -20,6 +20,7 @@
     "docs/dev/verification/verification-contract.md",
     "docs/dev/verification/behavioral-surface-coverage.md",
     "docs/dev/verification/stage-a-behavioral-surface.md",
+    "docs/dev/verification/stage-a-runtime-acceptance.md",
     "docs/dev/workflows/baseline-gate.md",
     "docs/dev/workflows/change-control.md",
     "docs/user/configuration.md",
@@ -90,7 +91,7 @@
       "Source-code similarity is not a release criterion."
     ],
     "docs/dev/verification/baseline-status.md": [
-      "OPEN — NOT YET MANUALLY ACCEPTED",
+      "ACCEPTED — STAGE A BASELINE CLOSED",
       "85409d167b97bec64ee330d51872d358d3ce2d57",
       "pwsh -NoProfile -File ./scripts/verify.ps1",
       "100% statement coverage"
@@ -210,6 +211,12 @@
       "Surface ID",
       "Runtime/manual evidence",
       "unverified"
+    ],
+    "docs/dev/verification/stage-a-runtime-acceptance.md": [
+      "google/gemma-4-12b-qat",
+      "Windows Terminal",
+      "100.0% statement coverage",
+      "29423037990"
     ],
     "docs/dev/workflows/stage-a-acceptance-work-packet.md": [
       "Outcome",

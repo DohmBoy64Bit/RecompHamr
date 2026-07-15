@@ -2,7 +2,7 @@
 
 ## Outcome
 
-The stripped RecompHamr baseline passes the canonical Go 1.26 gate on Windows and Ubuntu, has complete statement, behavioral-surface, and meaningful documentation coverage, and is manually accepted in Windows Terminal against LM Studio using `mistralai/devstral-small-2-2512`.
+The stripped RecompHamr baseline passes the canonical Go 1.26 gate on Windows and Ubuntu, has complete statement, behavioral-surface, and meaningful documentation coverage, and is manually accepted in Windows Terminal against LM Studio using the user-selected replacement model `google/gemma-4-12b-qat`.
 
 ## In scope
 
@@ -60,10 +60,10 @@ The exact accepted commit passes local and dual-platform CI gates, every behavio
 
 ## Completion evidence
 
-- Changed: pending.
-- Documented: pending.
-- Verified: pending.
-- Coverage: pending.
-- Security: pending.
-- Evidence: pending.
-- Known limits: pending.
+- Changed: verification portability, platform-native private-state protection, and deterministic test seams completed without changing the frozen layout or dependency stack.
+- Documented: configuration/security guarantees, behavioral inventory, and runtime acceptance are durable and contract-checked.
+- Verified: canonical local gate plus independent Windows and Ubuntu CI jobs.
+- Coverage: 100% meaningful statement and behavioral-surface coverage.
+- Security: POSIX modes and Windows current-user DACLs tested; committed evidence contains no secrets or raw prompts.
+- Evidence: `../verification/stage-a-runtime-acceptance.md` and its three representative screenshots.
+- Known limits: visual acceptance targets Windows Terminal only; the accepted real-model runtime is Gemma 4 12B QAT, replacing Devstral at the user's direction.
