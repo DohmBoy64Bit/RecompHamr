@@ -103,7 +103,7 @@ type ToolResultEffect struct {
 // ApplyToolResult appends a current-turn result, updates repeated-failure state,
 // and injects failure/runaway notes only after all sibling calls are paired.
 func (s *LoopState) ApplyToolResult(turn *TurnState, stream *StreamState, delivery ToolDelivery) ToolResultEffect {
-	if delivery.TurnID != turn.ID {
+	if delivery.TurnID != turn.ID || !turn.Active() {
 		return ToolResultEffect{}
 	}
 	effect := ToolResultEffect{Accepted: true, Message: delivery.Message}

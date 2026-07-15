@@ -78,12 +78,16 @@ func TestToolCancellationAndStaleCleanup(t *testing.T) {
 	result := make(chan ToolDelivery, 1)
 	go func() { result <- work.Run() }()
 	oldID := turn.ID
-	turn.Begin(context.Background(), time.Now())
+	turn.End()
 	delivery := <-result
 	if delivery.TurnID != oldID || delivery.Message.Content != "(cancelled)" {
 		t.Fatal("cancel delivery")
 	}
 	before := len(turn.History)
+	if effect := loop.ApplyToolResult(&turn, &stream, delivery); effect.Accepted || len(turn.History) != before {
+		t.Fatal("cancelled result accepted after turn ended")
+	}
+	turn.Begin(context.Background(), time.Now())
 	if effect := loop.ApplyToolResult(&turn, &stream, delivery); effect.Accepted || len(turn.History) != before {
 		t.Fatal("stale cancelled result")
 	}

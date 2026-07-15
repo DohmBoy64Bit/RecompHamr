@@ -190,3 +190,13 @@ The TUI no longer opens model streams, executes tools, stores turn contexts, pac
 - Security: model-facing packed messages, raw transport events, stable round identity, contexts, credentials, and resolved tool arguments do not cross the production presentation delivery boundary; request summaries contain counts only.
 - Evidence: production startup constructs one `agent.Runtime`; production chat startup calls `Runtime.StartRound`; stream messages carry opaque `StreamDelivery` values reduced by `ApplyDelivery`.
 - Known limits: the adapter still retains pointers to agent-owned mutable state for Bubble Tea compatibility, agent-event logging is still emitted through TUI logging calls, configuration/client/persistence ownership is a later Stage C slice, and the required real-model multi-tool/cancel runtime record remains open.
+
+#### Checkpoint 2G — cancellation regression and runtime scenario
+
+- Changed: tool-result acceptance now requires both matching stable identity and an active turn, preserving the pre-extraction rule that a result delivered after cancellation cannot re-enter chat before a replacement turn exists; the state-aware harness adds exact event-count and absent-file assertions plus a real-model ordered-tool/cancel/recovery scenario.
+- Documented: the harness contract names the new scenario and its non-disclosure/evidence semantics; this packet records why the lifecycle check is required in addition to `TurnID`.
+- Verified: deterministic agent tests cover cancellation delivery both immediately after turn end and after a fresh turn; the canonical gate validates all three scenario schemas and passes every automated check. Real execution is currently unverified because `http://localhost:1234/v1/models` was not listening when checked.
+- Coverage: the canonical repository profile passes at exactly 100.0% (1988/1988 statements); behavioral rows remain unverified until the exact-build real-model scenario runs successfully.
+- Security: the scenario uses only synthetic prompts and disposable relative fixture paths; reports contain event categories, never bodies, and the protected debug log is not copied to artifacts.
+- Evidence: `agent-tool-loop-cancel.json` waits for explicit bounded `tool_start` records, requires exactly paired successful results, asserts the cancelled result count does not advance, proves the delayed side-effect file is absent, and verifies recovery plus restored shell control.
+- Known limits: exact-build Windows Terminal execution requires LM Studio to listen on the configured local endpoint with the acceptance model loaded.

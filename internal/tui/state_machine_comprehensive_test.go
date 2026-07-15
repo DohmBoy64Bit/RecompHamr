@@ -103,10 +103,7 @@ func TestStreamEventStateMachine(t *testing.T) {
 		t.Fatal("dispatch pending")
 	}
 
-	turnCtx, cancel := context.WithCancel(context.Background())
-	cancel()
-	m.turn.Context = turnCtx
-	m.turn.ID = 1
+	m.turn.Begin(context.Background(), time.Now())
 	toolMsg := chmctx.Message{Role: chmctx.RoleTool, ToolName: tools.ReadFileName, Content: "ok"}
 	next, _ = m.update(toolResultMsg{delivery: agent.ToolDelivery{TurnID: 1, Message: toolMsg}})
 	m = next.(Model)
@@ -254,10 +251,7 @@ func TestRemainingStateBranches(t *testing.T) {
 	next, _ := m.update(probeMsg{profile: m.cfg.Active, silent: true})
 	m = next.(Model)
 	m.runtime.Pending = []chmctx.ToolCall{{Name: tools.ReadFileName}, {Name: tools.ReadFileName}}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	m.turn.Context = ctx
-	m.turn.ID = 1
+	m.turn.Begin(context.Background(), time.Now())
 	next, cmd := m.update(toolResultMsg{delivery: agent.ToolDelivery{TurnID: 1, Message: chmctx.Message{Role: chmctx.RoleTool}}})
 	m = next.(Model)
 	if cmd == nil || len(m.runtime.Pending) != 1 {

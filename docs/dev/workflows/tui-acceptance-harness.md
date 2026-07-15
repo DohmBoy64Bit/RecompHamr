@@ -26,7 +26,7 @@ pwsh -NoProfile -File ./scripts/acceptance/Invoke-TuiAcceptance.ps1 `
 
 Use `-ValidateOnly` to check a scenario on any platform without opening a terminal. The canonical repository gate validates every committed scenario.
 
-The `smoke.json` scenario proves startup, event readiness, pinned screenshots, resize handling, Ctrl+D terminal restoration, a command in the restored PowerShell shell, cleanup, and window closure. `model-stream-cancel.json` additionally exercises a real model turn, streaming screenshots, cancellation, recovery ordering, and clean exit. Its model endpoint must already be running.
+The `smoke.json` scenario proves startup, event readiness, pinned screenshots, resize handling, Ctrl+D terminal restoration, a command in the restored PowerShell shell, cleanup, and window closure. `model-stream-cancel.json` additionally exercises a real model turn, streaming screenshots, cancellation, recovery ordering, and clean exit. `agent-tool-loop-cancel.json` requires exactly four ordered fixture tool starts/results, verifies both files, cancels a long PowerShell call, proves its result and side effect stay absent, then proves recovery and terminal restoration. Real-model scenario endpoints must already be running.
 
 ## Scenario contract
 
@@ -36,11 +36,12 @@ Supported steps:
 
 - `launch` — open a new Windows Terminal window and bind its new top-level handle;
 - `wait_event` — poll the private debug log until a category reaches a required count;
+- `assert_event_count` — require an exact category count at a causal checkpoint, including proof that a cancelled stale result was not accepted;
 - `assert_event_sequence` — require a category subsequence without reading or reporting bodies;
 - `type_text` — paste Unicode/multiline text while restoring the previous clipboard afterward;
 - `key` — send an allow-listed terminal key (`enter`, `tab`, `escape`, arrows, page keys, Ctrl+C, Ctrl+D, or Alt+F4);
 - `resize` and `screenshot` — resize the bound window and capture only its rectangle;
-- `assert_file` and `remove_file` — wait for and verify an isolated fixture by exact content or SHA-256, then clean it up;
+- `assert_file` and `remove_file` — wait for and verify an isolated fixture by exact content or SHA-256, or require that a cancelled side effect is absent, then clean it up;
 - `sleep` — a deliberate, labeled visual-settle delay;
 - `close_window` — close the bound terminal and verify that its handle disappears.
 

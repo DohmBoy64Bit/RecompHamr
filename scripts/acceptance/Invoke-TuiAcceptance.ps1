@@ -46,7 +46,7 @@ function Test-Scenario($Scenario) {
     if ($null -eq $Scenario.steps -or $Scenario.steps.Count -eq 0) {
         throw 'scenario requires at least one step'
     }
-    $allowed = @('launch', 'wait_event', 'assert_event_sequence', 'type_text', 'key', 'resize', 'screenshot', 'assert_file', 'remove_file', 'sleep', 'close_window')
+    $allowed = @('launch', 'wait_event', 'assert_event_count', 'assert_event_sequence', 'type_text', 'key', 'resize', 'screenshot', 'assert_file', 'remove_file', 'sleep', 'close_window')
     $labels = @{}
     foreach ($step in $Scenario.steps) {
         $type = [string](Get-RequiredProperty $step 'type' 'step')
@@ -56,6 +56,10 @@ function Test-Scenario($Scenario) {
         $labels[$label] = $true
         switch ($type) {
             'wait_event' { [void](Get-RequiredProperty $step 'category' "step '$label'") }
+            'assert_event_count' {
+                [void](Get-RequiredProperty $step 'category' "step '$label'")
+                [void](Get-RequiredProperty $step 'count' "step '$label'")
+            }
             'assert_event_sequence' {
                 if ($null -eq $step.categories -or $step.categories.Count -eq 0) { throw "step '$label' requires categories" }
             }
@@ -258,6 +262,11 @@ try {
                 $timeout = if ($step.timeout_seconds) { [int]$step.timeout_seconds } else { 120 }
                 [void](Wait-Event $debugLog ([string]$step.category) $minimum $timeout)
             }
+            'assert_event_count' {
+                $actual = @((Get-EventCategories $debugLog) | Where-Object { $_ -eq [string]$step.category }).Count
+                $expected = [int]$step.count
+                if ($actual -ne $expected) { throw "event '$($step.category)' count $actual, expected $expected" }
+            }
             'assert_event_sequence' { Assert-EventSequence @(Get-EventCategories $debugLog) @($step.categories) }
             'type_text' { Send-Paste $windowHandle ([string]$step.text) }
             'key' { Send-NamedKey $windowHandle ([string]$step.key) }
@@ -273,18 +282,23 @@ try {
             'assert_file' {
                 $target = Resolve-ContainedPath ([string]$step.path) $resolvedWorkspace 'asserted file'
                 $timeout = if ($step.PSObject.Properties['timeout_seconds']) { [int]$step.timeout_seconds } else { 10 }
-                $deadline = [DateTime]::UtcNow.AddSeconds($timeout)
-                while (-not (Test-Path -LiteralPath $target -PathType Leaf) -and [DateTime]::UtcNow -lt $deadline) {
-                    Start-Sleep -Milliseconds 100
-                }
-                if (-not (Test-Path -LiteralPath $target -PathType Leaf)) { throw "asserted file does not exist after $timeout seconds: $target" }
-                if ($null -ne $step.PSObject.Properties['sha256']) {
-                    $actual = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
-                    if ($actual -ne [string]$step.sha256) { throw "asserted file hash mismatch: $target" }
-                }
-                if ($null -ne $step.PSObject.Properties['text']) {
-                    $actual = Get-Content -LiteralPath $target -Raw
-                    if ($actual -cne [string]$step.text) { throw "asserted file content mismatch: $target" }
+                $shouldExist = if ($step.PSObject.Properties['exists']) { [bool]$step.exists } else { $true }
+                if (-not $shouldExist) {
+                    if (Test-Path -LiteralPath $target -PathType Leaf) { throw "asserted file unexpectedly exists: $target" }
+                } else {
+                    $deadline = [DateTime]::UtcNow.AddSeconds($timeout)
+                    while (-not (Test-Path -LiteralPath $target -PathType Leaf) -and [DateTime]::UtcNow -lt $deadline) {
+                        Start-Sleep -Milliseconds 100
+                    }
+                    if (-not (Test-Path -LiteralPath $target -PathType Leaf)) { throw "asserted file does not exist after $timeout seconds: $target" }
+                    if ($null -ne $step.PSObject.Properties['sha256']) {
+                        $actual = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+                        if ($actual -ne [string]$step.sha256) { throw "asserted file hash mismatch: $target" }
+                    }
+                    if ($null -ne $step.PSObject.Properties['text']) {
+                        $actual = Get-Content -LiteralPath $target -Raw
+                        if ($actual -cne [string]$step.text) { throw "asserted file content mismatch: $target" }
+                    }
                 }
             }
             'remove_file' {

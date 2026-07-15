@@ -788,6 +788,7 @@ func toolCallLeakWarning(history []chmctx.Message) string {
 // same failing operation (see recordToolOutcome).
 func (m Model) dispatchNextTool() (tea.Model, tea.Cmd) {
 	work, _ := m.loop.NextTool(m.turn, m.runtime, m.executor)
+	dbgWritef("tool_start", "%s", work.Status())
 	m.appendLine(styleDim.Render(work.Status()))
 	return m, runToolCall(work)
 }
