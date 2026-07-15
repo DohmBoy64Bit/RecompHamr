@@ -39,7 +39,7 @@ Supported steps:
 - `assert_event_count` — require an exact category count at a causal checkpoint, including proof that a cancelled stale result was not accepted;
 - `assert_event_sequence` — require a category subsequence without reading or reporting bodies;
 - `type_text` — paste Unicode/multiline text while restoring the previous clipboard afterward;
-- `key` — send an allow-listed terminal key (`enter`, `tab`, `escape`, arrows, page keys, Ctrl+C, Ctrl+D, or Alt+F4);
+- `key` — send an allow-listed terminal key (`enter`, `tab`, `escape`, arrows, page keys, Ctrl+C, Ctrl+D, Ctrl+L, or Alt+F4);
 - `resize` and `screenshot` — resize the bound window and capture only its rectangle;
 - `assert_file` and `remove_file` — wait for and verify an isolated fixture by exact content or SHA-256, or require that a cancelled side effect is absent, then clean it up;
 - `sleep` — a deliberate, labeled visual-settle delay;

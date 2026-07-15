@@ -213,7 +213,7 @@ function Save-WindowScreenshot([IntPtr]$Handle, [string]$Path) {
 function Send-NamedKey([IntPtr]$Handle, [string]$Key) {
     $map = @{
         'enter' = '{ENTER}'; 'tab' = '{TAB}'; 'escape' = '{ESC}'; 'up' = '{UP}'; 'down' = '{DOWN}'
-        'page_up' = '{PGUP}'; 'page_down' = '{PGDN}'; 'ctrl_c' = '^c'; 'ctrl_d' = '^d'; 'alt_f4' = '%{F4}'
+        'page_up' = '{PGUP}'; 'page_down' = '{PGDN}'; 'ctrl_c' = '^c'; 'ctrl_d' = '^d'; 'ctrl_l' = '^l'; 'alt_f4' = '%{F4}'
     }
     if (-not $map.ContainsKey($Key)) { throw "unsupported key '$Key'" }
     Focus-Window $Handle
