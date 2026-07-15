@@ -30,8 +30,8 @@ func newTestModel(t *testing.T, handler http.HandlerFunc) Model {
 	if err := cfg.Save(); err != nil {
 		t.Fatal(err)
 	}
-	client := llm.New(srv.URL, cfg.ActiveProfile().LLM, "")
-	m := New(cfg, client, agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), session.NewHistory(cfg.Dir), t.TempDir(), "test")
+	sessionRuntime := session.NewRuntime(cfg)
+	m := New(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), "test system", "test")
 	sized, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	return sized.(Model)
 }
@@ -88,7 +88,10 @@ func stripANSI(s string) string {
 
 func testModel(t *testing.T, cfg *config.Config, client *llm.Client) Model {
 	t.Helper()
-	return New(cfg, client, agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), session.NewHistory(cfg.Dir), t.TempDir(), "test")
+	cfg.ActiveProfile().URL = client.BaseURL
+	cfg.ActiveProfile().LLM = client.Model
+	sessionRuntime := session.NewRuntime(cfg)
+	return New(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), "test system", "test")
 }
 
 func TestNewLoadsInjectedPromptHistory(t *testing.T) {
@@ -100,8 +103,8 @@ func TestNewLoadsInjectedPromptHistory(t *testing.T) {
 	if err := history.Append("persisted\nUnicode 🐹"); err != nil {
 		t.Fatal(err)
 	}
-	client := llm.New(cfg.ActiveURL(), cfg.ActiveProfile().LLM, "")
-	m := New(cfg, client, agent.NewRuntime(client, agent.LocalToolExecutor()), history, t.TempDir(), "test")
+	sessionRuntime := session.NewRuntime(cfg)
+	m := New(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()), "test system", "test")
 	if len(m.promptHistory) != 1 || m.promptHistory[0].display != "persisted\nUnicode 🐹" {
 		t.Fatalf("loaded history = %#v", m.promptHistory)
 	}

@@ -34,6 +34,15 @@ foreach ($Pattern in @('internal/tools', 'internal/logging', 'tools.Execute', 't
     }
 }
 
+# Slice 3 owns configuration, concrete clients, probes, and persistence in the
+# session boundary. Presentation may consume session snapshots/work only.
+foreach ($Pattern in @('internal/config', 'internal/llm', 'internal/provider', 'llm.New', 'provider.Reachable', 'os.Open', 'os.ReadFile', 'os.WriteFile', 'os.Remove', 'filepath.')) {
+    $Hit = $TuiProduction | Select-String -SimpleMatch $Pattern | Select-Object -First 1
+    if ($null -ne $Hit) {
+        Fail "presentation owns session lifecycle at $($Hit.Path):$($Hit.LineNumber): $Pattern"
+    }
+}
+
 $Entrypoint = Join-Path $Root 'cmd/recomphamr/main.go'
 foreach ($Pattern in @('internal/config', 'internal/ctx', 'internal/llm', 'internal/provider', 'internal/tools', 'internal/tui')) {
     $Hit = Select-String -Path $Entrypoint -SimpleMatch $Pattern | Select-Object -First 1
@@ -52,4 +61,4 @@ foreach ($Pattern in @('/mcp', '/skills', '/update', '/classifier', '/doctor', '
 }
 
 Write-Host 'architecture (Stage C transition): PASS'
-Write-Host 'note: internal/app composes the agent runtime; configuration/client persistence remains a later extraction.'
+Write-Host 'note: internal/app composes agent and session runtimes; Slice 3 runtime acceptance remains open.'

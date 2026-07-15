@@ -12,7 +12,6 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
@@ -26,8 +25,8 @@ func baselineModel(t *testing.T) Model {
 	if err := os.Mkdir(cfg.Dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	client := llm.New(cfg.ActiveURL(), cfg.ActiveProfile().LLM, "")
-	return New(cfg, client, agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), session.NewHistory(cfg.Dir), t.TempDir(), "test")
+	sessionRuntime := session.NewRuntime(cfg)
+	return New(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()).WithObserver(logging.NewObserver()), "test system", "test")
 }
 
 func TestCommandBoundariesAndErrorHints(t *testing.T) {
@@ -77,8 +76,7 @@ func TestFormatBoundaries(t *testing.T) {
 	if humanRate(0, time.Second) != "" || humanRate(1, 0) != "" || humanRate(5, time.Second) != "5.0 tok/s" || humanRate(20, time.Second) != "20 tok/s" {
 		t.Fatal("rate boundaries")
 	}
-	cfg := config.Default()
-	if backendLabel(cfg, true) == backendLabel(cfg, false) {
+	if backendLabel("local", true) == backendLabel("local", false) {
 		t.Fatal("backend states identical")
 	}
 	for n, want := range map[int]string{12: "12", 1234: "1,234", 123456: "123,456", 1234567: "1,234,567"} {

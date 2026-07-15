@@ -320,3 +320,13 @@ Production `internal/tui` no longer imports config, LLM, or provider packages; d
 - Security: path protection still delegates to `config.RestrictPrivatePath`; the app injects only an immutable directory-backed store, and no history content is added to snapshots, logs, reports, or config state.
 - Evidence: production TUI has no history filesystem helper or direct file operation for recall; architecture enforcement rejects the removed helper names and prevents `internal/session` from importing presentation.
 - Known limits: config/profile/client and backend probe ownership remain in TUI; `SESSION-03` remains `unverified` until exact-build restart recall and `/clear` evidence is recorded.
+
+#### Checkpoint 3B — configuration, client, and probe runtime
+
+- Changed: added one app-composed `internal/session.Runtime` that owns configuration reload, profile activation/persistence, concrete client construction/replacement, process-only URL override retention, prompt history, and captured reachability/authenticated-probe work. The agent uses the stable session chat contract while presentation consumes immutable snapshots and opaque work.
+- Documented: current architecture, decision D-014, architecture enforcement, active inventory, package/exported-symbol contracts, and this checkpoint agree on the new owner and non-secret boundary.
+- Verified: focused session/app/TUI tests pass at exactly 100.0% statements; tests cover snapshot secrecy, successful/failed activation, save rollback, unchanged/changed/failed reload, URL override, real chat/probe transport, captured reachability identity, history delegation, stale UI results, keyed/keyless startup, lists, switching, reload diagnostics, and rendering adapters.
+- Coverage: repository-atomic coverage and runtime rows remain open until the canonical gate and exact-build Windows Terminal scenario complete.
+- Security: resolved keys remain private to config/client construction and are represented only as booleans in snapshots; save rollback and existing private-path enforcement are preserved.
+- Evidence: production TUI has no config/LLM/provider import, client construction, probe transport, or persistence filesystem call; architecture enforcement rejects their return.
+- Known limits: exact-build profile persistence, history recall/clear, real response, screenshots, clean exit, and restored-shell evidence remain required before Slice 3 acceptance.

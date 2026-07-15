@@ -57,5 +57,6 @@ func runToolCall(work *agent.ToolWork) tea.Cmd {
 // errorMessage maps a stream error into a one-line TUI hint, same format across
 // all profiles.
 func (m Model) errorMessage(err error) string {
-	return agent.StreamErrorMessage(err, m.cfg.Active, m.cfg.ActiveURL())
+	facts := m.sessionRuntime.Snapshot()
+	return agent.StreamErrorMessage(err, facts.Active, facts.ActiveURL)
 }

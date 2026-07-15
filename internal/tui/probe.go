@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
 )
 
 // probeTimeout caps the activation hello-world request: long enough for a cold
@@ -26,19 +26,19 @@ type probeMsg struct {
 	err           error
 }
 
-// probeBackend wraps llm.Client.Probe in a tea.Cmd, bounded by probeTimeout so
+// probeBackend runs captured session probe work, bounded by probeTimeout so
 // a hung backend never freezes activation. silent=true (startup probe) skips
 // the "✓ active" banner, just seeding the optional live context value.
-func probeBackend(cli *llm.Client, profileName string, silent bool) tea.Cmd {
+func probeBackend(work session.ProbeWork, silent bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
 		defer cancel()
-		res, err := cli.Probe(ctx)
+		res := work.Run(ctx)
 		return probeMsg{
-			profile:       profileName,
+			profile:       res.Profile,
 			contextWindow: res.ContextWindow,
 			silent:        silent,
-			err:           err,
+			err:           res.Err,
 		}
 	}
 }
@@ -51,7 +51,8 @@ func probeBackend(cli *llm.Client, profileName string, silent bool) tea.Cmd {
 // Connection-state mutations are gated on the probe profile still being active.
 // A late result for a previous profile cannot overwrite the current indicator.
 func (m Model) handleProbe(msg probeMsg) (tea.Model, tea.Cmd) {
-	active := msg.profile == m.cfg.Active
+	facts := m.sessionRuntime.Snapshot()
+	active := msg.profile == facts.Active
 	if msg.err != nil {
 		if active {
 			m.agentRuntime.SetConnected(false)
@@ -67,7 +68,7 @@ func (m Model) handleProbe(msg probeMsg) (tea.Model, tea.Cmd) {
 	if active {
 		m.agentRuntime.SetConnected(true)
 	}
-	p, ok := m.cfg.Models[msg.profile]
+	p, ok := facts.Profile(msg.profile)
 	if !ok {
 		// Profile vanished between dispatch and return (hand-edited config or
 		// pruned by /models). Skip the cache write: an orphan key would
@@ -87,7 +88,7 @@ func (m Model) handleProbe(msg probeMsg) (tea.Model, tea.Cmd) {
 		suffix = fmt.Sprintf(" · ctx: %s", humanInt(msg.contextWindow))
 	}
 	m.appendLine(styleOK.Render(fmt.Sprintf(
-		"✓ active: %s · %s @ %s%s", msg.profile, p.LLM, p.URL, suffix)))
+		"✓ active: %s · %s @ %s%s", msg.profile, p.Model, p.URL, suffix)))
 	return m, nil
 }
 

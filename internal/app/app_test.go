@@ -13,7 +13,6 @@ import (
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
 )
 
@@ -23,12 +22,12 @@ func (w failingWriter) Write([]byte) (int, error) { return 0, w.err }
 
 func restoreAppHooks(t *testing.T) {
 	origCwd, origBootstrap, origAbs, origEnv := getWorkingDirectory, bootstrapConfig, absolutePath, getEnvironment
-	origClient, origRuntime, origFrontend := newClient, newAgentRuntime, newFrontend
+	origSession, origRuntime, origFrontend := newSessionRuntime, newAgentRuntime, newFrontend
 	origOpen, origClose, origHelp := openDebugLog, closeDebugLog, printFrontendHelp
 	origRun, origNew := runTeaProgram, newTeaProgram
 	t.Cleanup(func() {
 		getWorkingDirectory, bootstrapConfig, absolutePath, getEnvironment = origCwd, origBootstrap, origAbs, origEnv
-		newClient, newAgentRuntime, newFrontend = origClient, origRuntime, origFrontend
+		newSessionRuntime, newAgentRuntime, newFrontend = origSession, origRuntime, origFrontend
 		openDebugLog, closeDebugLog, printFrontendHelp = origOpen, origClose, origHelp
 		runTeaProgram, newTeaProgram = origRun, origNew
 	})
@@ -59,19 +58,19 @@ func TestRunCompositionAndLogging(t *testing.T) {
 		return ""
 	}
 	absolutePath = func(string) (string, error) { return "", errors.New("abs") }
-	clientCreated := false
-	newClient = func(baseURL, model, key string) *llm.Client {
-		clientCreated = true
-		if baseURL != "http://override" || model == "" || key != "" {
-			t.Fatalf("client args = %q %q %q", baseURL, model, key)
+	sessionCreated := false
+	newSessionRuntime = func(got *config.Config) *session.Runtime {
+		sessionCreated = true
+		if got != cfg || got.ActiveURL() != "http://override" {
+			t.Fatalf("session config = %p %q", got, got.ActiveURL())
 		}
-		return llm.New(baseURL, model, key)
+		return session.NewRuntime(got)
 	}
 	frontendCreated := false
-	newFrontend = func(gotCfg *config.Config, client *llm.Client, runtime agent.Runtime, _ session.History, projectDir, version string) tea.Model {
+	newFrontend = func(sessionRuntime *session.Runtime, runtime agent.Runtime, system, version string) tea.Model {
 		frontendCreated = true
-		if gotCfg != cfg || client == nil || runtime.Client != client || projectDir != root || version != "test" {
-			t.Fatalf("frontend args = %p %v %q %q", gotCfg, client, projectDir, version)
+		if sessionRuntime == nil || runtime.Client != sessionRuntime || !strings.Contains(system, "Working directory: "+root) || version != "test" {
+			t.Fatalf("frontend args = %p %q %q", sessionRuntime, system, version)
 		}
 		return inertModel{}
 	}
@@ -88,8 +87,8 @@ func TestRunCompositionAndLogging(t *testing.T) {
 	if err := Run(&out, "test"); err != nil {
 		t.Fatal(err)
 	}
-	if !clientCreated || !frontendCreated || opened != cfg.Dir || closed != 1 {
-		t.Fatalf("composition = client:%v frontend:%v open:%q close:%d", clientCreated, frontendCreated, opened, closed)
+	if !sessionCreated || !frontendCreated || opened != cfg.Dir || closed != 1 {
+		t.Fatalf("composition = session:%v frontend:%v open:%q close:%d", sessionCreated, frontendCreated, opened, closed)
 	}
 	if !strings.Contains(out.String(), "\x1b[2J") {
 		t.Fatalf("clear sequence = %q", out.String())
@@ -127,7 +126,7 @@ func TestRunFailuresAndNoLogging(t *testing.T) {
 			cfg := config.Default()
 			cfg.Dir = root
 			bootstrapConfig = func(string) (*config.Config, bool, error) { return cfg, false, nil }
-			newFrontend = func(*config.Config, *llm.Client, agent.Runtime, session.History, string, string) tea.Model {
+			newFrontend = func(*session.Runtime, agent.Runtime, string, string) tea.Model {
 				return inertModel{}
 			}
 			tc.configure()
@@ -173,8 +172,10 @@ func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
 
 func TestTeaProgramBoundary(t *testing.T) {
 	restoreAppHooks(t)
-	client := llm.New("http://localhost", "model", "")
-	if model := newFrontend(config.Default(), client, newAgentRuntime(client), session.NewHistory(t.TempDir()), t.TempDir(), "test"); model == nil {
+	cfg := config.Default()
+	cfg.Dir = t.TempDir()
+	sessionRuntime := session.NewRuntime(cfg)
+	if model := newFrontend(sessionRuntime, newAgentRuntime(sessionRuntime), "system", "test"); model == nil {
 		t.Fatal("default frontend factory returned nil")
 	}
 	if createTeaProgram(inertModel{}) == nil {

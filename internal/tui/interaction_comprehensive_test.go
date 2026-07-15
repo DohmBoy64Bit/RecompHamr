@@ -11,7 +11,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
 )
 
 func TestPopoverFilteringSelectionAndRendering(t *testing.T) {
@@ -193,11 +195,18 @@ func TestEnterQueueAndSlashContracts(t *testing.T) {
 }
 
 func TestSlashCommandsModelSwitchAndHelp(t *testing.T) {
-	m := baselineModel(t)
-	m.cfg.Models["other"] = &config.Profile{LLM: "other-model", URL: "http://other", ContextSize: 4096}
-	if err := m.cfg.Save(); err != nil {
+	cfg := config.Default()
+	cfg.Dir = filepath.Join(t.TempDir(), config.DirName)
+	if err := os.Mkdir(cfg.Dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	cfg.Models["other"] = &config.Profile{LLM: "other-model", URL: "http://other", ContextSize: 4096}
+	cfg.Models["keyed"] = &config.Profile{LLM: "keyed", URL: "http://keyed", Key: "secret", ContextSize: 4096}
+	if err := cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	sessionRuntime := session.NewRuntime(cfg)
+	m := New(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()), "test system", "test")
 	if commandByName("/clear") == nil || commandByName("/missing") != nil {
 		t.Fatal("command lookup")
 	}
@@ -218,7 +227,7 @@ func TestSlashCommandsModelSwitchAndHelp(t *testing.T) {
 	}
 	next, cmd := m.cmdModel([]string{"other"})
 	m = next.(Model)
-	if m.cfg.Active != "other" || cmd == nil || m.cli.Model != "other-model" {
+	if m.sessionRuntime.Snapshot().Active != "other" || cmd == nil || m.sessionRuntime.Snapshot().ActiveModel != "other-model" {
 		t.Fatal("switch")
 	}
 	next, _ = m.runSlash("/unknown")
@@ -226,18 +235,17 @@ func TestSlashCommandsModelSwitchAndHelp(t *testing.T) {
 	if !strings.Contains(m.scroll.String(), "unknown command") {
 		t.Fatal("unknown slash")
 	}
-	m.cfg.Models["keyed"] = &config.Profile{LLM: "keyed", URL: "http://keyed", Key: "secret", ContextSize: 4096}
-	m.cfg.Active = "keyed"
-	m.rebuildClient()
+	if _, err := m.sessionRuntime.Activate("keyed"); err != nil {
+		t.Fatal(err)
+	}
 	if cmd := m.confirmActive("keyed"); cmd == nil || !strings.Contains(m.scroll.String(), "probing") {
 		t.Fatal("keyed confirm")
 	}
 	// A hand-edited endpoint must rebuild the client on reload.
-	m.cfg.Active = "other"
-	if err := m.cfg.Save(); err != nil {
+	if _, err := m.sessionRuntime.Activate("other"); err != nil {
 		t.Fatal(err)
 	}
-	rawPath := filepath.Join(m.cfg.Dir, "config.yaml")
+	rawPath := filepath.Join(cfg.Dir, "config.yaml")
 	raw, err := os.ReadFile(rawPath)
 	if err != nil {
 		t.Fatal(err)
@@ -245,8 +253,8 @@ func TestSlashCommandsModelSwitchAndHelp(t *testing.T) {
 	if err := os.WriteFile(rawPath, []byte(strings.Replace(string(raw), "http://other", "http://changed", 1)), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := m.reloadConfigFromDisk(); err != nil || m.cli.BaseURL != "http://changed" {
-		t.Fatalf("reload = %v url=%s", err, m.cli.BaseURL)
+	if err := m.reloadConfigFromDisk(); err != nil || m.sessionRuntime.Snapshot().ActiveURL != "http://changed" {
+		t.Fatalf("reload = %v url=%s", err, m.sessionRuntime.Snapshot().ActiveURL)
 	}
 	if err := os.WriteFile(rawPath, []byte("not: [valid"), 0o600); err != nil {
 		t.Fatal(err)
@@ -335,14 +343,22 @@ func TestHandleEnterSelectionAndSlashCommit(t *testing.T) {
 	if !m.suggestArgLevel {
 		t.Fatal("command did not advance")
 	}
-	m.cfg.Models["other"] = &config.Profile{LLM: "m", URL: "http://x", ContextSize: 10}
-	if err := m.cfg.Save(); err != nil {
+	cfg := config.Default()
+	cfg.Dir = filepath.Join(t.TempDir(), config.DirName)
+	if err := os.Mkdir(cfg.Dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	cfg.Models["other"] = &config.Profile{LLM: "m", URL: "http://x", ContextSize: 10}
+	if err := cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	sessionRuntime := session.NewRuntime(cfg)
+	m = New(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()), "test system", "test")
+	m.ta.SetValue("/models")
 	m.setPopover([]argOption{{value: "other"}}, true, "/models")
 	next, _ = m.handleEnter(tea.KeyMsg{Type: tea.KeyEnter})
 	m = next.(Model)
-	if m.cfg.Active != "other" {
+	if m.sessionRuntime.Snapshot().Active != "other" {
 		t.Fatal("argument selection not committed")
 	}
 	m.ta.SetValue("   ")

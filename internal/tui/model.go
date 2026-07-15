@@ -13,10 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
 )
 
@@ -76,15 +73,13 @@ type queuedPrompt struct {
 type Model struct {
 	Version string
 
-	cfg *config.Config
-	cli *llm.Client
+	sessionRuntime *session.Runtime
 
 	turn         *agent.TurnState   // test-visible alias; private turn capabilities remain inside internal/agent
 	runtime      *agent.StreamState // test-visible alias; production paths use agentRuntime methods
 	loop         *agent.LoopState   // test-visible alias; production paths use agentRuntime methods
 	executor     agent.ToolExecutor // test-visible injected executor alias
 	agentRuntime agent.Runtime
-	history      session.History
 	system       string // embedded system prompt + working-directory anchor
 
 	// streaming is the live raw token buffer for the current content block,
@@ -171,7 +166,7 @@ type Model struct {
 
 }
 
-func New(cfg *config.Config, cli *llm.Client, runtime agent.Runtime, history session.History, projectDir, version string) Model {
+func New(sessionRuntime *session.Runtime, runtime agent.Runtime, system, version string) Model {
 	ta := newPromptInput()
 
 	// Fixed dark style: WithAutoStyle queries the terminal (OSC 11) before
@@ -184,13 +179,12 @@ func New(cfg *config.Config, cli *llm.Client, runtime agent.Runtime, history ses
 	sp.Style = styleSpinner
 
 	m := Model{
-		Version:  version,
-		cfg:      cfg,
-		cli:      cli,
-		system:   buildSystem(projectDir),
-		ta:       ta,
-		renderer: r,
-		spinner:  sp,
+		Version:        version,
+		sessionRuntime: sessionRuntime,
+		system:         system,
+		ta:             ta,
+		renderer:       r,
+		spinner:        sp,
 		// width/height left at 0; View() returns "" until the first
 		// WindowSizeMsg, so we don't flash an 80×24 frame then resize.
 		streaming:    new(strings.Builder),
@@ -201,17 +195,17 @@ func New(cfg *config.Config, cli *llm.Client, runtime agent.Runtime, history ses
 		loop:         runtime.Loop,
 		executor:     runtime.Executor,
 		agentRuntime: runtime,
-		history:      history,
 	}
 	// Record the active backend once, before any turn, so a shared log
 	// names exactly which model/endpoint/context window produced the behaviour.
-	m.agentRuntime.ObserveSession(version, cfg.Active, cfg.ActiveProfile().LLM, cfg.ActiveURL(),
+	facts := sessionRuntime.Snapshot()
+	m.agentRuntime.ObserveSession(version, facts.Active, facts.ActiveModel, facts.ActiveURL,
 		m.activeContextSize(), chmctx.Tokens(m.system))
 	// Seed prompt history from .rehamr/history so ↑ recalls prompts from
 	// earlier sessions. Loaded entries carry no chip metadata (the on-disk
 	// format stores expanded text only), so a recalled multi-line paste
 	// appears uncollapsed, the right tradeoff for a cat-friendly history file.
-	for _, value := range history.Load() {
+	for _, value := range sessionRuntime.LoadHistory() {
 		m.promptHistory = append(m.promptHistory, promptEntry{display: value})
 	}
 	return m
@@ -222,10 +216,11 @@ func New(cfg *config.Config, cli *llm.Client, runtime agent.Runtime, history ses
 // ContextSize, else defaultPackFallback, so providers before their first
 // response (and any missing/zero value) still get a sensible budget.
 func (m *Model) activeContextSize() int {
-	if v, ok := m.agentRuntime.LiveContextSize(m.cfg.Active); ok {
+	facts := m.sessionRuntime.Snapshot()
+	if v, ok := m.agentRuntime.LiveContextSize(facts.Active); ok {
 		return v
 	}
-	if v := m.cfg.ActiveProfile().ContextSize; v > 0 {
+	if v := facts.ContextSize; v > 0 {
 		return v
 	}
 	return defaultPackFallback
@@ -267,9 +262,10 @@ func (m Model) Init() tea.Cmd {
 	// Keyed profiles get a silent Probe at startup so credentials are validated
 	// and an optional live context window can be harvested. Keyless profiles use
 	// the cheaper reachability probe.
-	connectivity := pingBackend(m.cli.BaseURL)
-	if p := m.cfg.ActiveProfile(); p != nil && p.ResolvedKey() != "" {
-		connectivity = probeBackend(m.cli, m.cfg.Active, true)
+	facts := m.sessionRuntime.Snapshot()
+	connectivity := pingBackend(m.sessionRuntime.Reachability())
+	if facts.ActiveKeyed {
+		connectivity = probeBackend(m.sessionRuntime.Probe(facts.Active), true)
 	}
 	return tea.Batch(
 		textarea.Blink,
@@ -335,7 +331,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pingMsg:
 		// Drop stale pings from a prior backend (a /models switch while a ping
 		// was in flight). The live client's URL is the source of truth.
-		if msg.baseURL != m.cli.BaseURL {
+		if msg.baseURL != m.sessionRuntime.Snapshot().ActiveURL {
 			return m, nil
 		}
 		m.agentRuntime.SetConnected(msg.ok)
@@ -354,7 +350,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// fresh submit while the prior readEvent was in flight). Keep draining
 		// the channel so the producer goroutine exits cleanly, but never let
 		// the event mutate the now-active turn's state.
-		delivery := m.agentRuntime.ApplyDelivery(msg.stream, m.cfg.Active, m.activeContextSize(), msg.delivery)
+		delivery := m.agentRuntime.ApplyDelivery(msg.stream, m.sessionRuntime.Snapshot().Active, m.activeContextSize(), msg.delivery)
 		if !delivery.Accepted {
 			return m, readEvent(msg.stream)
 		}
@@ -364,7 +360,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Stale close from the prior turn's channel; running handleStreamClosed
 		// would release the live agent stream and, worse, finalizeTurn + endTurn the
 		// active turn, killing the user's request out from under them.
-		delivery := m.agentRuntime.ApplyDelivery(msg.stream, m.cfg.Active, m.activeContextSize(), msg.delivery)
+		delivery := m.agentRuntime.ApplyDelivery(msg.stream, m.sessionRuntime.Snapshot().Active, m.activeContextSize(), msg.delivery)
 		if !delivery.Accepted || !delivery.Closed {
 			return m, nil
 		}
@@ -484,7 +480,7 @@ func (m Model) submit(sendText, echoText string, entry promptEntry) (tea.Model, 
 	// Persist the (redacted) prompt so ↑ finds it after a restart. Errors are
 	// swallowed: a transient failure isn't worth derailing submit, and a
 	// permanent one (read-only .rehamr/) would just be noise on every prompt.
-	_ = m.history.Append(safeText)
+	_ = m.sessionRuntime.AppendHistory(safeText)
 
 	if strings.HasPrefix(sendText, "/") {
 		m.agentRuntime.ObserveSlash(safeText)
@@ -498,8 +494,7 @@ func (m Model) submit(sendText, echoText string, entry promptEntry) (tea.Model, 
 }
 
 func (m *Model) startChat() tea.Cmd {
-	m.agentRuntime.Client = m.cli
-	stream, _ := m.agentRuntime.StartRound(m.system, m.cfg.ActiveProfile().LLM, m.activeContextSize())
+	stream, _ := m.agentRuntime.StartRound(m.system, m.sessionRuntime.Snapshot().ActiveModel, m.activeContextSize())
 	return readEvent(stream)
 }
 
@@ -699,20 +694,15 @@ func (m Model) dispatchNextTool() (tea.Model, tea.Cmd) {
 func (m Model) cursorOnFirstLine() bool { return m.ta.Line() == 0 }
 func (m Model) cursorOnLastLine() bool  { return m.ta.Line() == m.ta.LineCount()-1 }
 
-// buildSystem appends the working-directory anchor to the embedded system
-// prompt so "hier" / "here" resolves to a concrete path.
-func buildSystem(projectDir string) string {
-	return config.DefaultSystemPrompt + "\n\nWorking directory: " + projectDir
-}
-
-// pingBackend issues a short GET to baseURL/v1/models via provider.Reachable. Any
+// pingBackend runs captured reachability work. Any
 // HTTP response counts as reachable; transport errors and timeouts mean
 // disconnected. The result carries the URL it was issued against so Update can
 // drop late results arriving after a /models switch.
-func pingBackend(baseURL string) tea.Cmd {
+func pingBackend(work session.ReachabilityWork) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
 		defer cancel()
-		return pingMsg{ok: provider.Reachable(ctx, baseURL) == nil, baseURL: baseURL}
+		result := work.Run(ctx)
+		return pingMsg{ok: result.Err == nil, baseURL: result.URL}
 	}
 }

@@ -56,3 +56,7 @@ Separation preserves every accepted Stage A behavior. Move existing responsibili
 ## D-013 — Agent orchestration emits causal records
 
 `internal/agent` emits stream, tool, cancellation, policy, and turn records at the state transition that owns them. `internal/app` injects the observer and owns its lifecycle through `internal/logging`; presentation applies typed effects but does not reconstruct orchestration events or open the protected log file.
+
+## D-014 — Session identity is stable while concrete clients are replaceable
+
+`internal/app` composes one stable `internal/session.Runtime` and supplies it to both the agent chat boundary and presentation adapter. The session runtime owns mutable configuration and concrete client replacement; asynchronous reachability and authenticated probes capture their endpoint/client at dispatch time so late results preserve the accepted stale-result identity. Presentation receives only non-secret immutable facts and opaque work.

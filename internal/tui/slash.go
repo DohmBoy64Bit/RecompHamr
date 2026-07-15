@@ -3,14 +3,10 @@ package tui
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
 	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 )
 
 // argOption is one popover entry, used at command-level (one row per command)
@@ -42,13 +38,13 @@ var commands = []command{
 		description: "list · <name> set (Tab cycles in the popover)",
 		handler:     (Model).cmdModel,
 		args: func(m Model) []argOption {
-			out := make([]argOption, 0, len(m.cfg.Models))
-			for _, n := range m.cfg.ModelNames() {
-				p := m.cfg.Models[n]
+			facts := m.sessionRuntime.Snapshot()
+			out := make([]argOption, 0, len(facts.Profiles))
+			for _, p := range facts.Profiles {
 				out = append(out, argOption{
-					value:       n,
-					description: p.LLM + " @ " + p.URL,
-					current:     n == m.cfg.Active,
+					value:       p.Name,
+					description: p.Model + " @ " + p.URL,
+					current:     p.Active,
 				})
 			}
 			return out
@@ -82,35 +78,15 @@ func (m Model) runSlash(text string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// reloadConfigFromDisk re-runs config.Bootstrap and replaces m.cfg so hand-edits
-// to config.yaml between slash commands take effect immediately. URLOverride
-// (from RECOMPHAMR_URL) is carried across the swap so the env var keeps applying.
+// reloadConfigFromDisk asks the session owner to re-bootstrap config.yaml so
+// hand-edits between slash commands take effect immediately.
 //
 // Returns the Bootstrap error verbatim; callers decide whether to surface it
 // (runSlash warns on submit; the popover-refresh path ignores it so a broken
 // file doesn't spam a warning on every keystroke).
-//
-// Rebuilds the llm.Client when the active profile's resolved (URL, model, key)
-// triple changed: covers both within-profile edits and a moved active.
 func (m *Model) reloadConfigFromDisk() error {
-	projectRoot := filepath.Dir(m.cfg.Dir)
-	fresh, _, err := config.Bootstrap(projectRoot)
-	if err != nil {
-		return err
-	}
-	fresh.URLOverride = m.cfg.URLOverride
-
-	prevURL := m.cfg.ActiveURL()
-	prevProfile := m.cfg.ActiveProfile()
-	prevLLM, prevKey := prevProfile.LLM, prevProfile.ResolvedKey()
-
-	m.cfg = fresh
-
-	newProfile := m.cfg.ActiveProfile()
-	if prevURL != m.cfg.ActiveURL() || prevLLM != newProfile.LLM || prevKey != newProfile.ResolvedKey() {
-		m.rebuildClient()
-	}
-	return nil
+	_, _, err := m.sessionRuntime.Reload()
+	return err
 }
 
 // PrintHelp writes the canonical human-readable command list. Used by --help.
@@ -131,25 +107,23 @@ func (m Model) cmdModel(args []string) (tea.Model, tea.Cmd) {
 		m.printModelList()
 		return m, nil
 	}
-	if err := m.cfg.SetActive(args[0]); err != nil {
+	if _, err := m.sessionRuntime.Activate(args[0]); err != nil {
 		m.appendLine(styleError.Render("⚠ " + err.Error()))
 		return m, nil
 	}
-	m.rebuildClient()
 	return m, m.confirmActive(args[0])
 }
 
 // printModelList writes the "▸ active, name, llm @ url" rollup to scroll.
 func (m *Model) printModelList() {
 	m.appendLine(styleDim.Render("models (▸ active, /models <name> to switch):"))
-	for _, n := range m.cfg.ModelNames() {
+	for _, p := range m.sessionRuntime.Snapshot().Profiles {
 		mark := "  "
-		if n == m.cfg.Active {
+		if p.Active {
 			mark = "▸ "
 		}
-		p := m.cfg.Models[n]
 		m.appendLine(fmt.Sprintf("%s%s  %s",
-			mark, n, styleDim.Render(p.LLM+" @ "+p.URL)))
+			mark, p.Name, styleDim.Render(p.Model+" @ "+p.URL)))
 	}
 }
 
@@ -158,24 +132,15 @@ func (m *Model) printModelList() {
 // and an optional live context window are validated; keyless profiles use the
 // cheaper reachability ping.
 func (m *Model) confirmActive(profile string) tea.Cmd {
-	p := m.cfg.ActiveProfile()
+	facts := m.sessionRuntime.Snapshot()
 	// ActiveURL, not p.URL: under a RECOMPHAMR_URL override the banner must name
 	// the endpoint actually dialed, not the config value the override displaced.
-	if p.ResolvedKey() != "" {
-		m.appendLine(styleDim.Render(fmt.Sprintf("▶ probing %s · %s @ %s", profile, p.LLM, m.cfg.ActiveURL())))
-		return probeBackend(m.cli, profile, false)
+	if facts.ActiveKeyed {
+		m.appendLine(styleDim.Render(fmt.Sprintf("▶ probing %s · %s @ %s", profile, facts.ActiveModel, facts.ActiveURL)))
+		return probeBackend(m.sessionRuntime.Probe(profile), false)
 	}
-	m.appendLine(styleOK.Render(fmt.Sprintf("✓ active: %s · %s @ %s", profile, p.LLM, m.cfg.ActiveURL())))
-	return pingBackend(m.cli.BaseURL)
-}
-
-// rebuildClient swaps in a fresh llm.Client for the now-active profile.
-// Replacing the pointer (not mutating fields) drops the prior Client's sticky
-// state (noReasoningEffort, keep-alive pool tied to the old URL): new
-// endpoint, fresh slate.
-func (m *Model) rebuildClient() {
-	p := m.cfg.ActiveProfile()
-	m.cli = llm.New(m.cfg.ActiveURL(), p.LLM, p.ResolvedKey())
+	m.appendLine(styleOK.Render(fmt.Sprintf("✓ active: %s · %s @ %s", profile, facts.ActiveModel, facts.ActiveURL)))
+	return pingBackend(m.sessionRuntime.Reachability())
 }
 
 func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
@@ -188,7 +153,7 @@ func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
 	// or leftover history would contradict the "fresh start" promise.
 	m.promptHistory = nil
 	m.histIdx = -1
-	_ = m.history.Clear()
+	_ = m.sessionRuntime.ClearHistory()
 	// Full wipe (unlike Ctrl+L, which redraws but keeps scrollback).
 	// tea.ClearScreen emits \x1b[2J, which only wipes the viewport; the
 	// saved-lines buffer needs eraseScrollback (DECSED 3) too, or old replies

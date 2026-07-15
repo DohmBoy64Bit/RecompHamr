@@ -13,10 +13,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/provider"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/tools"
 )
 
@@ -26,12 +28,12 @@ func (m Model) handleStream(event llm.Event) (tea.Model, tea.Cmd) {
 	if !m.runtime.Phase.Active() {
 		return m, readEvent(m.runtime.Stream)
 	}
-	effect := m.agentRuntime.ApplyEvent(m.cfg.Active, m.activeContextSize(), event)
+	effect := m.agentRuntime.ApplyEvent(m.sessionRuntime.Snapshot().Active, m.activeContextSize(), event)
 	return m.applyStreamEffect(effect)
 }
 
 func (m *Model) applyDone(event llm.Event) {
-	effect := m.agentRuntime.ApplyEvent(m.cfg.Active, m.activeContextSize(), event)
+	effect := m.agentRuntime.ApplyEvent(m.sessionRuntime.Snapshot().Active, m.activeContextSize(), event)
 	m.applyDoneEffect(effect)
 }
 
@@ -48,17 +50,26 @@ func TestPhaseOutcomeContextAndInitContracts(t *testing.T) {
 	if m.Init() == nil {
 		t.Fatal("init command missing")
 	}
-	m.cfg.ActiveProfile().Key = "secret"
-	if m.Init() == nil {
+	keyedCfg := config.Default()
+	keyedCfg.Dir = t.TempDir()
+	keyedCfg.ActiveProfile().Key = "secret"
+	keyedRuntime := session.NewRuntime(keyedCfg)
+	keyed := New(keyedRuntime, agent.NewRuntime(keyedRuntime, agent.LocalToolExecutor()), "test system", "test")
+	if keyed.Init() == nil {
 		t.Fatal("keyed init command missing")
 	}
-	m.runtime.LiveContextSize[m.cfg.Active] = 1234
+	active := m.sessionRuntime.Snapshot().Active
+	m.runtime.LiveContextSize[active] = 1234
 	if m.activeContextSize() != 1234 {
 		t.Fatal("live context")
 	}
-	delete(m.runtime.LiveContextSize, m.cfg.Active)
-	m.cfg.ActiveProfile().ContextSize = 0
-	if m.activeContextSize() != defaultPackFallback {
+	delete(m.runtime.LiveContextSize, active)
+	fallbackCfg := config.Default()
+	fallbackCfg.Dir = t.TempDir()
+	fallbackCfg.ActiveProfile().ContextSize = 0
+	fallbackRuntime := session.NewRuntime(fallbackCfg)
+	fallback := New(fallbackRuntime, agent.NewRuntime(fallbackRuntime, agent.LocalToolExecutor()), "test system", "test")
+	if fallback.activeContextSize() != defaultPackFallback {
 		t.Fatal("fallback context")
 	}
 	m.installTurnContext()
@@ -110,7 +121,7 @@ func TestStreamEventStateMachine(t *testing.T) {
 	final := chmctx.Message{Role: chmctx.RoleAssistant, Content: "done", ToolCalls: []chmctx.ToolCall{call}}
 	next, _ = m.handleStream(llm.Event{Kind: llm.EventDone, Final: &final, Tokens: 9, PromptTokens: 4000, ContextWindow: 4096})
 	m = next.(Model)
-	if m.runtime.TurnTokens != 9 || m.runtime.LiveContextSize[m.cfg.Active] != 4096 || len(m.turn.History) == 0 {
+	if m.runtime.TurnTokens != 9 || m.runtime.LiveContextSize[m.sessionRuntime.Snapshot().Active] != 4096 || len(m.turn.History) == 0 {
 		t.Fatal("done accounting")
 	}
 	next, cmd := m.handleStreamClosed()
@@ -167,13 +178,12 @@ func TestUpdateTypedMessagesAndClosedOutcomes(t *testing.T) {
 	if _, cmd := m.update(streamClosedMsg{stream: stale, delivery: stale.Read()}); cmd != nil {
 		t.Fatal("stale close acted")
 	}
-	m.cli.BaseURL = "http://current"
 	next, _ := m.update(pingMsg{ok: false, baseURL: "http://stale"})
 	m = next.(Model)
 	if !m.runtime.Connected {
 		t.Fatal("stale ping")
 	}
-	next, _ = m.update(pingMsg{ok: false, baseURL: "http://current"})
+	next, _ = m.update(pingMsg{ok: false, baseURL: m.sessionRuntime.Snapshot().ActiveURL})
 	m = next.(Model)
 	if m.runtime.Connected {
 		t.Fatal("live ping")
@@ -218,18 +228,19 @@ func TestUpdateTypedMessagesAndClosedOutcomes(t *testing.T) {
 
 func TestProbeSuccessFailureAndBackendCommands(t *testing.T) {
 	m := baselineModel(t)
-	next, _ := m.handleProbe(probeMsg{profile: m.cfg.Active, err: provider.ErrUnauthorized})
+	active := m.sessionRuntime.Snapshot().Active
+	next, _ := m.handleProbe(probeMsg{profile: active, err: provider.ErrUnauthorized})
 	m = next.(Model)
 	if m.runtime.Connected {
 		t.Fatal("failed probe connected")
 	}
-	next, _ = m.handleProbe(probeMsg{profile: m.cfg.Active, silent: true, err: errors.New("quiet")})
+	next, _ = m.handleProbe(probeMsg{profile: active, silent: true, err: errors.New("quiet")})
 	m = next.(Model)
 	next, _ = m.handleProbe(probeMsg{profile: "vanished", contextWindow: 10})
 	m = next.(Model)
-	next, _ = m.handleProbe(probeMsg{profile: m.cfg.Active, contextWindow: 8192})
+	next, _ = m.handleProbe(probeMsg{profile: active, contextWindow: 8192})
 	m = next.(Model)
-	if !m.runtime.Connected || m.runtime.LiveContextSize[m.cfg.Active] != 8192 {
+	if !m.runtime.Connected || m.runtime.LiveContextSize[active] != 8192 {
 		t.Fatal("probe success")
 	}
 	if probeErrorMessage(provider.ErrUnauthorized) != "key rejected" || !strings.Contains(probeErrorMessage(provider.ErrUnreachable{Err: errors.New("down")}), "unreachable") || probeErrorMessage(errors.New("raw")) != "raw" {
@@ -245,11 +256,14 @@ func TestProbeSuccessFailureAndBackendCommands(t *testing.T) {
 		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"completion_tokens":1}}`))
 	}))
 	defer srv.Close()
-	if got := pingBackend(srv.URL)().(pingMsg); !got.ok {
+	cfg := config.Default()
+	cfg.Dir = t.TempDir()
+	cfg.ActiveProfile().URL = srv.URL
+	sessionRuntime := session.NewRuntime(cfg)
+	if got := pingBackend(sessionRuntime.Reachability())().(pingMsg); !got.ok {
 		t.Fatal("ping failed")
 	}
-	cli := llm.New(srv.URL, "model", "key")
-	if got := probeBackend(cli, "p", false)().(probeMsg); got.err != nil {
+	if got := probeBackend(sessionRuntime.Probe("p"), false)().(probeMsg); got.err != nil {
 		t.Fatalf("probe command = %v", got.err)
 	}
 }
@@ -262,7 +276,7 @@ func TestRemainingStateBranches(t *testing.T) {
 	if len(m.promptHistory) != 0 {
 		t.Fatal("unexpected history")
 	}
-	next, _ := m.update(probeMsg{profile: m.cfg.Active, silent: true})
+	next, _ := m.update(probeMsg{profile: m.sessionRuntime.Snapshot().Active, silent: true})
 	m = next.(Model)
 	m.runtime.Pending = []chmctx.ToolCall{{Name: tools.ReadFileName}, {Name: tools.ReadFileName}}
 	m.turn.Begin(context.Background(), time.Now())

@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 )
 
 // humanTokens renders a token count compactly: `900 tok`, `1.2k tok`, `1.5M
@@ -59,11 +57,11 @@ func humanRate(tokens int, d time.Duration) string {
 // backendLabel renders the connection signal. Connected: profile name, bold,
 // no colour. Disconnected: bold yellow plus a `!` marker, so the state stays
 // legible on colour-stripped terminals.
-func backendLabel(c *config.Config, connected bool) string {
+func backendLabel(active string, connected bool) string {
 	if connected {
-		return styleBackendOK.Render(c.Active)
+		return styleBackendOK.Render(active)
 	}
-	return styleBackendWarn.Render(c.Active + " !")
+	return styleBackendWarn.Render(active + " !")
 }
 
 // humanInt formats a non-negative integer with commas so a context window
