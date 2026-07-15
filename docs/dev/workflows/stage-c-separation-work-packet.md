@@ -330,3 +330,67 @@ Production `internal/tui` no longer imports config, LLM, or provider packages; d
 - Security: resolved keys remain private to config/client construction and are represented only as booleans in snapshots; save rollback and existing private-path enforcement are preserved.
 - Evidence: production TUI has no config/LLM/provider import, client construction, probe transport, or persistence filesystem call; architecture enforcement rejects their return.
 - Known limits: none within this checkpoint; manual evidence is user-observed and no screenshot files were supplied or recorded.
+
+## Slice 4 — typed frontend boundary and Stage C closure
+
+### Outcome
+
+Core application orchestration communicates with presentation only through backend-neutral typed frontend contracts. `internal/tui` owns Bubble Tea rendering, local editor/popover/queue state, and input-to-intent translation; an application-owned controller owns every agent/session action and asynchronous completion. A thin application terminal adapter is the sole concrete TUI wiring edge.
+
+### In scope
+
+- Backend-neutral intents, immutable snapshots, ordered presentation events, and opaque asynchronous work/completions in `internal/frontend`.
+- An application controller for startup/history, configuration/profile/probe lifecycle, turn/stream/tool sequencing, cancellation, reset, final accounting, exactly-once completion, and stale-work cleanup.
+- Removal of production TUI dependencies on agent, session, context, configuration, transport, provider, tools, and logging packages.
+- Isolation of Bubble Tea and concrete TUI construction in `internal/app/terminal`, with core `internal/app` independently buildable/testable through frontend contracts.
+- Architecture enforcement, focused equivalence tests, documentation, canonical verification, exact-build Windows Terminal acceptance, and final Stage C closure.
+
+### Out of scope
+
+Visible layout or interaction changes, command additions, agent-policy changes, persistence-format changes, provider/tool changes, dependency upgrades, Legacy capabilities, MCP, skills, and Stage D feature work.
+
+### Authorities
+
+- Root, documentation, and TUI `AGENTS.md` instructions.
+- Current and target architecture, decisions D-011 through D-014, accepted Slices 1 through 3, Stage A inventory/runtime evidence, current source/tests, and Bubble Tea v1.2.4 behavior.
+
+### Evidence before editing
+
+- Core `internal/app` imports `internal/tui` and Bubble Tea, constructs `tui.New`, delegates command help to `tui.PrintHelp`, and runs the concrete Tea program.
+- Production TUI stores `agent.Runtime` and `*session.Runtime`, invokes their lifecycle methods, schedules their opaque stream/tool/probe/reachability work, and contains transitional mutable agent aliases used by tests.
+- TUI-local queueing, prompt editing, popovers, transcript formatting, resize, footer timing, and rendering are presentation responsibilities that must remain local and byte/behavior equivalent.
+- The accepted automated and Windows evidence for Slices 1 through 3 is the equivalence baseline; no Legacy implementation is an architectural authority.
+
+### Implementation approach
+
+Introduce contracts and an app-owned controller beside the accepted path, migrate session actions, then agent actions, and delete compatibility seams only after focused equivalence passes. Isolate the unavoidable concrete terminal wiring in an application subpackage so deleting the adapter removes the runnable terminal target while core application/backend behavior remains buildable and testable.
+
+### Verification
+
+- Focused frontend/controller/app/TUI tests at exactly 100% statements, covering every intent, event, work/completion, duplicate/stale/malformed input, cancellation, timeout, cleanup, persistence, security, and retained adapter behavior.
+- Architecture checks forbidding core app-to-TUI/Bubble Tea imports, TUI-to-backend imports/lifecycle calls, frontend-to-backend/Bubble Tea imports, backend-to-TUI imports, and entrypoint bypass.
+- A positive core-app/backend build/test that excludes the concrete TUI adapter.
+- Canonical `pwsh -NoProfile -File ./scripts/verify.ps1` at exactly 100.0% statements.
+- Exact-build Windows Terminal runs for the three committed harness scenarios plus profile/history persistence, multiline/queue, representative sizes, clean exit, and restored shell.
+
+### Documentation impact
+
+Update package/exported-symbol Go documentation, decision D-015, current/target architecture, active behavioral inventory, this packet, architecture enforcement, and runtime evidence. Update the documentation map/contract or user help only if their durable contracts actually change.
+
+### Security impact
+
+Frontend contracts must exclude credentials, model history, reasoning, contexts/cancel functions, raw transport events, tool arguments/results, process handles, log handles, and raw log content. Opaque work must retain captured endpoint/client/turn/round identity, bounded execution, cancellation cleanup, and stale-result rejection.
+
+### Stop condition
+
+Production TUI imports only `internal/frontend` among project runtime packages and emits typed intents without invoking backend lifecycle methods. Core `internal/app` imports neither TUI nor Bubble Tea and is buildable/testable with backend packages when the terminal adapter is excluded. Every Stage C row is verified, the canonical gate passes at 100%, required Windows evidence passes against the exact accepted build, and no compatibility adapter remains.
+
+### Completion evidence
+
+- Changed: open.
+- Documented: pre-edit contract and inventory recorded.
+- Verified: open.
+- Coverage: open.
+- Security: open.
+- Evidence: accepted Slices 1 through 3 and current source/tests frozen as the equivalence baseline.
+- Known limits: all Slice 4 implementation, deletion-boundary proof, and runtime acceptance remain open.
