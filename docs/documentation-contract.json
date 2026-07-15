@@ -19,6 +19,7 @@
     "docs/dev/verification/baseline-status.md",
     "docs/dev/verification/verification-contract.md",
     "docs/dev/verification/behavioral-surface-coverage.md",
+    "docs/dev/verification/stage-a-behavioral-surface.md",
     "docs/dev/workflows/baseline-gate.md",
     "docs/dev/workflows/change-control.md",
     "docs/user/configuration.md",
@@ -29,6 +30,7 @@
     "docs/dev/roadmap/legacy-parity-policy.md",
     "docs/dev/roadmap/agent-skills-standard.md",
     "docs/dev/workflows/work-packet-template.md"
+    ,"docs/dev/workflows/stage-a-acceptance-work-packet.md"
   ],
   "required_content": {
     "README.md": [
@@ -202,6 +204,18 @@
       "No old surface is grandfathered and no new surface is exempt.",
       "Required inventory fields",
       "100% meaningful documentation coverage"
+    ],
+    "docs/dev/verification/stage-a-behavioral-surface.md": [
+      "Stage A Behavioral Surface Inventory",
+      "Surface ID",
+      "Runtime/manual evidence",
+      "unverified"
+    ],
+    "docs/dev/workflows/stage-a-acceptance-work-packet.md": [
+      "Outcome",
+      "In scope",
+      "Out of scope",
+      "Stop condition"
     ],
     "docs/README.md": [
       "behavioral-surface-coverage.md",

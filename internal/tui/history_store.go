@@ -5,6 +5,21 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
+)
+
+type historyAppender interface {
+	WriteString(string) (int, error)
+	Close() error
+}
+
+var (
+	openHistoryAppend = func(path string) (historyAppender, error) {
+		return os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	}
+	restrictHistoryPath = config.RestrictPrivatePath
+	countStoredHistory  = countHistoryLines
 )
 
 // Prompt history persists in .rehamr/history, so recall is per-project
@@ -79,8 +94,12 @@ func appendPromptHistory(dir, value string) error {
 	}
 	line := quoted + "\n"
 	path := historyPath(dir)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	f, err := openHistoryAppend(path)
 	if err != nil {
+		return err
+	}
+	if err := restrictHistoryPath(path, false); err != nil {
+		_ = f.Close()
 		return err
 	}
 	if _, err := f.WriteString(line); err != nil {
@@ -91,7 +110,7 @@ func appendPromptHistory(dir, value string) error {
 		return err
 	}
 	// Lazy trim: rewrite only once the count exceeds historyMaxEntries.
-	count, err := countHistoryLines(path)
+	count, err := countStoredHistory(path)
 	if err != nil || count <= historyMaxEntries {
 		return nil
 	}

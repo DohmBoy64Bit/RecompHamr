@@ -7,7 +7,7 @@ Set-Location $Root
 $CoverageProfile = Join-Path ([System.IO.Path]::GetTempPath()) ("recomphamr-coverage-{0}.out" -f [guid]::NewGuid().ToString('N'))
 
 try {
-    go test ./... -covermode=atomic -coverprofile=$CoverageProfile
+    go test ./... -covermode=atomic "-coverprofile=$CoverageProfile"
     if ($LASTEXITCODE -ne 0) {
         throw "go test with coverage failed with exit code $LASTEXITCODE"
     }

@@ -17,6 +17,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type temporaryFile interface {
+	Name() string
+	Write([]byte) (int, error)
+	Sync() error
+	Close() error
+}
+
+var (
+	lstatPath      = os.Lstat
+	mkdirAllPath   = os.MkdirAll
+	readConfigFile = os.ReadFile
+	marshalYAML    = yaml.Marshal
+	createTempFile = func(dir, pattern string) (temporaryFile, error) { return os.CreateTemp(dir, pattern) }
+	renameConfig   = os.Rename
+	restrictPath   = RestrictPrivatePath
+)
+
 //go:embed PROMPT_SYS.md
 var DefaultSystemPrompt string
 
@@ -94,7 +111,7 @@ func Default() *Config {
 func Bootstrap(projectRoot string) (*Config, bool, error) {
 	dir := filepath.Join(projectRoot, DirName)
 	created := false
-	info, err := os.Lstat(dir)
+	info, err := lstatPath(dir)
 	switch {
 	case err == nil:
 		if info.Mode()&os.ModeSymlink != 0 {
@@ -103,32 +120,33 @@ func Bootstrap(projectRoot string) (*Config, bool, error) {
 		if !info.IsDir() {
 			return nil, false, fmt.Errorf("%s: exists but is not a directory", dir)
 		}
-		// Tighten a pre-existing loose dir (created by an older release or by
-		// hand): same upgrade-path rationale as Save's fresh-temp-inode trick
-		// for config.yaml, applied to the directory the threat comment below
-		// is about. Best-effort; a failure here shouldn't block launch.
-		if info.Mode().Perm() != 0o700 {
-			_ = os.Chmod(dir, 0o700)
-		}
 	case errors.Is(err, os.ErrNotExist):
 		// 0o700: only the project owner should read the config directory.
-		if err := os.MkdirAll(dir, 0o700); err != nil {
+		if err := mkdirAllPath(dir, 0o700); err != nil {
 			return nil, false, err
 		}
 		created = true
 	default:
 		return nil, false, err
 	}
+	if err := restrictPath(dir, true); err != nil {
+		return nil, false, fmt.Errorf("secure %s: %w", dir, err)
+	}
 
 	cfgPath := filepath.Join(dir, "config.yaml")
 	// Same symlink defence as the directory check: a symlinked config.yaml
 	// could redirect the read (which config we honour) or the write (clobbering
 	// an arbitrary user-writable file with the seed). Refuse with a clear error.
-	if li, err := os.Lstat(cfgPath); err == nil && li.Mode()&os.ModeSymlink != 0 {
+	if li, err := lstatPath(cfgPath); err == nil && li.Mode()&os.ModeSymlink != 0 {
 		return nil, false, fmt.Errorf("%s: refuses to follow symlink, remove or replace with a real file", cfgPath)
 	}
+	if _, err := lstatPath(cfgPath); err == nil {
+		if err := restrictPath(cfgPath, false); err != nil {
+			return nil, false, fmt.Errorf("secure %s: %w", cfgPath, err)
+		}
+	}
 	var cfg *Config
-	if b, err := os.ReadFile(cfgPath); err == nil {
+	if b, err := readConfigFile(cfgPath); err == nil {
 		cfg = &Config{} // do NOT merge Default here; strict means strict
 		dec := yaml.NewDecoder(bytes.NewReader(b))
 		dec.KnownFields(true)
@@ -182,7 +200,7 @@ func (c *Config) Save() error {
 }
 
 func writeYAML(path string, v any) error {
-	b, err := yaml.Marshal(v)
+	b, err := marshalYAML(v)
 	if err != nil {
 		return err
 	}
@@ -201,7 +219,7 @@ func writeYAML(path string, v any) error {
 	// on, bricking the next launch until the file is hand-deleted. Mirrors
 	// the same promote-by-rename pattern used for crash-safe configuration writes. os.CreateTemp makes the temp 0o600 and
 	// rename installs that fresh inode in place.
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".config-*.yaml")
+	tmp, err := createTempFile(filepath.Dir(path), ".config-*.yaml")
 	if err != nil {
 		return err
 	}
@@ -221,7 +239,18 @@ func writeYAML(path string, v any) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpPath, path)
+	if err := renameConfig(tmpPath, path); err != nil {
+		return err
+	}
+	return restrictPath(path, false)
+}
+
+// RestrictPrivatePath applies the platform-native owner-only protection used
+// for configuration, history, and debug logs. On POSIX it sets 0700 for a
+// directory or 0600 for a file. On Windows it installs a protected DACL that
+// grants full control only to the current process user.
+func RestrictPrivatePath(path string, directory bool) error {
+	return restrictPrivatePath(path, directory)
 }
 
 // ActiveProfile returns the selected profile. Bootstrap guarantees c.Active

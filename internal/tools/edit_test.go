@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +27,19 @@ func TestEditFileHappy(t *testing.T) {
 	}
 	if string(got) != "alpha BRAVO gamma\n" {
 		t.Fatalf("content wrong: %q", got)
+	}
+}
+
+func TestEditFileWriteFailure(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "f.txt")
+	if err := os.WriteFile(path, []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := writeEditedFile
+	t.Cleanup(func() { writeEditedFile = old })
+	writeEditedFile = func(string, []byte, os.FileMode) error { return errors.New("denied") }
+	if got := EditFile(path, "old", "new"); !strings.Contains(got, "write error") {
+		t.Fatalf("result = %q", got)
 	}
 }
 

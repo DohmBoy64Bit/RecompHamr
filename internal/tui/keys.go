@@ -130,8 +130,10 @@ func (m Model) handleCtrlC() (tea.Model, tea.Cmd) {
 	}
 	m.quitArmedAt = time.Now().Add(3 * time.Second)
 	m.status = quitArmText
-	return m, tea.Tick(3*time.Second, func(time.Time) tea.Msg { return quitArmResetMsg{} })
+	return m, tea.Tick(3*time.Second, quitArmReset)
 }
+
+func quitArmReset(time.Time) tea.Msg { return quitArmResetMsg{} }
 
 // historyUp walks one step toward older entries; caller gates on cursor-on-
 // first-line and popover closed. Empty history is a no-op.

@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+var writeEditedFile = os.WriteFile
+
 // EditFile replaces old_string with new_string in path. old_string must match
 // EXACTLY ONCE; otherwise the file is untouched and an error string is returned
 // so the model sees the failure and reacts, same convention as PowerShell/WriteFile.
@@ -24,7 +26,7 @@ func EditFile(path, oldString, newString string) string {
 	}
 	// Same guard as ReadFile: open(2) on a FIFO blocks forever and Ctrl+C
 	// can't unblock it, leaking the tool goroutine. Stat never blocks.
-	if info, err := os.Stat(path); err == nil && !info.Mode().IsRegular() && !info.IsDir() {
+	if info, err := statPath(path); err == nil && !info.Mode().IsRegular() && !info.IsDir() {
 		return fmt.Sprintf("(read error: %s is not a regular file)", path)
 	}
 	raw, err := os.ReadFile(path)
@@ -55,7 +57,7 @@ func EditFile(path, oldString, newString string) string {
 		return "(ambiguous: old_string overlaps itself - provide more context to make it unique)"
 	}
 	updated := strings.Replace(content, oldString, newString, 1)
-	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
+	if err := writeEditedFile(path, []byte(updated), 0o644); err != nil {
 		return fmt.Sprintf("(write error: %v)", err)
 	}
 	return fmt.Sprintf("edited %s: -%d +%d bytes", path, len(oldString), len(newString))

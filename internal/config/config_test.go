@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -146,7 +147,7 @@ func TestConfigFilePermissionsAreOwnerOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := st.Mode().Perm(); got != 0o600 {
+	if got := st.Mode().Perm(); runtime.GOOS != "windows" && got != 0o600 {
 		t.Fatalf("fresh config.yaml perms = %v, want 0o600 (key may leak to other local users)", got)
 	}
 
@@ -160,7 +161,7 @@ func TestConfigFilePermissionsAreOwnerOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := st2.Mode().Perm(); got != 0o600 {
+	if got := st2.Mode().Perm(); runtime.GOOS != "windows" && got != 0o600 {
 		t.Fatalf("Save() widened config.yaml perms to %v (must stay 0o600)", got)
 	}
 
@@ -170,7 +171,7 @@ func TestConfigFilePermissionsAreOwnerOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := parentSt.Mode().Perm(); got&0o077 != 0 {
+	if got := parentSt.Mode().Perm(); runtime.GOOS != "windows" && got&0o077 != 0 {
 		t.Fatalf(".rehamr/ dir perms = %v - must not grant any other-user bits", got)
 	}
 }
@@ -194,7 +195,7 @@ func TestBootstrapTightensLooseDirPerms(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := st.Mode().Perm(); got != 0o700 {
+	if got := st.Mode().Perm(); runtime.GOOS != "windows" && got != 0o700 {
 		t.Fatalf("pre-existing loose .rehamr/ = %v after Bootstrap, want 0o700", got)
 	}
 }
@@ -547,7 +548,7 @@ func TestSaveTightensPreexistingLoosePerms(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := st.Mode().Perm(); got != 0o600 {
+	if got := st.Mode().Perm(); runtime.GOOS != "windows" && got != 0o600 {
 		t.Fatalf("Save() must tighten a pre-existing 0o644 config.yaml to 0o600, got %v - key stays world-readable across an upgrade", got)
 	}
 }

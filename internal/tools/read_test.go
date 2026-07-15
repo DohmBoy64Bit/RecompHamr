@@ -36,6 +36,12 @@ func TestReadFileMissingFile(t *testing.T) {
 	}
 }
 
+func TestReadFileDirectory(t *testing.T) {
+	if got := ReadFile(t.TempDir()); !strings.HasPrefix(got, "(read error:") {
+		t.Fatalf("directory result = %q", got)
+	}
+}
+
 // TestReadFileTruncatesOversizeContent: ReadFile obeys the same Truncate
 // head+tail cap as every other tool. Oversize content must carry the marker so
 // the model re-reads a slice rather than trusting a silently-clipped blob.

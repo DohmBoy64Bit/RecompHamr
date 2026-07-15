@@ -110,3 +110,10 @@ func TestInlineStatusWriteFile(t *testing.T) {
 		t.Fatalf("bad inline status: %q", s)
 	}
 }
+
+func TestWriteFileSchemaShape(t *testing.T) {
+	fn := WriteFileSchema()["function"].(map[string]any)
+	if fn["name"] != WriteFileName {
+		t.Fatalf("name = %v", fn["name"])
+	}
+}

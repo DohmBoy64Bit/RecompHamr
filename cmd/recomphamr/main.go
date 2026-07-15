@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,22 +18,58 @@ import (
 
 var version = "dev"
 
+var (
+	getWorkingDirectory = os.Getwd
+	bootstrapConfig     = config.Bootstrap
+	absolutePath        = filepath.Abs
+	getEnvironment      = os.Getenv
+	runTeaProgram       = executeTeaProgram
+	newTeaProgram       = createTeaProgram
+	exitProcess         = os.Exit
+)
+
+type teaProgram interface {
+	Run() (tea.Model, error)
+}
+
 func main() {
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
+	handleRunResult(run(os.Args[1:], os.Stdout))
+}
+
+func executeTeaProgram(model tea.Model) error {
+	_, err := newTeaProgram(model).Run()
+	return err
+}
+
+func createTeaProgram(model tea.Model) teaProgram {
+	return tea.NewProgram(model, tea.WithReportFocus())
+}
+
+func handleRunResult(err error) {
+	if err != nil {
+		log.Printf("recomphamr: %v", err)
+		exitProcess(1)
+	}
+}
+
+func run(args []string, stdout io.Writer) error {
+	if len(args) > 0 {
+		switch args[0] {
 		case "-v", "--version", "version":
-			fmt.Println("recomphamr", version)
-			return
+			_, err := fmt.Fprintln(stdout, "recomphamr", version)
+			return err
 		case "-h", "--help", "help":
-			printHelp()
-			return
+			return printHelp(stdout)
 		}
 	}
 
-	cwd := mustCwd()
-	cfg, _, err := config.Bootstrap(cwd)
+	cwd, err := getWorkingDirectory()
 	if err != nil {
-		log.Fatalf("recomphamr: %v", err)
+		return err
+	}
+	cfg, _, err := bootstrapConfig(cwd)
+	if err != nil {
+		return err
 	}
 	applyEnvOverrides(cfg)
 
@@ -43,7 +80,7 @@ func main() {
 
 	profile := cfg.ActiveProfile()
 	client := llm.New(cfg.ActiveURL(), profile.LLM, profile.ResolvedKey())
-	projectDir, err := filepath.Abs(cwd)
+	projectDir, err := absolutePath(cwd)
 	if err != nil {
 		projectDir = cwd
 	}
@@ -51,23 +88,25 @@ func main() {
 
 	// Preserve the inherited inline TUI behavior: no alternate screen and no
 	// layout redesign. Scrollback remains terminal-native via tea.Println.
-	_, _ = os.Stdout.WriteString("\x1b[2J\x1b[3J\x1b[H")
-	if _, err := tea.NewProgram(model, tea.WithReportFocus()).Run(); err != nil {
-		log.Fatalf("recomphamr: %v", err)
+	if _, err := io.WriteString(stdout, "\x1b[2J\x1b[3J\x1b[H"); err != nil {
+		return err
 	}
+	return runTeaProgram(model)
 }
 
-func printHelp() {
-	fmt.Println(strings.TrimSpace(`
+func printHelp(stdout io.Writer) error {
+	if _, err := fmt.Fprintln(stdout, strings.TrimSpace(`
 recomphamr - barebones local-first coding-agent baseline
 
 Usage:
   recomphamr             start the inherited TUI
   recomphamr --version   print version
 
-Slash commands:`))
-	tui.PrintHelp(os.Stdout)
-	fmt.Println(strings.TrimSpace(`
+Slash commands:`)); err != nil {
+		return err
+	}
+	tui.PrintHelp(stdout)
+	_, err := fmt.Fprintln(stdout, strings.TrimSpace(`
 
 Keys:
   ctrl+l   clear the screen while keeping the conversation
@@ -80,18 +119,11 @@ Config:
 Environment:
   RECOMPHAMR_URL           override the active profile URL for this process
   RECOMPHAMR_IDLE_TIMEOUT  stream idle timeout, e.g. 90m or 1h`))
-}
-
-func mustCwd() string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Fatalf("recomphamr: %v", err)
-	}
-	return cwd
+	return err
 }
 
 func applyEnvOverrides(cfg *config.Config) {
-	if envURL := os.Getenv("RECOMPHAMR_URL"); envURL != "" {
+	if envURL := getEnvironment("RECOMPHAMR_URL"); envURL != "" {
 		cfg.URLOverride = envURL
 	}
 }

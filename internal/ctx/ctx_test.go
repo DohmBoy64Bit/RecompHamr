@@ -626,3 +626,28 @@ func TestResponseReserveScales(t *testing.T) {
 		}
 	}
 }
+
+func TestRuneBoundaryHelpersAndToolGroupEdges(t *testing.T) {
+	if got := runeBoundaryDown("abc", 99); got != 3 {
+		t.Fatalf("down past end = %d", got)
+	}
+	if got := runeBoundaryUp("abc", 0); got != 0 {
+		t.Fatalf("up at zero = %d", got)
+	}
+	s := "a🙂b"
+	if got := runeBoundaryDown(s, 3); got != 1 {
+		t.Fatalf("down in rune = %d", got)
+	}
+	if got := runeBoundaryUp(s, 3); got != 5 {
+		t.Fatalf("up in rune = %d", got)
+	}
+	if got := newestToolGroup(nil); got != nil {
+		t.Fatalf("empty group = %+v", got)
+	}
+	if got := newestToolGroup([]Message{{Role: RoleUser}}); got != nil {
+		t.Fatalf("non-tool group = %+v", got)
+	}
+	if got := newestToolGroup([]Message{{Role: RoleTool, ToolCallID: "missing"}}); got != nil {
+		t.Fatalf("ownerless group = %+v", got)
+	}
+}

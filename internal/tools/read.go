@@ -7,6 +7,8 @@ import (
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 )
 
+var statPath = os.Stat
+
 // ReadFile returns path's contents, truncated to the shared tool-output budget
 // (Truncate). The model gets exact bytes, not a shell-mangled approximation.
 // Per the PowerShell/write/edit convention, filesystem errors come back in the
@@ -19,7 +21,7 @@ func ReadFile(path string) string {
 	// waiting for a writer (leaking the tool goroutine past Ctrl+C, which
 	// cancels the turn but can't unblock the read), and an endless device file
 	// (/dev/zero) grows ReadFile's buffer without bound. Stat never blocks.
-	if info, err := os.Stat(path); err == nil && !info.Mode().IsRegular() && !info.IsDir() {
+	if info, err := statPath(path); err == nil && !info.Mode().IsRegular() && !info.IsDir() {
 		return fmt.Sprintf("(read error: %s is not a regular file)", path)
 	}
 	raw, err := os.ReadFile(path)

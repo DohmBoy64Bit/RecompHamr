@@ -17,7 +17,7 @@ func WriteFile(path, content string) string {
 	// with no reader blocks forever, leaking the tool goroutine past Ctrl+C
 	// (which cancels the turn but can't unblock the open). Stat never blocks;
 	// directories fall through to os.WriteFile's immediate EISDIR.
-	if info, err := os.Stat(path); err == nil && !info.Mode().IsRegular() && !info.IsDir() {
+	if info, err := statPath(path); err == nil && !info.Mode().IsRegular() && !info.IsDir() {
 		return fmt.Sprintf("(write error: %s is not a regular file)", path)
 	}
 	if dir := filepath.Dir(path); dir != "." {

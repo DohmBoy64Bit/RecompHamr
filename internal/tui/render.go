@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -9,6 +10,13 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-runewidth"
 )
+
+var renderMarkdown = func(m *Model, raw string) (string, error) {
+	if m.renderer == nil {
+		return "", errors.New("renderer unavailable")
+	}
+	return m.renderer.Render(raw)
+}
 
 // splashRecomp and splashHamr keep the inherited five-row, two-tone startup
 // composition. The RECOMP half is intentionally compact so the full wordmark
@@ -72,7 +80,7 @@ func (m *Model) flushStreaming() {
 		return
 	}
 	raw := m.streaming.String()
-	rendered, err := m.renderer.Render(raw)
+	rendered, err := renderMarkdown(m, raw)
 	if err != nil {
 		rendered = raw
 	}
@@ -175,9 +183,6 @@ func (m *Model) visualPromptLines() int {
 	total := 0
 	for line := range strings.SplitSeq(m.ta.DisplayValue(), "\n") {
 		total += wrapRows(line, w)
-	}
-	if total < 1 {
-		return 1
 	}
 	return total
 }

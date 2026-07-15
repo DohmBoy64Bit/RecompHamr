@@ -15,6 +15,8 @@ import (
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 )
 
+var lookPath = exec.LookPath
+
 const (
 	PowerShellName = "powershell"
 	WriteFileName  = "write_file"
@@ -60,19 +62,23 @@ func PowerShell(parent context.Context, script string, timeout time.Duration) st
 		text += fmt.Sprintf("\n(output capped at capture: %d bytes total, %d bytes dropped mid-stream)", buf.totalBytes(), dropped)
 	}
 
-	if runErr != nil {
-		switch {
-		case ctxT.Err() == context.DeadlineExceeded:
-			return text + fmt.Sprintf("\n(timeout after %s)", timeout)
-		case parent.Err() == context.Canceled || ctxT.Err() == context.Canceled:
-			return text + "\n(cancelled)"
-		case errors.Is(runErr, exec.ErrWaitDelay):
-			return text
-		default:
-			text += fmt.Sprintf("\n(exit: %v)", runErr)
-		}
+	return finishPowerShellResult(text, runErr, ctxT.Err(), parent.Err(), timeout)
+}
+
+func finishPowerShellResult(text string, runErr, commandContextErr, parentErr error, timeout time.Duration) string {
+	if runErr == nil {
+		return text
 	}
-	return text
+	switch {
+	case commandContextErr == context.DeadlineExceeded:
+		return text + fmt.Sprintf("\n(timeout after %s)", timeout)
+	case parentErr == context.Canceled || commandContextErr == context.Canceled:
+		return text + "\n(cancelled)"
+	case errors.Is(runErr, exec.ErrWaitDelay):
+		return text
+	default:
+		return text + fmt.Sprintf("\n(exit: %v)", runErr)
+	}
 }
 
 func findPowerShell() (string, error) {
@@ -81,7 +87,7 @@ func findPowerShell() (string, error) {
 		candidates = append(candidates, "powershell.exe", "powershell")
 	}
 	for _, name := range candidates {
-		if path, err := exec.LookPath(name); err == nil {
+		if path, err := lookPath(name); err == nil {
 			return path, nil
 		}
 	}

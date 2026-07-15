@@ -12,12 +12,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 )
 
 var (
-	dbgMu   sync.Mutex
-	dbgFile *os.File
+	dbgMu             sync.Mutex
+	dbgFile           *os.File
+	restrictDebugPath = config.RestrictPrivatePath
 )
 
 // OpenDebugLog truncates <dir>/log.txt and opens it for writing. On failure
@@ -33,6 +35,11 @@ func OpenDebugLog(dir string) {
 	path := filepath.Join(dir, "log.txt")
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
+		fmt.Fprintln(os.Stderr, "⚠ debuglog:", err)
+		return
+	}
+	if err := restrictDebugPath(path, false); err != nil {
+		_ = f.Close()
 		fmt.Fprintln(os.Stderr, "⚠ debuglog:", err)
 		return
 	}

@@ -30,6 +30,7 @@ Repository-wide always-on instructions live in [`../AGENTS.md`](../AGENTS.md). C
 - [`dev/verification/baseline-status.md`](dev/verification/baseline-status.md)
 - [`dev/verification/verification-contract.md`](dev/verification/verification-contract.md) — documentation contract, 100% statement coverage, behavioral-surface coverage, build, and smoke-test gates
 - [`dev/verification/behavioral-surface-coverage.md`](dev/verification/behavioral-surface-coverage.md) — 100% old-and-new behavioral surface coverage and meaningful documentation coverage contract
+- [`dev/verification/stage-a-behavioral-surface.md`](dev/verification/stage-a-behavioral-surface.md) — active Stage A surface inventory and acceptance evidence map
 
 ### Architecture
 
@@ -41,6 +42,7 @@ Repository-wide always-on instructions live in [`../AGENTS.md`](../AGENTS.md). C
 - [`dev/workflows/baseline-gate.md`](dev/workflows/baseline-gate.md)
 - [`dev/workflows/change-control.md`](dev/workflows/change-control.md)
 - [`dev/workflows/work-packet-template.md`](dev/workflows/work-packet-template.md)
+- [`dev/workflows/stage-a-acceptance-work-packet.md`](dev/workflows/stage-a-acceptance-work-packet.md)
 
 ### Roadmap
 

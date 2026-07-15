@@ -538,9 +538,11 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.suppressView = true
 	m.resizeGen++
 	gen := m.resizeGen
-	return m, tea.Tick(resizeSettleDelay, func(time.Time) tea.Msg {
-		return resizeSettleMsg{gen: gen}
-	})
+	return m, tea.Tick(resizeSettleDelay, resizeSettled(gen))
+}
+
+func resizeSettled(gen int) func(time.Time) tea.Msg {
+	return func(time.Time) tea.Msg { return resizeSettleMsg{gen: gen} }
 }
 
 // handleResizeSettle fires once the post-resize debounce expires for the

@@ -53,6 +53,11 @@ type promptEntry struct {
 	spans   []chipSpan
 }
 
+var (
+	movePromptCursorDown = func(ta *textarea.Model) { ta.CursorDown() }
+	movePromptCursorUp   = func(ta *textarea.Model) { ta.CursorUp() }
+)
+
 // newPromptInput builds the configured textarea and chip bookkeeping. All
 // styling lives here so model.go never touches textarea internals directly.
 func newPromptInput() promptInput {
@@ -395,20 +400,13 @@ func (p promptInput) cursorRuneOffset() int {
 	row := p.ta.Line()
 	info := p.ta.LineInfo()
 	col := info.StartColumn + info.ColumnOffset
-
-	offset, i := 0, 0
-	for line := range strings.SplitSeq(p.ta.Value(), "\n") {
-		if i == row {
-			n := utf8.RuneCountInString(line)
-			if col > n {
-				col = n
-			}
-			return offset + col
-		}
-		offset += utf8.RuneCountInString(line) + 1 // +1 for the \n
-		i++
+	lines := strings.Split(p.ta.Value(), "\n")
+	row = min(max(row, 0), len(lines)-1)
+	offset := 0
+	for i := 0; i < row; i++ {
+		offset += utf8.RuneCountInString(lines[i]) + 1
 	}
-	return offset
+	return offset + min(col, utf8.RuneCountInString(lines[row]))
 }
 
 // setCursorRuneOffset moves the cursor to an absolute rune position. textarea
@@ -426,9 +424,9 @@ func (p *promptInput) setCursorRuneOffset(offset int) {
 		}
 		info := p.ta.LineInfo()
 		if curRow < targetRow {
-			p.ta.CursorDown()
+			movePromptCursorDown(&p.ta)
 		} else {
-			p.ta.CursorUp()
+			movePromptCursorUp(&p.ta)
 		}
 		// Inside a soft-wrapped logical line a cursor step moves only the
 		// visual position (LineInfo), not Line(); that's progress toward the
