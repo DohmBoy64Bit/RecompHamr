@@ -75,11 +75,14 @@ type ChatClient interface {
 
 // StreamDelivery is one event or closure notification from an opaque Stream.
 type StreamDelivery struct {
-	TurnID  TurnID
-	RoundID RoundID
-	Event   llm.Event
-	Closed  bool
+	turnID  TurnID
+	roundID RoundID
+	event   llm.Event
+	closed  bool
 }
+
+// Closed reports whether the opaque stream ended instead of yielding an event.
+func (d StreamDelivery) Closed() bool { return d.closed }
 
 // BeginStream installs a newly opened model channel and returns its opaque,
 // stably identified reader.
@@ -108,7 +111,29 @@ func (s *StreamState) EndStream() {
 // Read blocks for one model event. Bubble Tea invokes it outside Update.
 func (s *Stream) Read() StreamDelivery {
 	event, ok := <-s.events
-	return StreamDelivery{TurnID: s.turnID, RoundID: s.roundID, Event: event, Closed: !ok}
+	return StreamDelivery{turnID: s.turnID, roundID: s.roundID, event: event, closed: !ok}
+}
+
+// DeliveryEffect is the typed result of validating and reducing one opaque
+// stream delivery. Stale deliveries are rejected without exposing transport
+// events or runtime identity to presentation.
+type DeliveryEffect struct {
+	Accepted bool
+	Closed   bool
+	Stream   StreamEffect
+}
+
+// ApplyDelivery validates stable turn/round identity and reduces a current
+// event. A current closure is reported without ending the stream because close
+// policy owns that transition; stale deliveries never mutate agent state.
+func (s *StreamState) ApplyDelivery(turn *TurnState, stream *Stream, profile string, delivery StreamDelivery) DeliveryEffect {
+	if !s.Current(stream) || delivery.turnID != turn.ID || delivery.roundID != stream.roundID {
+		return DeliveryEffect{}
+	}
+	if delivery.closed {
+		return DeliveryEffect{Accepted: true, Closed: true}
+	}
+	return DeliveryEffect{Accepted: true, Stream: s.Apply(turn, profile, delivery.event)}
 }
 
 // NewStreamState constructs an idle, optimistically connected stream state.
@@ -153,17 +178,21 @@ var ErrMalformedToolCall = errors.New("model stream emitted a tool-call event wi
 // transition. It intentionally excludes contexts, credentials, and tool
 // arguments; resolved calls remain inside StreamState.Pending.
 type StreamEffect struct {
-	Content       string
-	Reasoning     string
-	ToolArgs      string
-	RetryText     string
-	RetryError    error
-	RetryCleared  bool
-	Flush         bool
-	Done          bool
-	Final         *chmctx.Message
-	CountedTokens int
-	Error         error
+	Content        string
+	Reasoning      string
+	ToolArgs       string
+	RetryText      string
+	RetryError     error
+	RetryCleared   bool
+	Flush          bool
+	Done           bool
+	Final          *chmctx.Message
+	CountedTokens  int
+	ReportedTokens int
+	PromptTokens   int
+	Elapsed        time.Duration
+	ContextWindow  int
+	Error          error
 }
 
 // Apply reduces one transport event into agent state and a presentation-safe
@@ -220,6 +249,10 @@ func (s *StreamState) Apply(turn *TurnState, profile string, event llm.Event) St
 		effect.Done = true
 		effect.Final = event.Final
 		effect.CountedTokens = delta
+		effect.ReportedTokens = event.Tokens
+		effect.PromptTokens = event.PromptTokens
+		effect.Elapsed = event.Elapsed
+		effect.ContextWindow = event.ContextWindow
 		effect.Flush = true
 	case llm.EventError:
 		if _, ok := errors.AsType[provider.ErrUnreachable](event.Err); ok {

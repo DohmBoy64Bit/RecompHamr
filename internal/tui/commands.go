@@ -4,7 +4,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
-	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 )
 
 // streamEventMsg and streamClosedMsg tag their originating channel so the model
@@ -35,7 +34,7 @@ type toolResultMsg struct {
 func readEvent(stream *agent.Stream) tea.Cmd {
 	return func() tea.Msg {
 		delivery := stream.Read()
-		if delivery.Closed {
+		if delivery.Closed() {
 			return streamClosedMsg{stream: stream, delivery: delivery}
 		}
 		return streamEventMsg{stream: stream, delivery: delivery}
@@ -57,6 +56,6 @@ func runToolCall(work *agent.ToolWork) tea.Cmd {
 
 // errorMessage maps a stream error into a one-line TUI hint, same format across
 // all profiles.
-func (m Model) errorMessage(e llm.Event) string {
-	return agent.StreamErrorMessage(e.Err, m.cfg.Active, m.cfg.ActiveURL())
+func (m Model) errorMessage(err error) string {
+	return agent.StreamErrorMessage(err, m.cfg.Active, m.cfg.ActiveURL())
 }

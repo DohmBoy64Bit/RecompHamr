@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 )
@@ -100,33 +101,17 @@ func dbgWriteSession(version, profile, model, url string, ctxSize, sysTokens int
 // tool_result records, so this logs only the packing decisions those per-message
 // records cannot show: what the model saw versus what was dropped. packed
 // includes the prepended system message; historyLen is the pre-pack history.
-func dbgWriteRequest(model string, ctxSize, budget, historyLen int, packed []chmctx.Message) {
+func dbgWriteRequest(model string, summary agent.RequestSummary) {
 	if !dbgEnabled() {
 		return
 	}
-	// packed[0] is the prepended system message (buildMessages always prepends
-	// it). Count AND sum over history messages only (packed[1:]) so the token
-	// figure matches the message count and is directly comparable to budget,
-	// which is the *history* budget (ctx.Budget already subtracts the system and
-	// tool reservations). Summing the ~3k-token system prompt into a "packed=1
-	// msgs" line would read as if that one history message were 3k tokens.
-	tokens, truncated := 0, 0
-	for _, msg := range packed[1:] {
-		tokens += msg.Tokens()
-		if strings.Contains(msg.Content, "───── truncated:") {
-			truncated++
-		}
-	}
 	note := ""
-	if truncated > 0 {
-		note = fmt.Sprintf(" · %d tool output(s) truncated", truncated)
+	if summary.Truncated > 0 {
+		note = fmt.Sprintf(" · %d tool output(s) truncated", summary.Truncated)
 	}
-	// kept = packed minus the system message; dropped covers both budget
-	// eviction and orphan-tool drops.
-	kept := len(packed) - 1
 	dbgWritef("request",
 		"model=%s · ctx=%d (history budget=%d) · history=%d msgs → packed=%d msgs (~%d tokens) · dropped=%d oldest%s",
-		model, ctxSize, budget, historyLen, kept, tokens, historyLen-kept, note)
+		model, summary.ContextSize, summary.Budget, summary.History, summary.Packed, summary.Tokens, summary.Dropped, note)
 }
 
 // dbgWriteMessage records a chmctx.Message readably: content and tool calls

@@ -78,9 +78,9 @@ type Model struct {
 	cfg *config.Config
 	cli *llm.Client
 
-	turn     agent.TurnState   // model-facing history, stable identity, and cancellation root
-	runtime  agent.StreamState // stream, pending calls, phase, accounting, and connection facts
-	loop     agent.LoopState   // sequential tools and deterministic loop-policy latches
+	turn     *agent.TurnState   // agent-owned history, stable identity, and cancellation root
+	runtime  *agent.StreamState // agent-owned stream, pending calls, accounting, and connection facts
+	loop     *agent.LoopState   // agent-owned sequential-tool and loop-policy state
 	executor agent.ToolExecutor
 	system   string // embedded system prompt + working-directory anchor
 
@@ -360,16 +360,18 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// fresh submit while the prior readEvent was in flight). Keep draining
 		// the channel so the producer goroutine exits cleanly, but never let
 		// the event mutate the now-active turn's state.
-		if !m.runtime.Current(msg.stream) || msg.delivery.TurnID != m.turn.ID {
+		delivery := m.runtime.ApplyDelivery(m.turn, msg.stream, m.cfg.Active, msg.delivery)
+		if !delivery.Accepted {
 			return m, readEvent(msg.stream)
 		}
-		return m.handleStream(msg.delivery.Event)
+		return m.applyStreamEffect(delivery.Stream)
 
 	case streamClosedMsg:
 		// Stale close from the prior turn's channel; running handleStreamClosed
 		// would nil out the live m.runtime.Stream and, worse, finalizeTurn + endTurn the
 		// active turn, killing the user's request out from under them.
-		if !m.runtime.Current(msg.stream) || msg.delivery.TurnID != m.turn.ID {
+		delivery := m.runtime.ApplyDelivery(m.turn, msg.stream, m.cfg.Active, msg.delivery)
+		if !delivery.Accepted || !delivery.Closed {
 			return m, nil
 		}
 		return m.handleStreamClosed()
@@ -381,7 +383,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// startChat would abandon the in-flight stream. The turnCtx tag was
 		// captured at runToolCall time; endTurn nils m.turn.Context and a fresh
 		// beginTurn installs a new one that can't match.
-		effect := m.loop.ApplyToolResult(&m.turn, &m.runtime, msg.delivery)
+		effect := m.loop.ApplyToolResult(m.turn, m.runtime, msg.delivery)
 		if !effect.Accepted {
 			return m, nil
 		}
@@ -513,8 +515,9 @@ func (m Model) submit(sendText, echoText string, entry promptEntry) (tea.Model, 
 }
 
 func (m *Model) startChat() tea.Cmd {
-	msgs := m.buildMessages()
-	stream := m.runtime.StartRound(&m.turn, m.cli, msgs, m.buildTools())
+	runtime := agent.Runtime{Turn: m.turn, Stream: m.runtime, Loop: m.loop, Client: m.cli, Executor: m.executor}
+	stream, summary := runtime.StartRound(m.system, m.activeContextSize())
+	dbgWriteRequest(m.cfg.ActiveProfile().LLM, summary)
 	return readEvent(stream)
 }
 
@@ -568,21 +571,6 @@ func (m *Model) endTurn() {
 	}
 }
 
-func (m *Model) buildMessages() []chmctx.Message {
-	ctxSize := m.activeContextSize()
-	budget := chmctx.Budget(ctxSize)
-	out := agent.BuildMessages(m.system, m.turn.History, ctxSize)
-	dbgWriteRequest(m.cfg.ActiveProfile().LLM, ctxSize, budget, len(m.turn.History), out)
-	return out
-}
-
-// buildTools exposes the four local tools every turn: powershell, read_file,
-// write_file, edit_file. No loop/control tool; a turn ends when the model
-// stops emitting tool calls (see handleStreamClosed).
-func (m *Model) buildTools() []llm.Tool {
-	return agent.Tools()
-}
-
 // handleStream dispatches one llm.Event to the matching apply* helper and
 // re-arms the stream reader; EventError unwinds the turn instead of looping.
 // Events arriving after cancellation are drained quietly; acting on them would
@@ -592,7 +580,11 @@ func (m Model) handleStream(e llm.Event) (tea.Model, tea.Cmd) {
 	if !m.runtime.Phase.Active() {
 		return m, readEvent(m.runtime.Stream)
 	}
-	effect := m.runtime.Apply(&m.turn, m.cfg.Active, e)
+	effect := m.runtime.Apply(m.turn, m.cfg.Active, e)
+	return m.applyStreamEffect(effect)
+}
+
+func (m Model) applyStreamEffect(effect agent.StreamEffect) (tea.Model, tea.Cmd) {
 	if effect.RetryCleared {
 		m.status = ""
 	}
@@ -610,13 +602,12 @@ func (m Model) handleStream(e llm.Event) (tea.Model, tea.Cmd) {
 		}
 	}
 	if effect.Done {
-		m.applyDoneEffect(e, effect)
+		m.applyDoneEffect(effect)
 	} else if effect.Flush {
 		m.flushStreaming()
 	}
 	if effect.Error != nil {
-		e.Err = effect.Error
-		return m, m.applyError(e)
+		return m, m.applyError(effect.Error)
 	}
 	return m, readEvent(m.runtime.Stream)
 }
@@ -627,11 +618,11 @@ func (m Model) handleStream(e llm.Event) (tea.Model, tea.Cmd) {
 // banner reflects the whole turn. Tokens==0 means the backend skipped
 // include_usage; the char/4 estimate carries the counter on those servers.
 func (m *Model) applyDone(e llm.Event) {
-	effect := m.runtime.Apply(&m.turn, m.cfg.Active, e)
-	m.applyDoneEffect(e, effect)
+	effect := m.runtime.Apply(m.turn, m.cfg.Active, e)
+	m.applyDoneEffect(effect)
 }
 
-func (m *Model) applyDoneEffect(e llm.Event, effect agent.StreamEffect) {
+func (m *Model) applyDoneEffect(effect agent.StreamEffect) {
 	// Round-level reasoning first (it preceded the answer), then the assistant
 	// message, then the round metrics, so the log reads in causal order.
 	if r := m.reasoning.String(); r != "" {
@@ -645,7 +636,7 @@ func (m *Model) applyDoneEffect(e llm.Event, effect agent.StreamEffect) {
 	// record's char/4 estimate so a forensic pass can calibrate the packer's
 	// undercount on real histories. Log-only; nothing reads it back.
 	dbgWritef("round_done", "tokens=%d (counted=%d) · prompt_tokens=%d · elapsed=%s · ctx_window=%d",
-		e.Tokens, effect.CountedTokens, e.PromptTokens, e.Elapsed.Round(time.Millisecond), e.ContextWindow)
+		effect.ReportedTokens, effect.CountedTokens, effect.PromptTokens, effect.Elapsed.Round(time.Millisecond), effect.ContextWindow)
 	// Tripwire for the packer's blind spot: char/4 undercounts code-heavy
 	// history (measured ~1.6x on a real run), so the true prompt can reach the
 	// server's window while Pack still believes it has headroom. Ollama then
@@ -653,8 +644,8 @@ func (m *Model) applyDoneEffect(e llm.Event, effect agent.StreamEffect) {
 	// or past 95% of the window is that band; log it so a forensic pass sees
 	// the overflow instead of inferring it. Log-only; the headroom constant
 	// stays put until a run actually trips this.
-	if ctxSize := m.activeContextSize(); e.PromptTokens > 0 && e.PromptTokens >= ctxSize-ctxSize/20 {
-		dbgWritef("ctx_pressure", "prompt_tokens=%d at >=95%% of ctx=%d; real prompt has outgrown the packer's estimate, next request risks silent server-side truncation", e.PromptTokens, ctxSize)
+	if ctxSize := m.activeContextSize(); effect.PromptTokens > 0 && effect.PromptTokens >= ctxSize-ctxSize/20 {
+		dbgWritef("ctx_pressure", "prompt_tokens=%d at >=95%% of ctx=%d; real prompt has outgrown the packer's estimate, next request risks silent server-side truncation", effect.PromptTokens, ctxSize)
 	}
 	m.flushStreaming()
 }
@@ -662,9 +653,9 @@ func (m *Model) applyDoneEffect(e llm.Event, effect agent.StreamEffect) {
 // applyError unwinds the turn on a stream error: preserve content streamed
 // before the error (so the user keeps failure context), emit the one-line hint,
 // drop the pending queue, reset turn state.
-func (m *Model) applyError(e llm.Event) tea.Cmd {
-	dbgWritef("error", "%v", e.Err)
-	m.abortTurn(styleError.Render(m.errorMessage(e)))
+func (m *Model) applyError(err error) tea.Cmd {
+	dbgWritef("error", "%v", err)
+	m.abortTurn(styleError.Render(m.errorMessage(err)))
 	return nil
 }
 
@@ -727,7 +718,7 @@ func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
 	if !m.runtime.Phase.Active() {
 		return m, nil
 	}
-	decision := m.loop.DecideClose(&m.turn, &m.runtime)
+	decision := m.loop.DecideClose(m.turn, m.runtime)
 	switch decision.Action {
 	case agent.CloseRunTool:
 		return m.dispatchNextTool()
@@ -796,7 +787,7 @@ func toolCallLeakWarning(history []chmctx.Message) string {
 // call's target so the failure nudge can tell when the model keeps retrying the
 // same failing operation (see recordToolOutcome).
 func (m Model) dispatchNextTool() (tea.Model, tea.Cmd) {
-	work, _ := m.loop.NextTool(&m.turn, &m.runtime, m.executor)
+	work, _ := m.loop.NextTool(m.turn, m.runtime, m.executor)
 	m.appendLine(styleDim.Render(work.Status()))
 	return m, runToolCall(work)
 }

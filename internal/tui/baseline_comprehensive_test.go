@@ -46,17 +46,17 @@ func TestCommandBoundariesAndErrorHints(t *testing.T) {
 		t.Fatalf("tool result = %#v", msg)
 	}
 	m := baselineModel(t)
-	if got := m.errorMessage(llm.Event{}); got != "" {
+	if got := m.errorMessage(nil); got != "" {
 		t.Fatalf("nil error = %q", got)
 	}
-	if got := m.errorMessage(llm.Event{Err: provider.ErrUnauthorized}); !strings.Contains(got, "key rejected") {
+	if got := m.errorMessage(provider.ErrUnauthorized); !strings.Contains(got, "key rejected") {
 		t.Fatalf("auth = %q", got)
 	}
 	un := provider.ErrUnreachable{Err: errors.New("offline")}
-	if !agent.IsUnreachable(un) || !strings.Contains(m.errorMessage(llm.Event{Err: un}), "unreachable") {
+	if !agent.IsUnreachable(un) || !strings.Contains(m.errorMessage(un), "unreachable") {
 		t.Fatal("unreachable mapping failed")
 	}
-	if got := m.errorMessage(llm.Event{Err: errors.New("bad")}); !strings.Contains(got, "bad") {
+	if got := m.errorMessage(errors.New("bad")); !strings.Contains(got, "bad") {
 		t.Fatalf("generic = %q", got)
 	}
 }
@@ -98,7 +98,7 @@ func TestDebugLogLifecycleAndPayloads(t *testing.T) {
 		t.Fatal("logging not enabled")
 	}
 	dbgWriteSession("v", "p", "m", "u", 100, 10, []string{"read_file"})
-	dbgWriteRequest("m", 100, 80, 2, []chmctx.Message{{Role: chmctx.RoleSystem}, {Role: chmctx.RoleTool, Content: "x\n───── truncated:"}})
+	dbgWriteRequest("m", agent.RequestSummary{ContextSize: 100, Budget: 80, History: 2, Packed: 1, Tokens: 1, Truncated: 1, Dropped: 1})
 	dbgWriteMessage("assistant", chmctx.Message{Role: chmctx.RoleAssistant, Content: "answer", ToolCalls: []chmctx.ToolCall{{ID: "1", Name: "read_file", Arguments: map[string]any{"path": "x"}}}})
 	dbgWriteMessage("tool", chmctx.Message{Role: chmctx.RoleTool, ToolName: "read_file", ToolCallID: "1"})
 	CloseDebugLog()
@@ -113,7 +113,7 @@ func TestDebugLogLifecycleAndPayloads(t *testing.T) {
 		}
 	}
 	dbgWritef("off", "ignored")
-	dbgWriteRequest("m", 1, 1, 0, nil)
+	dbgWriteRequest("m", agent.RequestSummary{ContextSize: 1, Budget: 1})
 	dbgWriteMessage("off", chmctx.Message{})
 	OpenDebugLog(filepath.Join(dir, "missing", "child"))
 }

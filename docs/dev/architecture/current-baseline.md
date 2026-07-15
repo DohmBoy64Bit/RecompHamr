@@ -9,6 +9,7 @@ cmd/recomphamr
 internal/app
     +--> internal/config
     +--> internal/llm
+    +--> internal/agent
     +--> internal/tui
               |
               +--> internal/agent
@@ -16,7 +17,12 @@ internal/app
               +--> internal/ctx
               +--> internal/llm
               +--> internal/provider
-              +--> internal/tools
+
+internal/agent
+    +--> internal/ctx
+    +--> internal/llm
+    +--> internal/provider
+    +--> internal/tools
 ```
 
 ## Completed ownership
@@ -27,6 +33,6 @@ internal/app
 
 ## Remaining temporary ownership
 
-Stage C slice 2 is in progress. `internal/agent` now owns request packing/tool definitions, the mutable turn root, stable turn/round identity, model-round startup and opaque reading, event reduction/accounting, sequential local-tool execution, result pairing, cancellation identity, all loop-policy latch state, stream-close decisions, and provider-specific turn/probe diagnostic classification. `internal/app` constructs the typed agent runtime with its model and tool dependencies and injects it into the concrete frontend. The TUI currently unpacks that runtime into its value-model adapter, schedules opaque agent stream/tool work, and applies typed display/log/finish effects; production TUI code no longer imports `internal/tools`, opens model requests, reads raw transport channels, executes tool calls, decides loop policy, or classifies provider errors. Runtime-state encapsulation, logging ownership, and the final architecture/deletion boundary remain open.
+Stage C slice 2 is in progress. `internal/agent` now owns request packing/tool definitions, the mutable turn root, stable turn/round identity, model-round startup and opaque reading, stable-identity delivery validation, raw event reduction/accounting, sequential local-tool execution, result pairing, cancellation identity, all loop-policy latch state, stream-close decisions, and provider-specific turn/probe diagnostic classification. `internal/app` constructs the typed agent runtime with its model and tool dependencies and injects it into the concrete frontend; the runtime allocates the single turn, stream, and loop state roots shared by Bubble Tea model copies. The TUI schedules opaque agent stream/tool work and applies typed display/log/finish effects; production TUI code no longer imports `internal/tools`, packs model history, opens model requests, reads raw transport channels, inspects raw delivered events, executes tool calls, decides loop policy, or classifies provider errors. Removing the remaining exposed mutable-state pointers from the adapter, orchestration logging ownership, and the final architecture/deletion boundary remain open.
 
 Backend packages must not import `internal/tui`. `internal/app` is the sole current exception because a composition root must select the concrete frontend. Later slices replace that concrete runtime coupling with typed frontend contracts while preserving the accepted layout and behavior.

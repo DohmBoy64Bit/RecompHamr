@@ -51,11 +51,11 @@ func TestPhaseAndStreamState(t *testing.T) {
 	}
 	channel <- llm.Event{Kind: llm.EventContent, Content: "x"}
 	delivery := stream.Read()
-	if delivery.TurnID != 3 || delivery.RoundID == 0 || delivery.Closed || delivery.Event.Content != "x" {
+	if delivery.turnID != 3 || delivery.roundID == 0 || delivery.Closed() || delivery.event.Content != "x" {
 		t.Fatal("stream event")
 	}
 	close(channel)
-	if delivery = stream.Read(); !delivery.Closed {
+	if delivery = stream.Read(); !delivery.Closed() {
 		t.Fatal("stream close")
 	}
 	other := s.BeginStream(3, make(chan llm.Event))
@@ -153,5 +153,27 @@ func TestApplyStreamEvents(t *testing.T) {
 	effect = s2.Apply(&turn, "p", llm.Event{Kind: llm.EventContent, Content: "x"})
 	if s2.Phase != PhaseStreaming || effect.Content != "x" {
 		t.Fatal("first content transition")
+	}
+}
+
+func TestApplyDeliveryValidatesAndReducesOpaqueEvents(t *testing.T) {
+	turn := NewTurnState(nil)
+	turn.ID = 7
+	state := NewStreamState()
+	stream := state.BeginStream(turn.ID, make(chan llm.Event))
+
+	stale := StreamDelivery{turnID: turn.ID + 1, roundID: stream.roundID, event: llm.Event{Kind: llm.EventContent, Content: "stale"}}
+	if effect := state.ApplyDelivery(&turn, stream, "p", stale); effect.Accepted {
+		t.Fatal("stale delivery accepted")
+	}
+	current := StreamDelivery{turnID: turn.ID, roundID: stream.roundID, event: llm.Event{Kind: llm.EventContent, Content: "current"}}
+	effect := state.ApplyDelivery(&turn, stream, "p", current)
+	if !effect.Accepted || effect.Closed || effect.Stream.Content != "current" {
+		t.Fatalf("current delivery = %#v", effect)
+	}
+	closed := StreamDelivery{turnID: turn.ID, roundID: stream.roundID, closed: true}
+	effect = state.ApplyDelivery(&turn, stream, "p", closed)
+	if !effect.Accepted || !effect.Closed || effect.Stream != (StreamEffect{}) {
+		t.Fatalf("closed delivery = %#v", effect)
 	}
 }

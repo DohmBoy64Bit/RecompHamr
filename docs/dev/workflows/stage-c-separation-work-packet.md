@@ -180,3 +180,13 @@ The TUI no longer opens model streams, executes tools, stores turn contexts, pac
 - Security: the runtime constructor receives the already-resolved client and executor without exposing credentials or tool arguments in a new presentation fact; diagnostic strings retain only the previously accepted profile name, endpoint, and error detail.
 - Evidence: production application composition calls `agent.NewRuntime` exactly once and passes the result to `tui.New`; TUI diagnostic adapters call `agent.StreamErrorMessage` and `agent.ProbeErrorMessage`.
 - Known limits: the Bubble Tea value adapter still unpacks mutable runtime components, orchestration logging is still emitted by TUI code, typed delivery state remains wider than the final snapshot/event contract, and exact-build tool-loop runtime evidence remains open.
+
+#### Checkpoint 2F — single state root and opaque deliveries
+
+- Changed: the app-composed runtime now allocates the single turn, stream, and loop state roots shared by copied Bubble Tea models; request packing and model-round opening execute atomically inside `agent.Runtime.StartRound`, which returns only content-free packing facts; stream delivery internals are opaque and stable turn/round validation plus raw-event reduction occur inside `StreamState.ApplyDelivery`.
+- Documented: the current architecture identifies the exact remaining mutable-pointer, logging, and deletion-boundary debt without treating this checkpoint as Slice 2 closure.
+- Verified: focused agent/app/TUI tests cover runtime pointer sharing, packed-round dependencies and summary facts, current/stale/closed delivery handling, and retained adapter rendering; the strengthened architecture check forbids presentation from importing tools, constructing agent roots/executors, or classifying provider errors.
+- Coverage: focused packages pass; the canonical repository gate is required before checkpoint commit, and Stage C behavioral rows remain unverified pending runtime evidence and final closure.
+- Security: model-facing packed messages, raw transport events, stable round identity, contexts, credentials, and resolved tool arguments do not cross the production presentation delivery boundary; request summaries contain counts only.
+- Evidence: production startup constructs one `agent.Runtime`; production chat startup calls `Runtime.StartRound`; stream messages carry opaque `StreamDelivery` values reduced by `ApplyDelivery`.
+- Known limits: the adapter still retains pointers to agent-owned mutable state for Bubble Tea compatibility, agent-event logging is still emitted through TUI logging calls, configuration/client/persistence ownership is a later Stage C slice, and the required real-model multi-tool/cancel runtime record remains open.

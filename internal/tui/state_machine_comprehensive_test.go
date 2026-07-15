@@ -296,7 +296,7 @@ func TestRemainingStateBranches(t *testing.T) {
 	m.loop.ToolRounds = verifyNudgeMinRounds
 	m.loop.VerifyNudged = false
 	m.runtime.Pending = nil
-	if decision := m.loop.DecideClose(&m.turn, &m.runtime); decision.Action != agent.CloseFinishDone {
+	if decision := m.loop.DecideClose(m.turn, m.runtime); decision.Action != agent.CloseFinishDone {
 		t.Fatal("honest unverified finish nudged")
 	}
 	if _, ok := quitArmReset(time.Now()).(quitArmResetMsg); !ok {
