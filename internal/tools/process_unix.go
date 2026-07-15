@@ -7,12 +7,14 @@ import (
 	"syscall"
 )
 
+var killProcessGroup = func(pid int) error { return syscall.Kill(-pid, syscall.SIGKILL) }
+
 func configureProcessTree(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
 			return nil
 		}
-		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		return killProcessGroup(cmd.Process.Pid)
 	}
 }
