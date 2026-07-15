@@ -11,6 +11,10 @@ import (
 )
 
 func TestConfigureProcessTreeCancellation(t *testing.T) {
+	if err := killProcessGroup(1 << 30); err == nil {
+		t.Fatal("killing a nonexistent process group unexpectedly succeeded")
+	}
+
 	cmd := exec.CommandContext(context.Background(), "pwsh", "-NoProfile", "-Command", "Start-Sleep -Seconds 30")
 	configureProcessTree(cmd)
 	if cmd.SysProcAttr == nil || !cmd.SysProcAttr.Setpgid || cmd.Cancel == nil {
