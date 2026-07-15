@@ -73,3 +73,70 @@ Deleting `internal/tui` from a separated build removes presentation only: applic
 - Security: private logging and key resolution retain the same implementations and lifetime; no secret crosses a new presentation contract in this slice.
 - Evidence: local harness report `E:\ReProject\StageA-Acceptance\StageC-App-Slice\report.json` and reviewed standard/constrained screenshots remain outside the repository.
 - Known limits: turn orchestration, tool execution, config persistence, and client replacement still reside in `internal/tui`; later slices must move them without behavior changes.
+
+## Slice 2 — agent-turn orchestration
+
+### Outcome
+
+`internal/agent` owns context coordination, model streaming, sequential tool dispatch, cancellation, token accounting, and loop policy. `internal/tui` retains rendering, presentation state, input translation, and queued-prompt editing while preserving the accepted layout and interaction contract.
+
+### In scope
+
+- Typed turn intents, immutable runtime snapshots, and ordered agent events.
+- Stable turn and round identity, conversation history, context packing, streaming, tool sequencing, cancellation, accounting, and existing loop nudges.
+- Application composition of the agent runtime and the Bubble Tea presentation adapter.
+- Focused equivalence tests, architecture enforcement, documentation, and exact-build runtime acceptance.
+
+### Out of scope
+
+Configuration-format changes, configuration-persistence extraction, new providers, tool behavior changes, Legacy capabilities, MCP, skills, new commands, TUI redesign, and Charm dependency upgrades.
+
+### Evidence before editing
+
+- `internal/tui/model.go` currently owns the per-turn context, model-facing history, stream channel, pending tool queue, token/timing state, live context hints, and all loop-policy latches.
+- `internal/tui/commands.go` currently reads model events and executes tools through Bubble Tea commands, tagging work with channels or context pointers to reject stale results.
+- `state_machine_comprehensive_test.go`, `baseline_comprehensive_test.go`, and `queue_test.go` encode the accepted ordering, cancellation, nudge, queue, accounting, and stale-event behavior.
+- The existing runtime harness proves streaming cancellation and recovery, but does not by itself prove multi-tool ordering or cancellation during tool execution.
+
+### Implementation approach
+
+Move ownership incrementally behind a typed runtime composed by `internal/app`. Stable turn and round identifiers replace channel/context identity at the presentation boundary. The agent owns asynchronous model/tool work and emits immutable presentation facts; the TUI adapter maps those facts into the existing Bubble Tea state without importing agent policy or executing side effects.
+
+### Verification
+
+- Focused contract tests for `internal/agent`, `internal/app`, and the TUI adapter at 100% statements.
+- Architecture checks forbidding presentation imports from the agent and direct model/tool orchestration from the TUI.
+- Canonical `pwsh -NoProfile -File ./scripts/verify.ps1` at exactly 100% statements.
+- Exact-build Windows Terminal streaming/cancellation recovery plus a clean-log multi-tool and cancelled-PowerShell scenario.
+
+### Documentation impact
+
+Update the current architecture, target architecture as needed, decisions, active Stage C behavioral inventory, documentation map/contract, package and exported-symbol Go documentation, and this completion record in the same changes as ownership moves.
+
+### Security impact
+
+Keep credentials, contexts, private reasoning, and unrestricted tool arguments outside presentation snapshots. Preserve bounded tool execution, current cancellation/process cleanup, sanitized private logging, and provider authentication behavior.
+
+### Stop condition
+
+The TUI no longer opens model streams, executes tools, stores turn contexts, packs model history, or decides loop policy. All retained behavior has complete statement, behavioral-surface, documentation, and required runtime evidence, with no in-scope blocked or unverified row.
+
+### Completion evidence
+
+- Changed: open.
+- Documented: this work packet and the active Stage C inventory establish the pre-edit contract.
+- Verified: open.
+- Coverage: open.
+- Security: open.
+- Evidence: source and accepted tests inventoried; implementation and runtime evidence remain open.
+- Known limits: configuration persistence and model-client replacement remain later Stage C ownership slices except for the atomic runtime handoff required by this slice.
+
+#### Checkpoint 2A — pure request and policy contracts
+
+- Changed: added `internal/agent` package ownership for context-pack request construction, the four ordered tool definitions, assistant-finish classification, tool-target/failure classification, and the exact existing nudge texts and thresholds; the TUI delegates through temporary compatibility helpers.
+- Documented: current transitional architecture and this work packet now distinguish pure agent ownership from the still-open mutable lifecycle ownership.
+- Verified: focused `internal/agent` and `internal/tui` tests pass; `internal/agent` reports 100.0% statement coverage.
+- Coverage: behavioral rows remain unverified until the asynchronous lifecycle, adapter, canonical gate, and runtime evidence are complete.
+- Security: the extracted pure contracts contain no credentials, contexts, raw debug data, filesystem access, process execution, or network execution.
+- Evidence: production TUI paths call `agent.BuildMessages`, `agent.Tools`, and agent policy helpers; focused tests cover every new agent statement.
+- Known limits: stream reading, tool execution, context cancellation, accounting, policy latches, and model-facing history remain in `internal/tui` for the next checkpoint.

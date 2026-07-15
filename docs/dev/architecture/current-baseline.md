@@ -11,6 +11,7 @@ internal/app
     +--> internal/llm
     +--> internal/tui
               |
+              +--> internal/agent
               +--> internal/config
               +--> internal/ctx
               +--> internal/llm
@@ -26,6 +27,6 @@ internal/app
 
 ## Remaining temporary ownership
 
-`internal/tui` still owns configuration reload/model persistence, context packing, chat streaming, tool dispatch, cancellation, and agent-loop policy. This is the remaining inherited coupling for later Stage C slices, not the target design.
+Stage C slice 2 is in progress. `internal/agent` now owns the production request-packing/tool-schema helpers and the pure assistant/tool classification and nudge text contracts. `internal/tui` still owns configuration reload/model persistence, the mutable model-facing history, chat-stream lifecycle, tool dispatch, cancellation, accounting, and policy latch decisions. The TUI delegates to the extracted pure contracts through temporary compatibility helpers so the accepted tests remain intact while asynchronous ownership moves in later checkpoints.
 
 Backend packages must not import `internal/tui`. `internal/app` is the sole current exception because a composition root must select the concrete frontend. Later slices replace that concrete runtime coupling with typed frontend contracts while preserving the accepted layout and behavior.

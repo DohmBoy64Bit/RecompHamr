@@ -31,6 +31,7 @@ Repository-wide always-on instructions live in [`../AGENTS.md`](../AGENTS.md). C
 - [`dev/verification/verification-contract.md`](dev/verification/verification-contract.md) — documentation contract, 100% statement coverage, behavioral-surface coverage, build, and smoke-test gates
 - [`dev/verification/behavioral-surface-coverage.md`](dev/verification/behavioral-surface-coverage.md) — 100% old-and-new behavioral surface coverage and meaningful documentation coverage contract
 - [`dev/verification/stage-a-behavioral-surface.md`](dev/verification/stage-a-behavioral-surface.md) — active Stage A surface inventory and acceptance evidence map
+- [`dev/verification/stage-c-behavioral-surface.md`](dev/verification/stage-c-behavioral-surface.md) — active separation-of-concerns ownership and equivalence inventory
 - [`dev/verification/stage-a-runtime-acceptance.md`](dev/verification/stage-a-runtime-acceptance.md) — sanitized Windows Terminal, LM Studio, tool, cancellation, security, and screenshot evidence
 
 ### Architecture

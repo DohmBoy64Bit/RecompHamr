@@ -2,7 +2,6 @@ package tui
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
@@ -671,10 +671,7 @@ func (m *Model) endTurn() {
 func (m *Model) buildMessages() []chmctx.Message {
 	ctxSize := m.activeContextSize()
 	budget := chmctx.Budget(ctxSize)
-	r := chmctx.Pack(m.history, budget)
-	out := make([]chmctx.Message, 0, len(r.Messages)+1)
-	out = append(out, chmctx.Message{Role: chmctx.RoleSystem, Content: m.system})
-	out = append(out, r.Messages...)
+	out := agent.BuildMessages(m.system, m.history, ctxSize)
 	dbgWriteRequest(m.cfg.ActiveProfile().LLM, ctxSize, budget, len(m.history), out)
 	return out
 }
@@ -683,26 +680,7 @@ func (m *Model) buildMessages() []chmctx.Message {
 // write_file, edit_file. No loop/control tool; a turn ends when the model
 // stops emitting tool calls (see handleStreamClosed).
 func (m *Model) buildTools() []llm.Tool {
-	return []llm.Tool{
-		schemaToTool(tools.PowerShellSchema()),
-		schemaToTool(tools.ReadFileSchema()),
-		schemaToTool(tools.WriteFileSchema()),
-		schemaToTool(tools.EditFileSchema()),
-	}
-}
-
-// schemaToTool unwraps a tool schema (the map[string]any shape shared by powershell
-// and the file tools) into the typed llm.Tool the chat payload expects.
-func schemaToTool(s map[string]any) llm.Tool {
-	fn := s["function"].(map[string]any)
-	return llm.Tool{
-		Type: s["type"].(string),
-		Function: llm.FunctionDef{
-			Name:        fn["name"].(string),
-			Description: fn["description"].(string),
-			Parameters:  fn["parameters"].(map[string]any),
-		},
-	}
+	return agent.Tools()
 }
 
 // handleStream dispatches one llm.Event to the matching apply* helper and
@@ -947,7 +925,7 @@ func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
 			dbgWritef("nudge", "empty-reply nudge injected (turn ended with no content and no tool call)")
 			m.history = append(m.history, chmctx.Message{
 				Role:    chmctx.RoleSystem,
-				Content: nudgeOrigin + "Your last turn ended with no reply and no tool call. If you meant to call a tool and it did not run, issue it again now as a proper tool call. If you are still working, continue. If the task is done, check it against the original request - actually run or drive what proves it works - then reply with a one-line summary.",
+				Content: agent.EmptyReplyNudge,
 			})
 			m.phase = phaseThinking
 			return m, m.startChat()
@@ -994,12 +972,7 @@ func (m Model) fireQueued() (tea.Model, tea.Cmd) {
 // newestAssistant returns the newest assistant-role message in history: the
 // turn's final reply, which all three finish checks below inspect.
 func newestAssistant(history []chmctx.Message) (chmctx.Message, bool) {
-	for i := len(history) - 1; i >= 0; i-- {
-		if history[i].Role == chmctx.RoleAssistant {
-			return history[i], true
-		}
-	}
-	return chmctx.Message{}, false
+	return agent.NewestAssistant(history)
 }
 
 // newestAssistantEmpty reports whether the turn's final assistant message
@@ -1008,8 +981,7 @@ func newestAssistant(history []chmctx.Message) (chmctx.Message, bool) {
 // assistant message is always an anomaly: the model stopped mid-task, or its
 // call streamed into the reasoning channel and was dropped before reaching us.
 func newestAssistantEmpty(history []chmctx.Message) bool {
-	msg, ok := newestAssistant(history)
-	return ok && strings.TrimSpace(msg.Content) == "" && len(msg.ToolCalls) == 0
+	return agent.NewestAssistantEmpty(history)
 }
 
 // newestAssistantUnverified reports whether the turn's final assistant message
@@ -1018,8 +990,7 @@ func newestAssistantEmpty(history []chmctx.Message) bool {
 // "Unverified" interchangeably. Used to suppress the finish nudge on a finish
 // that already named what it couldn't prove (see maybeVerifyNudge).
 func newestAssistantUnverified(history []chmctx.Message) bool {
-	msg, ok := newestAssistant(history)
-	return ok && strings.Contains(strings.ToLower(msg.Content), "unverified")
+	return agent.NewestAssistantUnverified(history)
 }
 
 // toolCallLeakWarning returns a user-facing diagnostic when the newest assistant
@@ -1036,11 +1007,7 @@ func newestAssistantUnverified(history []chmctx.Message) bool {
 // not parse or run the leaked call); it points the user at the server-side fix.
 // Empty string when there is nothing to warn.
 func toolCallLeakWarning(history []chmctx.Message) string {
-	msg, ok := newestAssistant(history)
-	if !ok || len(msg.ToolCalls) > 0 {
-		return "" // no assistant yet, or it called a tool properly; the prose tag is incidental
-	}
-	if strings.Contains(msg.Content, "<tool_call>") {
+	if agent.HasToolCallLeak(history) {
 		return styleError.Render("⚠ a tool call leaked into the reply as text instead of running - your model server isn't parsing tool calls. Enable its OpenAI tool-call parser server-side (e.g. vLLM `--tool-call-parser`, llama.cpp `--jinja`).")
 	}
 	return "" // newest assistant message is clean
@@ -1069,13 +1036,13 @@ func (m Model) dispatchNextTool() (tea.Model, tea.Cmd) {
 // Deliberately says nothing about whether to stop or keep going (each nudge body
 // owns that), so it can't induce the premature-completion failure the runaway /
 // verify wording fights.
-const nudgeOrigin = "[Automated RecompHamr check - not a message from your user.] "
+const nudgeOrigin = agent.NudgeOrigin
 
 // maxToolFailStreak is how many consecutive same-target failures trigger the
 // nudge. Generous on purpose: a model iterating on a hard edit gets several
 // attempts before being told it's stuck; catches genuine loops without
 // interrupting honest trial-and-error.
-const maxToolFailStreak = 5
+const maxToolFailStreak = agent.MaxToolFailStreak
 
 // toolTargetKey is the stable identity used to detect a repeated-failure loop:
 // tool name + its target (the path for file tools, the command's first line for
@@ -1084,18 +1051,7 @@ const maxToolFailStreak = 5
 // command). Keying on the target catches a model hammering the same operation
 // while leaving varied exploration alone.
 func toolTargetKey(call chmctx.ToolCall) string {
-	switch call.Name {
-	case tools.WriteFileName, tools.EditFileName, tools.ReadFileName:
-		path, _ := call.Arguments["path"].(string)
-		return call.Name + "|" + path
-	case tools.PowerShellName:
-		script, _ := call.Arguments["script"].(string)
-		if i := strings.IndexByte(script, '\n'); i >= 0 {
-			script = script[:i]
-		}
-		return call.Name + "|" + strings.TrimSpace(script)
-	}
-	return call.Name
+	return agent.ToolTargetKey(call)
 }
 
 // toolResultFailed reports whether a tool result is an error the model should
@@ -1104,39 +1060,7 @@ func toolTargetKey(call chmctx.ToolCall) string {
 // appends "(exit: N)" / "(timeout after ...)" on failure. A user Ctrl+C
 // ("(cancelled)") never counts as a failure.
 func toolResultFailed(name, result string) bool {
-	if strings.Contains(result, "(cancelled)") {
-		return false
-	}
-	// Router-level failures arrive under any tool name and bypass the per-tool
-	// shapes below: truncated/invalid JSON args (the failure that makes a model
-	// re-emit the same too-large write for minutes) and a hallucinated tool
-	// name. Both must count as failures or the repeated-failure nudge never
-	// fires on exactly the loops it was built for.
-	t := strings.TrimSpace(result)
-	if strings.HasPrefix(t, "(tool arguments were not valid JSON") || strings.HasPrefix(t, "(unknown tool:") {
-		return true
-	}
-	switch name {
-	case tools.WriteFileName, tools.EditFileName:
-		// write/edit report success as plain text ("wrote N bytes", "edited …")
-		// and every error in parens, so a leading "(" is the failure signal.
-		return strings.HasPrefix(t, "(")
-	case tools.ReadFileName:
-		// read_file returns the file's RAW content on success, which can
-		// legitimately start with "(" (Lisp, S-expressions, a leading paren
-		// expr). Match only its two real failure outputs so a successful read
-		// isn't counted as a failure and made to feed the repeated-failure nudge.
-		return strings.HasPrefix(t, "(read error:") || t == "(empty path)"
-	case tools.PowerShellName:
-		// "(empty script)" is PowerShell's malformed-call outcome (missing/blank
-		// script), exact-matched like read_file's "(empty path)": successful shell
-		// output can legitimately start with "(", so no prefix match here. It
-		// must count as a failure or a model looping on empty calls never
-		// builds a streak and slips past the backstop to the runaway cap.
-		return strings.Contains(result, "\n(exit: ") || strings.Contains(result, "(timeout after ") ||
-			t == "(empty script)"
-	}
-	return false
+	return agent.ToolResultFailed(name, result)
 }
 
 // recordToolOutcome updates the failure streak from one finished tool result.
@@ -1170,10 +1094,8 @@ func (m *Model) maybeFailureNudge() {
 	}
 	dbgWritef("nudge", "repeated-failure nudge injected after %d same-target failures (key=%s)", m.failStreak, m.failKey)
 	m.history = append(m.history, chmctx.Message{
-		Role: chmctx.RoleSystem,
-		Content: nudgeOrigin + fmt.Sprintf(
-			"The last %d tool calls to the same target failed the same way. Stop repeating it - read the error, change your approach, or tell the user what's blocking you.",
-			m.failStreak),
+		Role:    chmctx.RoleSystem,
+		Content: agent.FailureNudge(m.failStreak),
 	})
 	m.failKey, m.failStreak = "", 0
 }
@@ -1183,7 +1105,7 @@ func (m *Model) maybeFailureNudge() {
 // below a genuine runaway, so a doomed loop the same-target failure streak
 // can't see (a blocked install or lib-hunt re-fired with cosmetic variations)
 // still gets a self-check with context left, not after it has burned the turn.
-const maxToolRounds = 75
+const maxToolRounds = agent.MaxToolRounds
 
 // maybeRunawayNudge appends one soft system note when a turn crosses
 // maxToolRounds tool calls without finishing. The runawayNudged latch fires it
@@ -1200,10 +1122,8 @@ func (m *Model) maybeRunawayNudge() {
 	m.runawayNudged = true
 	dbgWritef("nudge", "runaway-iteration nudge injected at %d tool calls this turn", m.toolRounds)
 	m.history = append(m.history, chmctx.Message{
-		Role: chmctx.RoleSystem,
-		Content: nudgeOrigin + fmt.Sprintf(
-			"%d tool calls so far this turn without finishing. If you're still making real progress, keep going. If you're repeating a step that can't work here - a blocked install, a missing tool, a path failing the same way - stop chasing it (that loop burns the turn); verify another way. If you're stuck or unsure you're converging, tell the user where things stand and what's blocking you.",
-			m.toolRounds),
+		Role:    chmctx.RoleSystem,
+		Content: agent.RunawayNudge(m.toolRounds),
 	})
 }
 
@@ -1213,7 +1133,7 @@ func (m *Model) maybeRunawayNudge() {
 // while a build / refactor / test-fix loop clears it easily. Below this the
 // original request is still close in context and a re-ground would be noise; the
 // galaxy runs that shipped broken-but-claimed-done artifacts each made dozens.
-const verifyNudgeMinRounds = 8
+const verifyNudgeMinRounds = agent.VerifyNudgeMinRounds
 
 // maybeVerifyNudge appends one re-grounding system note when a substantial turn
 // (>= verifyNudgeMinRounds tool calls) is about to finish with a clean, non-empty
@@ -1243,7 +1163,7 @@ func (m *Model) maybeVerifyNudge() bool {
 	dbgWritef("nudge", "finish re-grounding nudge injected at %d tool calls this turn", m.toolRounds)
 	m.history = append(m.history, chmctx.Message{
 		Role:    chmctx.RoleSystem,
-		Content: nudgeOrigin + "Before you finish: re-read the original request and walk its acceptance criteria one at a time. For each, name the check you actually ran and what it showed. Anything runnable you built or changed is proven only by running it - build or type-check it, run the test, execute the script, or for a page or UI load it in a headless browser and drive the primary interaction (click Start, press the keys, submit the form) and confirm the state changed - then fix what breaks and re-run. If a check seems to need a runtime or browser this environment lacks, prove the lack with one read-only probe (`command -v node`, `command -v chromium chromium-browser google-chrome`, `ls ~/.cache/ms-playwright`) instead of assuming; the fire-once browser install your instructions allow is the ONE install worth attempting, and only if you haven't tried it this turn - never re-try a failed install or hunt missing libs, and if the probe comes up empty with no network, stop hunting. Only then mark the check `unverified: <what> - <why>` and lead your summary with it, not with a confident \"works\"; never dress up a static check (a brace count, a grep, an HTTP 200) as proof, and never report a check you didn't run. Then reply with your one-line summary.",
+		Content: agent.VerifyNudge,
 	})
 	return true
 }

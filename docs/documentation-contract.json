@@ -20,6 +20,7 @@
     "docs/dev/verification/verification-contract.md",
     "docs/dev/verification/behavioral-surface-coverage.md",
     "docs/dev/verification/stage-a-behavioral-surface.md",
+    "docs/dev/verification/stage-c-behavioral-surface.md",
     "docs/dev/verification/stage-a-runtime-acceptance.md",
     "docs/dev/workflows/baseline-gate.md",
     "docs/dev/workflows/change-control.md",
@@ -215,6 +216,13 @@
       "Surface ID",
       "Runtime/manual evidence",
       "unverified"
+    ],
+    "docs/dev/verification/stage-c-behavioral-surface.md": [
+      "AGENT-01",
+      "AGENT-02",
+      "TUI-04",
+      "unverified",
+      "Runtime/manual evidence"
     ],
     "docs/dev/verification/stage-a-runtime-acceptance.md": [
       "google/gemma-4-12b-qat",
