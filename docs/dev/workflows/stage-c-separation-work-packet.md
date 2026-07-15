@@ -394,3 +394,23 @@ Production TUI imports only `internal/frontend` among project runtime packages a
 - Security: open.
 - Evidence: accepted Slices 1 through 3 and current source/tests frozen as the equivalence baseline.
 - Known limits: all Slice 4 implementation, deletion-boundary proof, and runtime acceptance remain open.
+
+#### Checkpoint 4A — work packet and evidence freeze
+
+- Changed: no production behavior changed; recorded the final Stage C outcome, constraints, source evidence, security boundary, verification, deletion interpretation, and stop condition before implementation.
+- Documented: Slice 4 and behavioral rows `APP-02`, `FRONTEND-01`, and `TUI-06` are durable and initially unverified.
+- Verified: the canonical gate passes at exactly 100.0% statements against the accepted pre-change implementation.
+- Coverage: accepted Slices 1 through 3 remain the complete equivalence baseline; Slice 4 rows remain unverified.
+- Security: the planned contract explicitly excludes credentials and raw backend capabilities; no production boundary changed.
+- Evidence: source/import audit and retained app/TUI/agent/session tests.
+- Known limits: contracts, controller, migration, deletion proof, and runtime acceptance remain open.
+
+#### Checkpoint 4B — neutral contracts and parallel controller
+
+- Changed: added backend- and Bubble-Tea-neutral `internal/frontend` intents, immutable snapshots, ordered events, opaque work/completions, controller interface, and canonical help rows. Added an app-owned controller beside the accepted TUI path for startup/history, reload/activation, reset, reachability/probe work, exactly-once completion consumption, and stale/foreign/duplicate rejection.
+- Documented: every exported frontend/controller contract states its lifecycle and security boundary; current architecture records the parallel compatibility checkpoint.
+- Verified: focused frontend/app tests pass at exactly 100.0% statements, covering constructors/accessors, copy-safe snapshots, startup/history, reload/activation errors, captured keyed/keyless work, success/failure/silent/stale/duplicate/foreign/unknown completions, reset, context fallback, and transitional no-op agent intents.
+- Coverage: repository-atomic coverage and Slice 4 behavioral rows remain open until migration and canonical verification complete.
+- Security: frontend types contain only display-safe fields; opaque work retains backend values in unexported app implementations, and the controller rejects completions it did not issue or already consumed.
+- Evidence: the accepted TUI path is unchanged while the new controller is independently tested; no frontend source imports a project backend or Bubble Tea.
+- Known limits: production TUI still uses agent/session façades directly; agent-turn intents, terminal isolation, architecture enforcement, deletion proof, and runtime evidence remain open.
