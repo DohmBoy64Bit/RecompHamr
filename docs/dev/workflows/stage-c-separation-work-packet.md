@@ -303,13 +303,13 @@ Production `internal/tui` no longer imports config, LLM, or provider packages; d
 
 ### Completion evidence
 
-- Changed: open.
-- Documented: pre-edit contract recorded here and in the active inventory.
-- Verified: open.
-- Coverage: open.
-- Security: open.
-- Evidence: current source/tests inventoried; implementation and runtime evidence remain open.
-- Known limits: history ownership is implemented at Checkpoint 3A; configuration/client/probe ownership and all Slice 3 runtime evidence remain open.
+- Changed: accepted. Prompt-history persistence, configuration reload/profile activation, concrete model-client lifecycle, and backend reachability/probe execution are owned by the app-composed `internal/session` runtime; presentation consumes only non-secret snapshots and opaque work.
+- Documented: current architecture, decision D-014, active behavioral inventory, package/exported-symbol contracts, architecture enforcement, and checkpoints 3A/3B agree with the accepted ownership boundary.
+- Verified: focused session/app/TUI/config/LLM/provider tests, architecture enforcement, the canonical repository gate, and the complete user-observed Windows Terminal checklist pass against implementation commit `39fb263`.
+- Coverage: exactly 100.0% repository statement coverage, every Slice 3 behavioral row verified, and affected documentation audited with no stale open claim.
+- Security: resolved credentials remain inside configuration/client construction; snapshots expose only keyed booleans; private history/config enforcement, atomic persistence, rollback, override handling, and secret non-disclosure are preserved.
+- Evidence: source and automated evidence at `39fb263`; on 2026-07-15 the user confirmed all 12 manual checks passed with LM Studio `google/gemma-4-12b-qat`, including startup/connectivity, model list/switch, real response, persisted restart selection, history recall/clear, 120×36/80×24/50×16 rendering, clean Ctrl+D exit, and restored PowerShell input. No screenshot files were supplied or claimed as retained artifacts.
+- Known limits: none within Slice 3. Later Stage C work remains governed by the overall separation stop condition.
 
 #### Checkpoint 3A — prompt-history persistence
 
@@ -326,7 +326,7 @@ Production `internal/tui` no longer imports config, LLM, or provider packages; d
 - Changed: added one app-composed `internal/session.Runtime` that owns configuration reload, profile activation/persistence, concrete client construction/replacement, process-only URL override retention, prompt history, and captured reachability/authenticated-probe work. The agent uses the stable session chat contract while presentation consumes immutable snapshots and opaque work.
 - Documented: current architecture, decision D-014, architecture enforcement, active inventory, package/exported-symbol contracts, and this checkpoint agree on the new owner and non-secret boundary.
 - Verified: focused session/app/TUI tests pass at exactly 100.0% statements; tests cover snapshot secrecy, successful/failed activation, save rollback, unchanged/changed/failed reload, URL override, real chat/probe transport, captured reachability identity, history delegation, stale UI results, keyed/keyless startup, lists, switching, reload diagnostics, and rendering adapters.
-- Coverage: repository-atomic coverage and runtime rows remain open until the canonical gate and exact-build Windows Terminal scenario complete.
+- Coverage: focused and canonical repository gates pass at exactly 100.0% statements; Slice 3 behavioral rows are verified by the completed runtime checklist.
 - Security: resolved keys remain private to config/client construction and are represented only as booleans in snapshots; save rollback and existing private-path enforcement are preserved.
 - Evidence: production TUI has no config/LLM/provider import, client construction, probe transport, or persistence filesystem call; architecture enforcement rejects their return.
-- Known limits: exact-build profile persistence, history recall/clear, real response, screenshots, clean exit, and restored-shell evidence remain required before Slice 3 acceptance.
+- Known limits: none within this checkpoint; manual evidence is user-observed and no screenshot files were supplied or recorded.
