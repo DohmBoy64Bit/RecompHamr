@@ -45,9 +45,9 @@ func TestPhaseOutcomeContextAndInitContracts(t *testing.T) {
 		t.Fatal("fallback context")
 	}
 	m.installTurnContext()
-	first := m.cancel
+	first := m.turn.CancelFunc
 	m.installTurnContext()
-	if first == nil || m.cancel == nil {
+	if first == nil || m.turn.CancelFunc == nil {
 		t.Fatal("turn context")
 	}
 	m.status = queueSlashHint
@@ -93,7 +93,7 @@ func TestStreamEventStateMachine(t *testing.T) {
 	final := chmctx.Message{Role: chmctx.RoleAssistant, Content: "done", ToolCalls: []chmctx.ToolCall{call}}
 	next, _ = m.handleStream(llm.Event{Kind: llm.EventDone, Final: &final, Tokens: 9, PromptTokens: 4000, ContextWindow: 4096})
 	m = next.(Model)
-	if m.turnTokens != 9 || m.liveContextSize[m.cfg.Active] != 4096 || len(m.history) == 0 {
+	if m.turnTokens != 9 || m.liveContextSize[m.cfg.Active] != 4096 || len(m.turn.History) == 0 {
 		t.Fatal("done accounting")
 	}
 	next, cmd := m.handleStreamClosed()
@@ -104,18 +104,18 @@ func TestStreamEventStateMachine(t *testing.T) {
 
 	turnCtx, cancel := context.WithCancel(context.Background())
 	cancel()
-	m.turnCtx = turnCtx
+	m.turn.Context = turnCtx
+	m.turn.ID = 1
 	toolMsg := chmctx.Message{Role: chmctx.RoleTool, ToolName: tools.ReadFileName, Content: "ok"}
-	next, _ = m.update(toolResultMsg{Msg: toolMsg, turnCtx: turnCtx})
+	next, _ = m.update(toolResultMsg{Msg: toolMsg, turnID: 1})
 	m = next.(Model)
 	if m.phase != phaseThinking {
 		t.Fatal("tool result did not resume")
 	}
-	otherCtx := context.Background()
-	before := len(m.history)
-	next, _ = m.update(toolResultMsg{Msg: toolMsg, turnCtx: otherCtx})
+	before := len(m.turn.History)
+	next, _ = m.update(toolResultMsg{Msg: toolMsg, turnID: 2})
 	m = next.(Model)
-	if len(m.history) != before {
+	if len(m.turn.History) != before {
 		t.Fatal("stale tool result")
 	}
 
@@ -176,8 +176,8 @@ func TestUpdateTypedMessagesAndClosedOutcomes(t *testing.T) {
 	m.turnStart = time.Now().Add(-time.Second)
 	closedCtx, closeCancel := context.WithCancel(context.Background())
 	closeCancel()
-	m.turnCtx = closedCtx
-	m.history = []chmctx.Message{{Role: chmctx.RoleAssistant}}
+	m.turn.Context = closedCtx
+	m.turn.History = []chmctx.Message{{Role: chmctx.RoleAssistant}}
 	next, cmd := m.handleStreamClosed()
 	m = next.(Model)
 	if cmd == nil || !m.emptyNudged {
@@ -193,7 +193,7 @@ func TestUpdateTypedMessagesAndClosedOutcomes(t *testing.T) {
 	m = baselineModel(t)
 	m.phase = phaseThinking
 	m.turnStart = time.Now().Add(-time.Second)
-	m.history = []chmctx.Message{{Role: chmctx.RoleAssistant, Content: "<tool_call>bad"}}
+	m.turn.History = []chmctx.Message{{Role: chmctx.RoleAssistant, Content: "<tool_call>bad"}}
 	next, _ = m.handleStreamClosed()
 	m = next.(Model)
 	if m.lastOutcome != outcomeStopped {
@@ -252,8 +252,9 @@ func TestRemainingStateBranches(t *testing.T) {
 	m.pending = []chmctx.ToolCall{{Name: tools.ReadFileName}, {Name: tools.ReadFileName}}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	m.turnCtx = ctx
-	next, cmd := m.update(toolResultMsg{Msg: chmctx.Message{Role: chmctx.RoleTool}, turnCtx: ctx})
+	m.turn.Context = ctx
+	m.turn.ID = 1
+	next, cmd := m.update(toolResultMsg{Msg: chmctx.Message{Role: chmctx.RoleTool}, turnID: 1})
 	m = next.(Model)
 	if cmd == nil || len(m.pending) != 1 {
 		t.Fatal("pending tool chain")
@@ -287,7 +288,7 @@ func TestRemainingStateBranches(t *testing.T) {
 	if toolCallLeakWarning([]chmctx.Message{{Role: chmctx.RoleAssistant, Content: "<tool_call>", ToolCalls: []chmctx.ToolCall{{Name: "x"}}}}) != "" {
 		t.Fatal("structured call warned")
 	}
-	m.history = []chmctx.Message{{Role: chmctx.RoleAssistant, Content: "UNVERIFIED: runtime"}}
+	m.turn.History = []chmctx.Message{{Role: chmctx.RoleAssistant, Content: "UNVERIFIED: runtime"}}
 	m.toolRounds = verifyNudgeMinRounds
 	m.verifyNudged = false
 	if m.maybeVerifyNudge() {

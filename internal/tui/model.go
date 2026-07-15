@@ -94,8 +94,8 @@ type Model struct {
 	cfg *config.Config
 	cli *llm.Client
 
-	history []chmctx.Message // full conversation minus the system prompt
-	system  string           // embedded system prompt + working-directory anchor
+	turn   agent.TurnState // model-facing history, stable identity, and cancellation root
+	system string          // embedded system prompt + working-directory anchor
 
 	// streaming is the live raw token buffer for the current content block,
 	// rendered above the prompt by View() while the model talks. On flush
@@ -196,10 +196,6 @@ type Model struct {
 	suggestArgLevel bool
 	activeCmd       string
 
-	// per-turn cancel plumbing: one context + CancelFunc govern the LLM stream
-	// and tool calls for the turn. Ctrl+C cancels the whole cascade.
-	turnCtx     context.Context
-	cancel      context.CancelFunc
 	quitArmedAt time.Time // first Ctrl+C in idle arms; second within 3s quits
 
 	status string // transient status-bar hint; cleared by the event that obsoletes it (keypress, quit-arm timer, endTurn)
@@ -294,6 +290,7 @@ func New(cfg *config.Config, cli *llm.Client, projectDir, version string) Model 
 		scroll:          new(strings.Builder),
 		reasoning:       new(strings.Builder),
 		histIdx:         -1,
+		turn:            agent.NewTurnState(nil),
 		liveContextSize: map[string]int{},
 	}
 	// Record the active backend once, before any turn, so a shared log
@@ -469,13 +466,13 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// drop, the orphan tool message gets appended to the live turn's history
 		// (no preceding assistant.tool_calls → the next /v1 request 400s) and
 		// startChat would abandon the in-flight stream. The turnCtx tag was
-		// captured at runToolCall time; endTurn nils m.turnCtx and a fresh
+		// captured at runToolCall time; endTurn nils m.turn.Context and a fresh
 		// beginTurn installs a new one that can't match.
-		if msg.turnCtx != m.turnCtx {
+		if msg.turnID != m.turn.ID {
 			return m, nil
 		}
 		dbgWriteMessage("tool_result", msg.Msg)
-		m.history = append(m.history, msg.Msg)
+		m.turn.Append(msg.Msg)
 		m.recordToolOutcome(msg.Msg.ToolName, msg.Msg.Content)
 		// Drain every remaining call before re-entering chat: OpenAI rejects an
 		// assistant.tool_calls message followed by fewer tool messages than
@@ -602,24 +599,21 @@ func (m Model) submit(sendText, echoText string, entry promptEntry) (tea.Model, 
 
 func (m *Model) startChat() tea.Cmd {
 	msgs := m.buildMessages()
-	ch := m.cli.Chat(m.turnCtx, msgs, m.buildTools())
+	ch := m.cli.Chat(m.turn.Context, msgs, m.buildTools())
 	m.stream = ch
 	return readEvent(ch)
 }
 
 // installTurnContext cancels any in-flight turn context and installs a fresh
-// per-turn root on m.turnCtx / m.cancel. Cancel-old-then-install-new keeps
-// Ctrl+C consistent: one m.cancel() always unwinds the whole current cascade.
+// per-turn root on m.turn.Context / m.turn.CancelFunc. Cancel-old-then-install-new keeps
+// Ctrl+C consistent: one m.turn.CancelFunc() always unwinds the whole current cascade.
 func (m *Model) installTurnContext() {
-	if m.cancel != nil {
-		m.cancel()
-	}
-	m.turnCtx, m.cancel = context.WithCancel(context.Background())
+	m.turn.Begin(context.Background(), time.Now())
 }
 
 // beginTurn installs a fresh per-turn context, flips phase to thinking, and
 // returns the chat stream-reader Cmd. Every path starting a new LLM round
-// funnels through here so one m.cancel() cancels the whole cascade.
+// funnels through here so one m.turn.CancelFunc() cancels the whole cascade.
 func (m *Model) beginTurn() tea.Cmd {
 	m.installTurnContext()
 	m.turnStart = time.Now()
@@ -631,7 +625,7 @@ func (m *Model) beginTurn() tea.Cmd {
 // appendUserTurn appends a user-role message to history and starts a turn.
 // The only path that does so; used by submit.
 func (m *Model) appendUserTurn(content string) tea.Cmd {
-	m.history = append(m.history, chmctx.Message{Role: chmctx.RoleUser, Content: content})
+	m.turn.Append(chmctx.Message{Role: chmctx.RoleUser, Content: content})
 	return m.beginTurn()
 }
 
@@ -644,12 +638,8 @@ func (m *Model) appendUserTurn(content string) tea.Cmd {
 // whose tool_call_id no longer pairs the latest assistant message. Does NOT
 // touch scrollback; callers decide whether to flush streaming or emit a banner.
 func (m *Model) endTurn() {
-	if m.cancel != nil {
-		m.cancel()
-	}
+	m.turn.End()
 	m.phase = phaseIdle
-	m.cancel = nil
-	m.turnCtx = nil
 	m.pending = nil
 	m.toolRounds = 0
 	m.runawayNudged = false
@@ -671,8 +661,8 @@ func (m *Model) endTurn() {
 func (m *Model) buildMessages() []chmctx.Message {
 	ctxSize := m.activeContextSize()
 	budget := chmctx.Budget(ctxSize)
-	out := agent.BuildMessages(m.system, m.history, ctxSize)
-	dbgWriteRequest(m.cfg.ActiveProfile().LLM, ctxSize, budget, len(m.history), out)
+	out := agent.BuildMessages(m.system, m.turn.History, ctxSize)
+	dbgWriteRequest(m.cfg.ActiveProfile().LLM, ctxSize, budget, len(m.turn.History), out)
 	return out
 }
 
@@ -792,7 +782,7 @@ func (m *Model) applyDone(e llm.Event) {
 	m.reasoning.Reset()
 	if e.Final != nil {
 		dbgWriteMessage("assistant", *e.Final)
-		m.history = append(m.history, *e.Final)
+		m.turn.Append(*e.Final)
 	}
 	// prompt_tokens (server-counted, 0 = not reported) sits beside the request
 	// record's char/4 estimate so a forensic pass can calibrate the packer's
@@ -919,11 +909,11 @@ func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
 	// rather than dying silently: the prior behaviour left a half-done artifact
 	// with no banner at all.
 	outcome := outcomeDone // a clean, non-empty finish; stall/leak below downgrade it
-	if newestAssistantEmpty(m.history) {
+	if newestAssistantEmpty(m.turn.History) {
 		if !m.emptyNudged {
 			m.emptyNudged = true
 			dbgWritef("nudge", "empty-reply nudge injected (turn ended with no content and no tool call)")
-			m.history = append(m.history, chmctx.Message{
+			m.turn.Append(chmctx.Message{
 				Role:    chmctx.RoleSystem,
 				Content: agent.EmptyReplyNudge,
 			})
@@ -933,7 +923,7 @@ func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
 		m.appendLine(styleError.Render("⚠ the model ended its turn with no reply and no tool call - it stalled, or your server dropped the call. If thinking is on, its reasoning parser may be swallowing calls - enable one (e.g. vLLM `--reasoning-parser`) or disable thinking for tool turns."))
 		dbgWritef("leak", "turn ended with an empty assistant message after a re-prompt (model stalled or the call was swallowed server-side)")
 		outcome = outcomeStopped
-	} else if w := toolCallLeakWarning(m.history); w != "" {
+	} else if w := toolCallLeakWarning(m.turn.History); w != "" {
 		// The model meant to call a tool but its server's parser leaked the raw
 		// call into the reply text instead. The fix is server-side.
 		m.appendLine(w)
@@ -1024,7 +1014,7 @@ func (m Model) dispatchNextTool() (tea.Model, tea.Cmd) {
 	m.lastToolKey = toolTargetKey(call)
 	m.toolRounds++
 	m.phase = phaseRunning
-	return m, runToolCall(m.turnCtx, call)
+	return m, runToolCall(m.turn.Context, m.turn.ID, call)
 }
 
 // nudgeOrigin prefixes every deterministic backstop note. A weak (30B) model
@@ -1093,7 +1083,7 @@ func (m *Model) maybeFailureNudge() {
 		return
 	}
 	dbgWritef("nudge", "repeated-failure nudge injected after %d same-target failures (key=%s)", m.failStreak, m.failKey)
-	m.history = append(m.history, chmctx.Message{
+	m.turn.Append(chmctx.Message{
 		Role:    chmctx.RoleSystem,
 		Content: agent.FailureNudge(m.failStreak),
 	})
@@ -1121,7 +1111,7 @@ func (m *Model) maybeRunawayNudge() {
 	}
 	m.runawayNudged = true
 	dbgWritef("nudge", "runaway-iteration nudge injected at %d tool calls this turn", m.toolRounds)
-	m.history = append(m.history, chmctx.Message{
+	m.turn.Append(chmctx.Message{
 		Role:    chmctx.RoleSystem,
 		Content: agent.RunawayNudge(m.toolRounds),
 	})
@@ -1156,12 +1146,12 @@ func (m *Model) maybeVerifyNudge() bool {
 	// runtime" got re-prompted into a confident, caveat-free "it works". Let an
 	// honest finish stand. A true false green carries no such marker, so it still
 	// gets nudged.
-	if newestAssistantUnverified(m.history) {
+	if newestAssistantUnverified(m.turn.History) {
 		return false
 	}
 	m.verifyNudged = true
 	dbgWritef("nudge", "finish re-grounding nudge injected at %d tool calls this turn", m.toolRounds)
-	m.history = append(m.history, chmctx.Message{
+	m.turn.Append(chmctx.Message{
 		Role:    chmctx.RoleSystem,
 		Content: agent.VerifyNudge,
 	})

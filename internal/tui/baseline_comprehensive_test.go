@@ -32,8 +32,8 @@ func TestCommandBoundariesAndErrorHints(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	msg := runToolCall(ctx, chmctx.ToolCall{ID: "1", Name: tools.ReadFileName, Arguments: map[string]any{"path": path}})().(toolResultMsg)
-	if msg.Msg.Content != "hello" || msg.turnCtx != ctx {
+	msg := runToolCall(ctx, 7, chmctx.ToolCall{ID: "1", Name: tools.ReadFileName, Arguments: map[string]any{"path": path}})().(toolResultMsg)
+	if msg.Msg.Content != "hello" || msg.turnID != 7 {
 		t.Fatalf("tool result = %#v", msg)
 	}
 	m := baselineModel(t)
@@ -140,18 +140,18 @@ func TestToolOutcomeAndNudgeContracts(t *testing.T) {
 		m.recordToolOutcome(tools.ReadFileName, "(read error: x)")
 	}
 	m.maybeFailureNudge()
-	if m.failStreak != 0 || len(m.history) == 0 {
+	if m.failStreak != 0 || len(m.turn.History) == 0 {
 		t.Fatal("failure nudge missing")
 	}
 	m.maybeFailureNudge()
 	m.toolRounds = maxToolRounds
 	m.maybeRunawayNudge()
-	before := len(m.history)
+	before := len(m.turn.History)
 	m.maybeRunawayNudge()
-	if !m.runawayNudged || len(m.history) != before {
+	if !m.runawayNudged || len(m.turn.History) != before {
 		t.Fatal("runaway latch failed")
 	}
-	m.history = append(m.history, chmctx.Message{Role: chmctx.RoleAssistant, Content: "done"})
+	m.turn.History = append(m.turn.History, chmctx.Message{Role: chmctx.RoleAssistant, Content: "done"})
 	m.toolRounds = verifyNudgeMinRounds
 	if !m.maybeVerifyNudge() || m.maybeVerifyNudge() {
 		t.Fatal("verify latch failed")

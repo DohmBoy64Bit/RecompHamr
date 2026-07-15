@@ -302,7 +302,7 @@ func TestHandleKeyAllInteractionBranches(t *testing.T) {
 	m.setPopover([]argOption{{value: "/clear"}, {value: "/models"}}, false, "")
 	_, _ = m.handleTab(tea.KeyMsg{Type: tea.KeyTab})
 
-	m.cancel = func() {}
+	m.turn.CancelFunc = func() {}
 	m.phase = phaseThinking
 	m.turnStart = time.Now().Add(-time.Second)
 	next, _ = m.handleCtrlC()
@@ -351,7 +351,7 @@ func TestHandleEnterSelectionAndSlashCommit(t *testing.T) {
 	m.ta.SetValue("/clear")
 	next, cmd = m.handleEnter(tea.KeyMsg{Type: tea.KeyEnter})
 	m = next.(Model)
-	if cmd == nil || len(m.history) != 0 {
+	if cmd == nil || len(m.turn.History) != 0 {
 		t.Fatal("plain slash commit")
 	}
 	if !m.cursorOnFirstLine() || !m.cursorOnLastLine() || m.ta.Line() != 0 || m.ta.LineCount() < 1 {

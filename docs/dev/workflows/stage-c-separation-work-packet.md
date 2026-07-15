@@ -140,3 +140,13 @@ The TUI no longer opens model streams, executes tools, stores turn contexts, pac
 - Security: the extracted pure contracts contain no credentials, contexts, raw debug data, filesystem access, process execution, or network execution.
 - Evidence: production TUI paths call `agent.BuildMessages`, `agent.Tools`, and agent policy helpers; focused tests cover every new agent statement.
 - Known limits: stream reading, tool execution, context cancellation, accounting, policy latches, and model-facing history remain in `internal/tui` for the next checkpoint.
+
+#### Checkpoint 2B — turn root and stable identity
+
+- Changed: moved model-facing history, begin/end/reset context lifecycle, cancellation ownership, and stable monotonically increasing turn identity into `agent.TurnState`; accepted tool results now match `agent.TurnID` instead of exposing context identity to presentation.
+- Documented: current architecture and this checkpoint distinguish the agent-owned turn root from the still-open stream/tool reducer.
+- Verified: focused `internal/agent` and `internal/tui` tests pass, including context replacement cancellation, idempotent end/reset, accepted result handling, and stale result rejection.
+- Coverage: `internal/agent` remains at 100.0% focused statement coverage; behavioral rows remain unverified until the complete adapter and runtime evidence exist.
+- Security: contexts and cancel functions remain opaque runtime values and are neither logged nor included in presentation messages; `TurnID` carries no secret or user content.
+- Evidence: production submit/end/clear/result paths use `agent.TurnState` and `agent.TurnID`.
+- Known limits: stream channels, pending tool calls, accounting, phase transitions, and loop-policy latch state still reside in `internal/tui`.

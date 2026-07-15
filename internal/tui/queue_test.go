@@ -21,7 +21,7 @@ func TestQueueStoresPromptMidTurn(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.phase = phaseThinking
 	m.ta.SetValue("run the tests next")
-	before := len(m.history)
+	before := len(m.turn.History)
 
 	out, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	om := out.(Model)
@@ -35,8 +35,8 @@ func TestQueueStoresPromptMidTurn(t *testing.T) {
 	if om.phase != phaseThinking {
 		t.Fatalf("queuing must not change the running phase, got %v", om.phase)
 	}
-	if len(om.history) != before {
-		t.Fatalf("queuing must not submit (history grew by %d)", len(om.history)-before)
+	if len(om.turn.History) != before {
+		t.Fatalf("queuing must not submit (history grew by %d)", len(om.turn.History)-before)
 	}
 	if cmd != nil {
 		t.Fatal("queuing must not start a turn (nil Cmd)")
@@ -166,8 +166,8 @@ func TestQueueAutoSubmitsAfterTurn(t *testing.T) {
 func TestQueueRestoredOnCtrlC(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	ctx, cancel := context.WithCancel(context.Background())
-	m.turnCtx = ctx
-	m.cancel = cancel
+	m.turn.Context = ctx
+	m.turn.CancelFunc = cancel
 	m.phase = phaseThinking
 	m.queued = &queuedPrompt{send: "later task", echo: "later task"}
 
@@ -191,8 +191,8 @@ func TestQueueRestoredOnCtrlC(t *testing.T) {
 func TestQueueRestoreKeepsExistingDraft(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	ctx, cancel := context.WithCancel(context.Background())
-	m.turnCtx = ctx
-	m.cancel = cancel
+	m.turn.Context = ctx
+	m.turn.CancelFunc = cancel
 	m.phase = phaseThinking
 	m.queued = &queuedPrompt{send: "queued one", echo: "queued one"}
 	m.ta.SetValue("a fresh draft")
@@ -217,7 +217,7 @@ func TestQueueWaitsForVerifyNudge(t *testing.T) {
 	m.phase = phaseStreaming
 	m.toolRounds = verifyNudgeMinRounds // substantial → verify nudge fires
 	m.stream = make(chan llm.Event)
-	m.history = []chmctx.Message{
+	m.turn.History = []chmctx.Message{
 		{Role: chmctx.RoleUser, Content: "build it"},
 		{Role: chmctx.RoleAssistant, Content: "Done, all features built."},
 	}
@@ -232,7 +232,7 @@ func TestQueueWaitsForVerifyNudge(t *testing.T) {
 	if om.queued == nil || om.queued.send != "now deploy" {
 		t.Fatalf("the queued prompt must wait through the verify re-prompt, got %+v", om.queued)
 	}
-	last := om.history[len(om.history)-1]
+	last := om.turn.History[len(om.turn.History)-1]
 	if last.Role != chmctx.RoleSystem {
 		t.Fatalf("the re-prompt must append the verify note, not the queued user msg, got %+v", last)
 	}
@@ -345,7 +345,7 @@ func TestQueueAutoFireUnitFromStreamClosed(t *testing.T) {
 	m.installTurnContext()
 	m.phase = phaseStreaming
 	m.stream = make(chan llm.Event) // non-nil so handleStreamClosed proceeds
-	m.history = []chmctx.Message{
+	m.turn.History = []chmctx.Message{
 		{Role: chmctx.RoleUser, Content: "first"},
 		{Role: chmctx.RoleAssistant, Content: "done"},
 	}
@@ -363,7 +363,7 @@ func TestQueueAutoFireUnitFromStreamClosed(t *testing.T) {
 	if om.queued != nil {
 		t.Fatalf("slot must clear on auto-fire, got %+v", om.queued)
 	}
-	last := om.history[len(om.history)-1]
+	last := om.turn.History[len(om.turn.History)-1]
 	if last.Role != chmctx.RoleUser || last.Content != "next task" {
 		t.Fatalf("auto-fire must append the queued user message, got %+v", last)
 	}

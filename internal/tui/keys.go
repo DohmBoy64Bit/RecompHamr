@@ -109,7 +109,7 @@ func (m *Model) setPromptText(s string) {
 // handleCtrlC implements Ctrl+C's three-level precedence: in-flight cancel >
 // popover close > quit arming. Each level fully handles the key, no fallthrough.
 func (m Model) handleCtrlC() (tea.Model, tea.Cmd) {
-	if m.cancel != nil {
+	if m.turn.CancelFunc != nil {
 		// abortTurn flushes the partial block so streamed output stays
 		// visible, drains turn stats for a clean next banner, then unwinds
 		// the per-turn context.

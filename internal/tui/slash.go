@@ -179,7 +179,7 @@ func (m *Model) rebuildClient() {
 }
 
 func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
-	m.history = nil
+	m.turn.Reset()
 	m.scroll.Reset()
 	m.sessionTokens = 0
 	m.streamingEstimate = 0
