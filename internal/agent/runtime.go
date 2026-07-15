@@ -31,6 +31,17 @@ type Observer interface {
 	WriteMessage(category string, message chmctx.Message)
 }
 
+// Snapshot is an immutable, presentation-safe view of current runtime facts.
+// It excludes history, contexts, cancellation, streams, tool calls, arguments,
+// credentials, reasoning, and observer state.
+type Snapshot struct {
+	Phase             Phase
+	Connected         bool
+	Retrying          bool
+	SessionTokens     int
+	StreamingEstimate int
+}
+
 // NewRuntime constructs an idle agent runtime from application-owned
 // dependencies.
 func NewRuntime(client ChatClient, executor ToolExecutor) Runtime {
@@ -49,6 +60,39 @@ func (r Runtime) WithObserver(observer Observer) Runtime {
 	r.observer = observer
 	return r
 }
+
+// Snapshot returns current presentation facts by value.
+func (r Runtime) Snapshot() Snapshot {
+	return Snapshot{
+		Phase:             r.Stream.Phase,
+		Connected:         r.Stream.Connected,
+		Retrying:          r.Stream.Retrying,
+		SessionTokens:     r.Stream.SessionTokens,
+		StreamingEstimate: r.Stream.StreamingEstimate,
+	}
+}
+
+// Active reports whether an agent turn is active.
+func (r Runtime) Active() bool { return r.Turn.Active() }
+
+// LiveContextSize returns the positive runtime context hint for profile.
+func (r Runtime) LiveContextSize(profile string) (int, bool) {
+	value, ok := r.Stream.LiveContextSize[profile]
+	return value, ok && value > 0
+}
+
+// SetConnected updates the presentation-safe backend connectivity fact.
+func (r Runtime) SetConnected(connected bool) { r.Stream.Connected = connected }
+
+// SetLiveContextSize records a positive probe result for a known profile.
+func (r Runtime) SetLiveContextSize(profile string, contextSize int) {
+	if contextSize > 0 {
+		r.Stream.LiveContextSize[profile] = contextSize
+	}
+}
+
+// CurrentStream returns the opaque reader currently owned by the runtime.
+func (r Runtime) CurrentStream() *Stream { return r.Stream.Stream }
 
 func (r Runtime) observef(category, format string, args ...any) {
 	if r.observer != nil {

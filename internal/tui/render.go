@@ -311,12 +311,13 @@ func (m Model) splashLines() []string {
 
 func (m Model) renderStatusBar() string {
 	sep := styleStatus.Render(" · ")
-	segs := []string{backendLabel(m.cfg, m.runtime.Connected)}
+	snapshot := m.agentRuntime.Snapshot()
+	segs := []string{backendLabel(m.cfg, snapshot.Connected)}
 
-	if live := m.runtime.SessionTokens + m.runtime.StreamingEstimate; live > 0 {
+	if live := snapshot.SessionTokens + snapshot.StreamingEstimate; live > 0 {
 		segs = appendStatus(segs, humanTokens(live))
 	}
-	if label := m.runtime.Phase.Label(); label != "" {
+	if label := snapshot.Phase.Label(); label != "" {
 		segs = appendStatus(segs, m.spinner.View()+" "+label)
 		segs = appendStatus(segs, liveElapsed(time.Since(m.turnStart)))
 	} else if mark := m.lastOutcome.marker(); mark != "" {

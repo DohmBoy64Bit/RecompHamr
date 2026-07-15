@@ -217,7 +217,7 @@ func New(cfg *config.Config, cli *llm.Client, runtime agent.Runtime, projectDir,
 // ContextSize, else defaultPackFallback, so providers before their first
 // response (and any missing/zero value) still get a sensible budget.
 func (m *Model) activeContextSize() int {
-	if v, ok := m.runtime.LiveContextSize[m.cfg.Active]; ok && v > 0 {
+	if v, ok := m.agentRuntime.LiveContextSize(m.cfg.Active); ok {
 		return v
 	}
 	if v := m.cfg.ActiveProfile().ContextSize; v > 0 {
@@ -333,7 +333,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.baseURL != m.cli.BaseURL {
 			return m, nil
 		}
-		m.runtime.Connected = msg.ok
+		m.agentRuntime.SetConnected(msg.ok)
 		return m, nil
 
 	case probeMsg:
@@ -357,7 +357,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case streamClosedMsg:
 		// Stale close from the prior turn's channel; running handleStreamClosed
-		// would nil out the live m.runtime.Stream and, worse, finalizeTurn + endTurn the
+		// would release the live agent stream and, worse, finalizeTurn + endTurn the
 		// active turn, killing the user's request out from under them.
 		delivery := m.agentRuntime.ApplyDelivery(msg.stream, m.cfg.Active, m.activeContextSize(), msg.delivery)
 		if !delivery.Accepted || !delivery.Closed {
@@ -563,7 +563,7 @@ func (m Model) applyStreamEffect(effect agent.StreamEffect) (tea.Model, tea.Cmd)
 	if effect.Error != nil {
 		return m, m.applyError(effect.Error)
 	}
-	return m, readEvent(m.runtime.Stream)
+	return m, readEvent(m.agentRuntime.CurrentStream())
 }
 
 func (m *Model) applyDoneEffect(effect agent.StreamEffect) {
@@ -623,7 +623,7 @@ func (m *Model) finalizeTurn(outcome turnOutcome) {
 	if avg != "" {
 		avg = " · " + avg + " avg"
 	}
-	m.agentRuntime.ObserveTurnEnd(humanTokens(tokens), humanTokens(m.runtime.SessionTokens), wall, avg)
+	m.agentRuntime.ObserveTurnEnd(humanTokens(tokens), humanTokens(m.agentRuntime.Snapshot().SessionTokens), wall, avg)
 	m.turnStart = time.Time{}
 }
 
@@ -632,7 +632,7 @@ func (m *Model) finalizeTurn(outcome turnOutcome) {
 // hand control back. A turn ends precisely when the assistant emits no tool
 // calls; there is no loop tool to land on.
 func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
-	if !m.runtime.Phase.Active() {
+	if !m.agentRuntime.Snapshot().Phase.Active() {
 		return m, nil
 	}
 	decision := m.agentRuntime.DecideClose()
@@ -645,7 +645,7 @@ func (m Model) handleStreamClosed() (tea.Model, tea.Cmd) {
 		if decision.Reason == agent.CloseEmptyStall {
 			m.appendLine(styleError.Render("⚠ the model ended its turn with no reply and no tool call - it stalled, or your server dropped the call. If thinking is on, its reasoning parser may be swallowing calls - enable one (e.g. vLLM `--reasoning-parser`) or disable thinking for tool turns."))
 		} else {
-			m.appendLine(toolCallLeakWarning(m.turn.History))
+			m.appendLine(styleError.Render("⚠ a tool call leaked into the reply as text instead of running - your model server isn't parsing tool calls. Enable its OpenAI tool-call parser server-side (e.g. vLLM `--tool-call-parser`, llama.cpp `--jinja`)."))
 		}
 		m.finalizeTurn(outcomeStopped)
 	default:
@@ -671,26 +671,6 @@ func (m Model) fireQueued() (tea.Model, tea.Cmd) {
 	return m.submit(q.send, q.echo, promptEntry{display: q.send})
 }
 
-// toolCallLeakWarning returns a user-facing diagnostic when the newest assistant
-// message carries a tool-call opener (`<tool_call>`) in its text instead of
-// structured tool_calls, the dominant local-hosting failure: a
-// misconfigured/missing server parser leaks the call as content with
-// finish_reason "stop", so the turn ends silently with the tool intent stranded.
-// The bare `<tool_call>` opener covers both shapes the target servers emit: the
-// XML body (`<function=…`) and the general JSON body
-// (`{"name":…`): gating on the literal tag alone catches both while staying
-// specific enough that ordinary prose can't trip it. A message that carried a
-// real structured call never leaked, even if its prose quotes the tag, so a
-// non-empty ToolCalls short-circuits to clean. RecompHamr stays wire-only (it does
-// not parse or run the leaked call); it points the user at the server-side fix.
-// Empty string when there is nothing to warn.
-func toolCallLeakWarning(history []chmctx.Message) string {
-	if agent.HasToolCallLeak(history) {
-		return styleError.Render("⚠ a tool call leaked into the reply as text instead of running - your model server isn't parsing tool calls. Enable its OpenAI tool-call parser server-side (e.g. vLLM `--tool-call-parser`, llama.cpp `--jinja`).")
-	}
-	return "" // newest assistant message is clean
-}
-
 // dispatchNextTool pops the next pending tool call and runs it. Every tool
 // flows through runToolCall; none are special-cased. lastToolKey records this
 // call's target so the failure nudge can tell when the model keeps retrying the
@@ -700,12 +680,6 @@ func (m Model) dispatchNextTool() (tea.Model, tea.Cmd) {
 	m.appendLine(styleDim.Render(work.Status()))
 	return m, runToolCall(work)
 }
-
-// maxToolFailStreak is retained only for the exact debug-log denominator.
-const maxToolFailStreak = agent.MaxToolFailStreak
-
-// verifyNudgeMinRounds is retained temporarily by adapter equivalence tests.
-const verifyNudgeMinRounds = agent.VerifyNudgeMinRounds
 
 // cursorOnFirstLine: true when ↑ should walk prompt history instead of moving
 // the textarea's own cursor. cursorOnLastLine is the mirror for ↓.

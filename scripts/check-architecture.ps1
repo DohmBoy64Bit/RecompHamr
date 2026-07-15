@@ -27,7 +27,7 @@ foreach ($Relative in $BackendRoots) {
 # tool execution, provider-error policy, or construct parallel agent roots.
 $TuiProduction = Get-ChildItem -Path (Join-Path $Root 'internal/tui') -File -Filter '*.go' |
     Where-Object { $_.Name -notlike '*_test.go' }
-foreach ($Pattern in @('internal/tools', 'internal/logging', 'tools.Execute', 'tools.InlineStatus', 'provider.ErrUnauthorized', 'provider.ErrUnreachable', 'agent.LocalToolExecutor', 'agent.NewTurnState', 'agent.NewStreamState', 'turn.Context', 'turn.CancelFunc')) {
+foreach ($Pattern in @('internal/tools', 'internal/logging', 'tools.Execute', 'tools.InlineStatus', 'provider.ErrUnauthorized', 'provider.ErrUnreachable', 'agent.LocalToolExecutor', 'agent.NewTurnState', 'agent.NewStreamState', 'turn.Context', 'turn.CancelFunc', 'm.turn.', 'm.runtime.', 'm.loop.')) {
     $Hit = $TuiProduction | Select-String -SimpleMatch $Pattern | Select-Object -First 1
     if ($null -ne $Hit) {
         Fail "presentation owns agent orchestration at $($Hit.Path):$($Hit.LineNumber): $Pattern"

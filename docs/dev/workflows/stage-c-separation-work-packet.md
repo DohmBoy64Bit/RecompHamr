@@ -220,3 +220,13 @@ The TUI no longer opens model streams, executes tools, stores turn contexts, pac
 - Security: prompts, reasoning, tool arguments, and results remain confined to the owner-protected log; acceptance reports consume category names only. Presentation receives no log handle, observer, credentials, context, cancel function, or resolved tool arguments.
 - Evidence: production stream and tool messages call `agent.Runtime.ApplyDelivery`, `ApplyToolResult`, `NextTool`, and `DecideClose`; application startup calls `logging.Open`, injects `logging.NewObserver`, and defers `logging.Close`.
 - Known limits: exact-build Gemma runtime execution remains blocked by the recorded LM Studio load failure; broader configuration/client/persistence extraction is outside Slice 2 and remains later Stage C work.
+
+#### Checkpoint 2J — immutable presentation snapshots
+
+- Changed: production TUI phase, connectivity, retry, token, context-hint, active-turn, and current-stream access now goes through `agent.Runtime` methods; rendering consumes an immutable `agent.Snapshot`. Probe and ping results update runtime facts through typed setters, and leaked-tool presentation follows the typed close reason rather than reading model history.
+- Documented: current architecture and this checkpoint distinguish the opaque app-composed runtime handle from its immutable presentation facts.
+- Verified: focused snapshot/lifecycle tests cover idle/active, connection, positive/absent context hints, current stream, accounting, and reset behavior; retained TUI input, probe, popover, render, queue, resize, and state-machine tests pass. Architecture enforcement rejects production TUI reads of mutable turn, stream, or loop component fields.
+- Coverage: focused `internal/agent` and affected TUI suites and the canonical repository profile pass at exactly 100.0% (2017/2017 statements).
+- Security: snapshots exclude history, contexts, cancellation, streams, tool calls/arguments, credentials, reasoning, and observer state. The only stream accessor returns the existing opaque reader needed for Bubble Tea scheduling.
+- Evidence: production rendering calls `Runtime.Snapshot`; input calls `Runtime.Active`; probe/context paths call typed runtime methods; no production TUI source matches `m.turn.`, `m.runtime.`, or `m.loop.`.
+- Known limits: exact-build Gemma runtime evidence remains blocked; configuration/client/persistence extraction is explicitly outside Slice 2.

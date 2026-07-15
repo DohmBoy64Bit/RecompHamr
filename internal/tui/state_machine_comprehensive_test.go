@@ -296,11 +296,11 @@ func TestRemainingStateBranches(t *testing.T) {
 	if _, ok := agent.NewestAssistant([]chmctx.Message{{Role: chmctx.RoleUser}}); ok {
 		t.Fatal("found absent assistant")
 	}
-	if toolCallLeakWarning([]chmctx.Message{{Role: chmctx.RoleAssistant, Content: "<tool_call>", ToolCalls: []chmctx.ToolCall{{Name: "x"}}}}) != "" {
+	if agent.HasToolCallLeak([]chmctx.Message{{Role: chmctx.RoleAssistant, Content: "<tool_call>", ToolCalls: []chmctx.ToolCall{{Name: "x"}}}}) {
 		t.Fatal("structured call warned")
 	}
 	m.turn.History = []chmctx.Message{{Role: chmctx.RoleAssistant, Content: "UNVERIFIED: runtime"}}
-	m.loop.ToolRounds = verifyNudgeMinRounds
+	m.loop.ToolRounds = agent.VerifyNudgeMinRounds
 	m.loop.VerifyNudged = false
 	m.runtime.Pending = nil
 	if decision := m.loop.DecideClose(m.turn, m.runtime); decision.Action != agent.CloseFinishDone {

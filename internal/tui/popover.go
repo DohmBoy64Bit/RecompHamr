@@ -61,7 +61,7 @@ func (m *Model) refreshSuggest() {
 	// mid-turn: a reload can rebuildClient and swap the live client (and zero
 	// the budget) under the in-flight turn; submit is phase-gated anyway, so
 	// runSlash's own reload covers correctness once the turn is over.
-	if !m.runtime.Phase.Active() && (!m.suggestArgLevel || m.activeCmd != cmdName) {
+	if !m.agentRuntime.Snapshot().Phase.Active() && (!m.suggestArgLevel || m.activeCmd != cmdName) {
 		_ = m.reloadConfigFromDisk()
 	}
 	argPrefix := strings.TrimLeft(rest, " ")

@@ -42,6 +42,21 @@ func observedRuntime(observer Observer) Runtime {
 func TestRuntimeLifecycleAndObserver(t *testing.T) {
 	observer := &fakeObserver{enabled: true}
 	runtime := observedRuntime(observer)
+	if snapshot := runtime.Snapshot(); snapshot.Phase != PhaseIdle || !snapshot.Connected || runtime.Active() {
+		t.Fatalf("initial snapshot = %#v", snapshot)
+	}
+	if _, ok := runtime.LiveContextSize("p"); ok {
+		t.Fatal("unexpected context hint")
+	}
+	runtime.SetLiveContextSize("p", 0)
+	runtime.SetLiveContextSize("p", 4096)
+	if contextSize, ok := runtime.LiveContextSize("p"); !ok || contextSize != 4096 {
+		t.Fatal("context hint")
+	}
+	runtime.SetConnected(false)
+	if runtime.Snapshot().Connected {
+		t.Fatal("connection snapshot")
+	}
 	runtime.ObserveUser("hello")
 	runtime.ObserveCancel()
 	runtime.ObserveSlash("/models")
@@ -73,7 +88,7 @@ func TestRuntimeStreamObservation(t *testing.T) {
 	runtime.BeginTurn(time.Now())
 	runtime.Turn.History = []chmctx.Message{{Role: chmctx.RoleUser, Content: "───── truncated: x"}}
 	stream, summary := runtime.StartRound("system", "model", 200)
-	if summary.Truncated != 1 || stream == nil {
+	if summary.Truncated != 1 || stream == nil || runtime.CurrentStream() != stream {
 		t.Fatal("request summary")
 	}
 	runtime.ApplyEvent("p", 100, llm.Event{Kind: llm.EventRetry, Content: "wait", Err: errors.New("retry")})

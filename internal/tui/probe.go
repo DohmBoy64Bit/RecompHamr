@@ -54,7 +54,7 @@ func (m Model) handleProbe(msg probeMsg) (tea.Model, tea.Cmd) {
 	active := msg.profile == m.cfg.Active
 	if msg.err != nil {
 		if active {
-			m.runtime.Connected = false
+			m.agentRuntime.SetConnected(false)
 		}
 		// Silent startup probes print no banner either way; an offline launch
 		// shouldn't greet the user with "⚠ probe". connected=false suffices;
@@ -65,7 +65,7 @@ func (m Model) handleProbe(msg probeMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if active {
-		m.runtime.Connected = true
+		m.agentRuntime.SetConnected(true)
 	}
 	p, ok := m.cfg.Models[msg.profile]
 	if !ok {
@@ -75,7 +75,7 @@ func (m Model) handleProbe(msg probeMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg.contextWindow > 0 {
-		m.runtime.LiveContextSize[msg.profile] = msg.contextWindow
+		m.agentRuntime.SetLiveContextSize(msg.profile, msg.contextWindow)
 	}
 	// Don't print "✓ active: <profile>" for a stale probe whose profile is no
 	// longer active. (liveContextSize is set above.)

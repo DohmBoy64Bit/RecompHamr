@@ -11,6 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/DohmBoy64Bit/RecompHamr/internal/agent"
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 )
@@ -212,7 +213,7 @@ func TestQueueWaitsForVerifyNudge(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.installTurnContext()
 	m.runtime.Phase = phaseStreaming
-	m.loop.ToolRounds = verifyNudgeMinRounds // substantial → verify nudge fires
+	m.loop.ToolRounds = agent.VerifyNudgeMinRounds // substantial → verify nudge fires
 	m.runtime.BeginStream(m.turn.ID, make(chan llm.Event))
 	m.turn.History = []chmctx.Message{
 		{Role: chmctx.RoleUser, Content: "build it"},
