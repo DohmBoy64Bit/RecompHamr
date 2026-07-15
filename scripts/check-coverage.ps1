@@ -15,6 +15,7 @@ try {
 
     go run ./cmd/coveragecheck $CoverageProfile
     if ($LASTEXITCODE -ne 0) {
+		go tool cover "-func=$CoverageProfile"
         throw "100% statement coverage gate failed with exit code $LASTEXITCODE"
     }
     Write-Host 'statement coverage: PASS (100.0%)'
