@@ -60,3 +60,7 @@ Separation preserves every accepted Stage A behavior. Move existing responsibili
 ## D-014 — Session identity is stable while concrete clients are replaceable
 
 `internal/app` composes one stable `internal/session.Runtime` and supplies it to both the agent chat boundary and presentation adapter. The session runtime owns mutable configuration and concrete client replacement; asynchronous reachability and authenticated probes capture their endpoint/client at dispatch time so late results preserve the accepted stale-result identity. Presentation receives only non-secret immutable facts and opaque work.
+
+## D-015 — The frontend boundary is neutral and terminal wiring is isolated
+
+`internal/frontend` defines the only project-runtime contract imported by production TUI code. An application-owned controller translates typed intents, owns asynchronous work identity and backend lifecycle, and emits immutable display-safe snapshots and ordered semantic events. Core `internal/app` exposes only that neutral controller and cleanup lifetime; `internal/app/terminal` is the sole concrete TUI and Bubble Tea wiring edge. This preserves the runnable terminal while allowing application and backend packages to build and test without the presentation implementation.

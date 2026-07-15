@@ -6,15 +6,17 @@
   "artifact_directory": "../../../../artifacts/tui-acceptance/smoke",
   "debug_log": ".rehamr/log.txt",
   "terminal": {
-    "columns": 80,
-    "rows": 24
+    "columns": 120,
+    "rows": 36
   },
   "steps": [
     { "type": "launch", "label": "launch application", "timeout_seconds": 20 },
     { "type": "wait_event", "label": "wait for debug session", "category": "session", "minimum": 2, "timeout_seconds": 20 },
-    { "type": "screenshot", "label": "capture standard layout", "file": "standard.png" },
+    { "type": "screenshot", "label": "capture wide layout", "file": "wide-120x36.png" },
+    { "type": "resize", "label": "resize standard", "columns": 80, "rows": 24 },
+    { "type": "screenshot", "label": "capture standard layout", "file": "standard-80x24.png" },
     { "type": "resize", "label": "resize constrained", "columns": 50, "rows": 16 },
-    { "type": "screenshot", "label": "capture constrained layout", "file": "constrained.png" },
+    { "type": "screenshot", "label": "capture constrained layout", "file": "constrained-50x16.png" },
     { "type": "key", "label": "exit application", "key": "ctrl_d" },
     { "type": "sleep", "label": "allow terminal restoration", "milliseconds": 500 },
     { "type": "type_text", "label": "write shell restoration sentinel", "text": "Set-Content -LiteralPath '.harness-shell-restored' -Value 'restored' -NoNewline" },
