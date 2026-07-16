@@ -1,12 +1,12 @@
 # Scope Control
 
-The accepted Stage A, Stage C, Stage D, and Stage E gates plus the active Stage F RecompHamr tools packet define the current project boundary.
+The accepted Stage A, Stage C, Stage D, Stage E, and Stage F gates define the current project boundary. Stage G is next but has no active packet yet.
 
 ## Allowed now
 
 - preserve and fix evidence-backed defects in the accepted workspace and configuration foundations;
 - preserve and fix evidence-backed defects in the accepted agent/runtime contracts;
-- implement and verify only `repomixr`, `recomp_reference`, and their application-owned tool-set boundary under the active Stage F packet;
+- preserve and fix evidence-backed defects in the accepted six-tool boundary;
 - preserve or improve verified Legacy behavior within its current architecture owner;
 - improve tests, verification, rules, or documentation without changing the frozen TUI contract;
 - fix evidence-backed defects in accepted behavior;

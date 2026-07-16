@@ -42,7 +42,7 @@ Validate all external identifiers before filesystem or network work. Refuse cred
 
 ## Behavioral surface inventory
 
-The active inventory is [`../verification/stage-f-behavioral-surface.md`](../verification/stage-f-behavioral-surface.md). `TOOLSET-01`, `REPOMIX-01`, and `REFERENCE-01` begin unverified and no production capability is accepted merely because a similarly named Legacy function exists.
+The accepted inventory is [`../verification/stage-f-behavioral-surface.md`](../verification/stage-f-behavioral-surface.md). `TOOLSET-01`, `REPOMIX-01`, and `REFERENCE-01` began unverified and closed only after source/test traceability, exact-build runtime evidence, canonical verification, protected-cache inspection, and dual-platform CI agreed.
 
 ## Verification
 
@@ -87,3 +87,12 @@ Stage F closes only when both tools are real and application-configured; every L
 - Disposition: both Legacy capabilities are improved. Legacy schemas and useful output/cache behavior are retained; permissive URLs, globals, unsafe XML, unbounded HTML, weak tests, and non-atomic/unprotected cache writes are intentionally replaced.
 - Verified: `internal/tools` is exactly 100.0% statement-covered across success, failure, malformed, boundary, cancellation, timeout, cleanup, platform, Unicode, persistence, concurrency, and security surfaces. The first repository canonical gate passes at 100.0% (`2587/2587` statements).
 - Known limits: exact-build runtime, final documentation audit, CI, and closure remain open.
+
+### Checkpoint F1D/F1E — verification and closure
+
+- Changed: finalized the six-tool prompt/user contract, architecture and baseline enforcement, committed real-model Stage F scenario, complete behavioral inventory, and acceptance records. No TUI layout or interaction code changed.
+- Disposition: `repomixr`, `recomp_reference`, and the tool-set boundary are improved Legacy parity. Bash remains intentionally replaced by the accepted PowerShell contract; additional non-MCP Legacy built-ins are not applicable because none exist.
+- Verified: implementation commit `d7286bee7a00b0debacc4708e9b5807550e3b7ba` passes focused coverage and the canonical gate at exactly 100.0% (`2603/2603` statements). GitHub Actions run `29514055254` passed independently on `windows-latest` and `ubuntu-latest`.
+- Runtime: exact-build committed `stage-f-tools` and `agent-tool-loop-cancel` scenarios passed with LM Studio `google/gemma-4-12b-qat`. Reports and reviewed screenshots are retained outside the repository under `E:\ReProject\StageA-Acceptance\StageF-Tools\d7286be`; they prove two exact Stage F calls/results and cache artifacts, four retained ordered file results, cancelled PowerShell cleanup with no stale result/side effect, recovery, clean exit, and restored shell.
+- Security: private/reserved IP and redirect/DNS policies, URL/query redaction, Git/response/time/size bounds, XML/CDATA encoding, link refusal, atomic rollback paths, POSIX modes, and Windows DACL installation are deterministically covered. `icacls` showed exactly one current-user full-control entry on each exact-build cache artifact. Retained evidence contains synthetic public fixture prompts and no keys or unrelated user data.
+- Stop condition: met. No Stage F row is blocked or unverified, and no Stage G/H behavior entered production.

@@ -8,8 +8,8 @@ Everything in this document is intentionally **excluded** from the barebones bas
 | doctor/environment diagnostics | excluded | Stage D or later |
 | project memory/workspace state | Stage D foundation accepted: secure optional state loading and refresh are verified; initialization/status commands and RE templates remain deferred | Stage D foundation accepted; Stage F/G for template/command exposure |
 | expanded agent-loop behavior | accepted: Stage E verified the required Legacy policies as equivalent or improved in the current backend; no redundant port was needed | Stage E accepted at `b4fee3c` |
-| `repomixr` | Stage F active under a strict public-GitHub, bounded, protected-cache contract | Stage F |
-| `recomp_reference` | Stage F active under a public-network-only, bounded, protected-cache contract | Stage F |
+| `repomixr` | accepted with improved strict public-GitHub, bounded, protected-cache behavior | Stage F accepted at `d7286be` |
+| `recomp_reference` | accepted with improved public-network-only, bounded, protected-cache behavior | Stage F accepted at `d7286be` |
 | extra RE-specific built-in tools | not applicable: direct Legacy inventory found no additional non-MCP built-ins | Stage F audit |
 | extended slash-command surface | excluded | Stage G |
 | built-in skills and skill loading | excluded; Legacy format is not the target | Stage G using the Agent Skills standard |

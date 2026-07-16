@@ -1,6 +1,6 @@
 # Current Transitional Architecture
 
-Stage A, all four Stage C slices, Stage D, and Stage E are accepted. The accepted Stage E implementation/parity-audit commit is `b4fee3c02b6178aa9e2d1e2a7cdf843b13281355`.
+Stage A, all four Stage C slices, Stage D, Stage E, and Stage F are accepted. The accepted Stage F implementation commit is `d7286bee7a00b0debacc4708e9b5807550e3b7ba`.
 
 ```text
 cmd/recomphamr
@@ -61,8 +61,8 @@ Focused and canonical tests, architecture enforcement, dual-platform CI, and exa
 
 Stage E audited the accepted `internal/agent`, `internal/ctx`, and `internal/llm` owners against every in-scope Legacy agent/runtime branch. Exact source/test traceability and runtime evidence established that Stage C already preserved the required loop policies and lifecycle while improving typed ownership, cancellation cleanup, context pairing, stream error handling, and deterministic testing. No genuine production gap existed, so Stage E made no redundant runtime change. The Legacy skills-template classifier remains outside this graph until Stage G.
 
-## Active Stage F tools
+## Accepted Stage F tools
 
 Core `internal/app` constructs an immutable `internal/tools.Set` with the protected `.rehamr` root and platform-native path protection, then injects its executor into `internal/agent`. The agent exposes six stable schemas and retains sequential execution, cancellation, stale-result rejection, and bounded conversation output. `internal/tools` privately owns Git/process, public-network policy, deterministic packing/reduction, and protected atomic cache persistence. Frontend/TUI contracts are unchanged and receive only the existing one-line status and semantic tool events.
 
-The active Stage F scope is exactly `repomixr` and `recomp_reference`. Unknown tools still fail closed; skills/commands and MCP remain absent. Focused backend verification is complete, while repository-wide, runtime, CI, and final disposition evidence remain open.
+Stage F scope is exactly `repomixr` and `recomp_reference`. Unknown tools still fail closed; skills/commands and MCP remain absent. Complete focused/canonical verification, exact-build Gemma runtime evidence, Windows cache ACL inspection, and dual-platform CI accept the boundary and both improved Legacy parity contracts.

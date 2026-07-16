@@ -24,4 +24,4 @@ Stage A was accepted on 2026-07-15. The accepted implementation commit is `71f70
 
 ## Next allowed work
 
-Stage C separation was accepted at implementation commit `72e6b43215cc14f91eb6547de15a7386bc77b927`. Stage D workspace and configuration foundations were accepted at implementation commit `449a83cb379e79fd84b817b0e95f63de7472578a`. Stage E agent/runtime parity was accepted at implementation/audit commit `b4fee3c02b6178aa9e2d1e2a7cdf843b13281355`. Stage F tool integration is active under its work packet and is limited to the two verified Legacy built-ins plus their backend-owned configuration boundary.
+Stage C separation was accepted at implementation commit `72e6b43215cc14f91eb6547de15a7386bc77b927`. Stage D workspace/configuration foundations were accepted at `449a83cb379e79fd84b817b0e95f63de7472578a`. Stage E agent/runtime parity was accepted at `b4fee3c02b6178aa9e2d1e2a7cdf843b13281355`. Stage F tool integration was accepted at `d7286bee7a00b0debacc4708e9b5807550e3b7ba`; its packet and inventory record exact source, tests, runtime, security, and CI evidence. Stage G is next but requires its own packet and authority refresh before implementation.

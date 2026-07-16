@@ -44,11 +44,13 @@ Do not copy Legacy orchestration into presentation merely to achieve superficial
 
 Add reverse-engineering/recompilation tool families through typed tool contracts, tests, security boundaries, and docs.
 
-Active under `../workflows/stage-f-recomp-tools-work-packet.md`. Direct Legacy inspection limits this stage to `repomixr`, `recomp_reference`, and their application-owned typed tool-set boundary; Stage G commands/skills and Stage H MCP tools remain excluded.
+Accepted at implementation commit `d7286bee7a00b0debacc4708e9b5807550e3b7ba`. Direct Legacy inspection limited the stage to `repomixr`, `recomp_reference`, and their application-owned typed tool-set boundary; both capabilities were implemented with improved security and verified without adding Stage G commands/skills or Stage H MCP tools.
 
 ## Stage G — Commands and Agent Skills
 
 Add command registries and standards-based skills support after their backend owners exist.
+
+Stage G is next but is not active until its evidence-backed packet is established and the current mandatory Agent Skills authorities have been read.
 
 Skills requirements:
 
