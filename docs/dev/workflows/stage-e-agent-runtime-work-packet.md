@@ -31,7 +31,7 @@ Determine the complete evidence-backed Legacy agent/runtime capability contract,
 
 ## Legacy evidence before editing
 
-- Legacy keeps one cancellation root across every model and tool round, executes emitted tool calls sequentially, pairs every accepted result, rejects stale work, and removes a running-tool goal on cancellation so it cannot be reissued.
+- Legacy keeps one cancellation root across every model and tool round, executes emitted tool calls sequentially, pairs every accepted result, rejects stale work, and drops pending calls on cancellation. It leaves the incomplete user goal in history; current RecompHamr improves this by removing a running-tool goal so a later turn cannot reissue the cancelled side effect.
 - Four soft policy backstops are bounded rather than hard stops: five same-target failures, 75 tool calls, one empty-round retry, and a verification re-ground after eight tool calls. Raw textual `<tool_call>` leakage ends stopped instead of being executed.
 - Legacy context packing truncates large tool output with head/tail preservation, maintains Unicode validity, rejects orphan/dangling/partial tool groups, keeps the newest complete group when over budget, anchors a real user task, and demotes historical system nudges for strict OpenAI-compatible servers.
 - Legacy streams content, reasoning, and fragmented tool calls; probes context size; retries selected transient failures; falls back once and sticks when a server rejects `reasoning_effort`; and uses an activity-reset idle watchdog rather than a total turn deadline.
@@ -76,3 +76,28 @@ Stage E closes only when every in-scope Legacy agent/runtime contract is disposi
 - Security: no new capability or exposure is authorized by this checkpoint.
 - Evidence: current and Legacy files named above plus accepted Stage C agent rows.
 - Known limits: production equivalence, focused/canonical reruns, runtime reconfirmation, CI, and final parity dispositions remain open.
+
+### Checkpoint E1B — agent lifecycle and policy audit
+
+- Changed: no production code. Mapped Legacy begin/end/cancel, sequential dispatch, paired results, stream/tool stale rejection, accounting, and every nudge branch to `internal/agent` and controller tests.
+- Disposition: core lifecycle and policy are equivalent; stable typed identities, running-tool goal removal, and PowerShell-specific empty-script failure classification are improved.
+- Verified: `internal/agent` and `internal/app/controller` pass focused 100.0% statement coverage. Tests cover thresholds, below/at/above boundaries, same/different targets, success reset, queue drain, empty re-arm/stall, leak stop, verification latch/suppression, cancellation, cleanup, and stale delivery.
+- Security: current frontend still receives no history, tool arguments/results, contexts, cancel functions, or raw model events.
+- Known limits: exact-build runtime reconfirmation and final Stage E closure remain open.
+
+### Checkpoint E1C — context packing audit
+
+- Changed: no production code. Compared every Legacy token, reserve, truncation, packing, tool-group, task-anchor, and nudge-demotion branch with current source and tests.
+- Disposition: required behavior is equivalent and current handling is improved for reused tool-call IDs plus recovery past trailing nudges/empty assistant tails. These fixes prevent cross-turn false pairing and silent loss without accepting partial groups.
+- Verified: `internal/ctx` and agent request tests pass focused 100.0% statement coverage, including malformed/empty IDs, orphan/dangling/partial groups, newest over-budget groups, reused IDs, Unicode boundaries, exact budget edges, original-task anchoring, and strict-backend-safe system demotion.
+- Security: packing is deterministic, in-memory, content-preserving within documented bounds, and exposes only aggregate summaries outside the agent owner.
+- Known limits: canonical and runtime corroboration remain open.
+
+### Checkpoint E1D/E1E — model boundary audit and gap decision
+
+- Changed: no production code because no missing in-scope capability was found. Compared Legacy request encoding, SSE reduction, reasoning/tool fragments, reasoning fallback, probing, error paths, cancellation, and activity timeout with current implementation/tests.
+- Disposition: equivalent core OpenAI-compatible behavior; improved mid-stream error detection, generic provider separation, deterministic injection, and bounded transient pre-stream retry. The one-hour local-model idle default is an intentional accepted change from Legacy's five minutes. Hosted quota behavior is not applicable after Stage A.
+- Verified: `internal/llm`, `internal/provider`, and agent stream/diagnostic tests pass focused 100.0% statement coverage across success, malformed frames, HTTP/transport errors, authentication, retry/backoff cancellation, sticky fallback/concurrency, idle reset/expiry, context probes, Unicode, and secret-safe diagnostics.
+- Security: credentials remain headers only, response/log diagnostics remain bounded and redacted, and retries never replay after content has begun streaming.
+- Evidence: D-017 and the Stage E inventory contain the complete parity dispositions. The Legacy classifier is confirmed as a Stage G skill-document surface.
+- Known limits: canonical verification, exact-build Gemma scenarios, CI, final docs audit, and Stage E closure remain open.

@@ -68,3 +68,7 @@ Separation preserves every accepted Stage A behavior. Move existing responsibili
 ## D-016 — Workspace state is optional lower-trust model context
 
 Stage D preserves the Legacy-compatible `.rehamr/REPHAMR_STATE.md` filename and optional persistent-context behavior without porting the mixed Legacy initializer. `internal/workspace` owns canonical identity and bounded secure reads; core application composition is its only consumer. State is labeled untrusted project-maintained context beneath the embedded application contract, refreshes for each model round, and is silently omitted on absence or secure-read failure. Commands, RE templates, tools, skills, and MCP configuration remain in their authorized later stages.
+
+## D-017 — Stage E parity is satisfied by the accepted backend, not a rewrite
+
+The complete Legacy agent/runtime audit maps the required turn policy, context packing, and model-stream resilience contracts to the accepted Stage C backend. Where current behavior is equivalent, it remains untouched; where it is safer or more robust, the improvement is retained and documented. Stage E does not recreate Legacy TUI orchestration or add parallel abstractions merely to produce a code delta. The Legacy skills-template classifier remains Stage G because it classifies skill documents and is not an agent-turn decision service.
