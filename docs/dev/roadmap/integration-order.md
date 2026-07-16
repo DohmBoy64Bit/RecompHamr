@@ -36,7 +36,7 @@ Use `legacy-parity-policy.md`: preserve required behavior and compatibility, but
 
 Integrate verified agent-loop capabilities below the TUI.
 
-Next in sequence, but not active until an evidence-backed work packet defines the exact Legacy capability contract, owners, tests, security boundary, runtime evidence, and stop condition.
+Active under `../workflows/stage-e-agent-runtime-work-packet.md`. The first checkpoint audits the complete Legacy agent/runtime contract against the accepted Stage C backend before authorizing any production delta.
 
 Do not copy Legacy orchestration into presentation merely to achieve superficial parity.
 

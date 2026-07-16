@@ -11,7 +11,7 @@ Order of work:
 3. integrate RecompHamr capabilities one coherent subsystem at a time;
 4. verify each capability against evidence, tests, docs, and runtime behavior.
 
-**Stage A: fresh-source barebones baseline**, **Stage C: separation of concerns**, and **Stage D: workspace and configuration foundations** are accepted. **Stage E: agent/runtime capabilities** is next in the integration order but is not active until an evidence-backed work packet is approved. Preserve every accepted behavior and the established ownership boundary; do not add Legacy feature families, MCP, skills, new command families, diagnostics systems, reverse-engineering helpers, or a TUI redesign outside an approved later-stage work packet.
+**Stage A: fresh-source barebones baseline**, **Stage C: separation of concerns**, and **Stage D: workspace and configuration foundations** are accepted. **Stage E: agent/runtime capabilities** is active under its evidence-audit work packet. Preserve every accepted behavior and the established ownership boundary; do not add tools, commands, MCP, skills, diagnostics systems, reverse-engineering helpers, or a TUI redesign outside their approved later-stage work packets.
 
 ## Codex reading route
 

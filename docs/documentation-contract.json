@@ -38,6 +38,8 @@
     ,"docs/dev/workflows/tui-acceptance-harness-work-packet.md"
     ,"docs/dev/workflows/stage-c-separation-work-packet.md"
     ,"docs/dev/workflows/stage-d-workspace-configuration-work-packet.md"
+    ,"docs/dev/workflows/stage-e-agent-runtime-work-packet.md"
+    ,"docs/dev/verification/stage-e-behavioral-surface.md"
     ,"docs/dev/verification/stage-d-behavioral-surface.md"
     ,"docs/dev/workflows/default-gemma-profile-work-packet.md"
   ],
@@ -277,6 +279,21 @@
       "Legacy evidence",
       "Security impact",
       "Stop condition"
+    ],
+    "docs/dev/workflows/stage-e-agent-runtime-work-packet.md": [
+      "Outcome",
+      "In scope",
+      "Out of scope",
+      "Legacy evidence",
+      "Security impact",
+      "Stop condition"
+    ],
+    "docs/dev/verification/stage-e-behavioral-surface.md": [
+      "AGENT-03",
+      "CTX-02",
+      "LLM-02",
+      "Runtime/manual evidence",
+      "unverified"
     ],
     "docs/dev/verification/stage-d-behavioral-surface.md": [
       "WORKSPACE-01",

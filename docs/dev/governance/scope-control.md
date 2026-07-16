@@ -1,11 +1,11 @@
 # Scope Control
 
-The accepted Stage A, Stage C, and Stage D gates define the current project boundary. Stage E is next but has no active implementation packet.
+The accepted Stage A, Stage C, and Stage D gates plus the active Stage E agent/runtime work packet define the current project boundary.
 
 ## Allowed now
 
 - preserve and fix evidence-backed defects in the accepted workspace and configuration foundations;
-- prepare an evidence-backed Stage E work packet without adding production capability before approval;
+- audit and, only where evidence proves a gap, correct the agent/runtime contracts listed in the active Stage E packet;
 - preserve or improve verified Legacy behavior within its current architecture owner;
 - improve tests, verification, rules, or documentation without changing the frozen TUI contract;
 - fix evidence-backed defects in accepted behavior;
