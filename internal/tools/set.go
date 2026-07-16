@@ -14,11 +14,12 @@ import (
 // keeps cache authority and injectable process/network boundaries below the
 // agent and presentation layers.
 type Set struct {
-	privateRoot string
-	restrict    func(string, bool) error
-	runGit      func(context.Context, string, []string, string) ([]byte, error)
-	httpClient  *http.Client
-	now         func() time.Time
+	privateRoot    string
+	restrict       func(string, bool) error
+	runGit         func(context.Context, string, []string, string) ([]byte, error)
+	httpClient     *http.Client
+	now            func() time.Time
+	repomixTimeout time.Duration
 }
 
 // NewSet configures the production tool collection beneath an already-secured
@@ -29,11 +30,12 @@ func NewSet(privateRoot string, restrict func(string, bool) error) Set {
 		privateRoot = filepath.Clean(privateRoot)
 	}
 	return Set{
-		privateRoot: privateRoot,
-		restrict:    restrict,
-		runGit:      runGitCommand,
-		httpClient:  newPublicHTTPClient(),
-		now:         time.Now,
+		privateRoot:    privateRoot,
+		restrict:       restrict,
+		runGit:         runGitCommand,
+		httpClient:     newPublicHTTPClient(),
+		now:            time.Now,
+		repomixTimeout: 5 * time.Minute,
 	}
 }
 
@@ -64,5 +66,8 @@ func runGitCommand(ctx context.Context, executable string, args []string, dir st
 	cmd.Dir = dir
 	configureProcessTree(cmd)
 	cmd.WaitDelay = 100 * time.Millisecond
-	return cmd.CombinedOutput()
+	buffer := &headTailBuffer{}
+	cmd.Stdout, cmd.Stderr = buffer, buffer
+	err := cmd.Run()
+	return []byte(buffer.String()), err
 }

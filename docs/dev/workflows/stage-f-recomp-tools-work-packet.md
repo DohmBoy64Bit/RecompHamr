@@ -50,7 +50,7 @@ The active inventory is [`../verification/stage-f-behavioral-surface.md`](../ver
 - Deterministic fake Git/process, filesystem-failure, HTTP/redirect/DNS-policy, clock, timeout, cancellation, Unicode, XML, atomicity, permission/ACL, link/reparse, output-bound, and stale/fresh-cache tests.
 - Architecture checks proving only application composition configures concrete tool capabilities; frontend/TUI remain backend-neutral; unknown tools still fail closed; Stage G/H owners are absent.
 - Canonical `pwsh -NoProfile -File ./scripts/verify.ps1` with exactly 100.0% repository coverage and complete documentation/link checks.
-- Exact-build Windows Terminal use with LM Studio `google/gemma-4-12b-qat`: retain the four-tool/cancellation scenario and add sanitized real `repomixr` plus controlled local-reference evidence without secrets or private data.
+- Exact-build Windows Terminal use with LM Studio `google/gemma-4-12b-qat`: retain the four-tool/cancellation scenario and add sanitized real `repomixr` plus controlled public-reference evidence without secrets or private data.
 - Independent passing `windows-latest` and `ubuntu-latest` jobs for the accepted commit.
 
 ## Documentation impact

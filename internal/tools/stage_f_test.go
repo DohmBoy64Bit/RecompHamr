@@ -112,7 +112,10 @@ func TestParsePublicGitHubRepo(t *testing.T) {
 
 func TestRepomixSuccessTransformsAndSafeXML(t *testing.T) {
 	set := configuredTestSet(t)
-	set.runGit = func(_ context.Context, executable string, args []string, dir string) ([]byte, error) {
+	set.runGit = func(ctx context.Context, executable string, args []string, dir string) ([]byte, error) {
+		if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) <= 0 {
+			t.Fatal("clone deadline missing")
+		}
 		if executable == "" || dir == "" || args[0] != "clone" {
 			t.Fatalf("git %q %#v %q", executable, args, dir)
 		}
@@ -631,6 +634,18 @@ func TestRepomixAndReferenceInjectedFailures(t *testing.T) {
 		set.runGit = func(context.Context, string, []string, string) ([]byte, error) { return nil, nil }
 		got := set.Execute(context.Background(), chmctx.ToolCall{Name: RepomixrName, Arguments: map[string]any{"repo_url": "https://github.com/o/r"}}).Content
 		if !strings.Contains(got, "scan") {
+			t.Fatal(got)
+		}
+	})
+	t.Run("repomix-timeout", func(t *testing.T) {
+		set := configuredTestSet(t)
+		set.repomixTimeout = time.Millisecond
+		set.runGit = func(ctx context.Context, _ string, _ []string, _ string) ([]byte, error) {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}
+		got := set.Execute(context.Background(), chmctx.ToolCall{Name: RepomixrName, Arguments: map[string]any{"repo_url": "https://github.com/o/r"}}).Content
+		if !strings.Contains(got, "timeout after 1ms") {
 			t.Fatal(got)
 		}
 	})

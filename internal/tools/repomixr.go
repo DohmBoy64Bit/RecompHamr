@@ -125,10 +125,15 @@ func (s Set) repomix(ctx context.Context, args repomixArgs) string {
 	if err != nil {
 		return "(repomixr: git unavailable)"
 	}
-	out, err := s.runGit(ctx, gitPath, []string{"clone", "--depth", "1", "--single-branch", "--branch", branch, "--", canonical, cloneRoot}, repoRoot)
+	cloneContext, cancel := context.WithTimeout(ctx, s.repomixTimeout)
+	defer cancel()
+	out, err := s.runGit(cloneContext, gitPath, []string{"clone", "--depth", "1", "--single-branch", "--branch", branch, "--", canonical, cloneRoot}, repoRoot)
 	if err != nil {
 		if ctx.Err() != nil {
 			return "(repomixr: cancelled)"
+		}
+		if cloneContext.Err() == context.DeadlineExceeded {
+			return fmt.Sprintf("(repomixr: timeout after %s)", s.repomixTimeout)
 		}
 		return fmt.Sprintf("(repomixr: git clone failed: %s)", boundedDiagnostic(out))
 	}

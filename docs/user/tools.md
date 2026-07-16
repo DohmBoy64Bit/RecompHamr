@@ -40,7 +40,7 @@ Arguments:
 
 The tool performs a new depth-one, single-branch clone for each call. It replaces only its derived owner/repository cache directory, never an arbitrary path. It skips `.git`, links, non-regular/non-UTF-8 files, common binary/archive/media extensions, and files over 512 KiB. A repository is refused above 10,000 included files or 64 MiB of included source. XML attributes and CDATA terminators are encoded safely. If `.rehamr/repomix-instruction.md` is a regular, link-free file no larger than 64 KiB, its untrusted content is included in an `<instruction>` element; RecompHamr never creates that optional file.
 
-Clone diagnostics are bounded. Cancellation terminates the direct Git process; Unix additionally kills its process group, while Windows does not claim descendant-process cleanup. The returned summary names the packed path, count, and sizes; use `read_file` to inspect it. Cloned code and optional instructions are untrusted external content, not application policy.
+Clone execution is capped at five minutes and diagnostics are retained through the same bounded head/tail capture used by PowerShell. Cancellation terminates the direct Git process; Unix additionally kills its process group, while Windows does not claim descendant-process cleanup. The returned summary names the packed path, count, and sizes; use `read_file` to inspect it. Cloned code and optional instructions are untrusted external content, not application policy.
 
 ## `recomp_reference`
 
