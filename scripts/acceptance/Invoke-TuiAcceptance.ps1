@@ -46,7 +46,7 @@ function Test-Scenario($Scenario) {
     if ($null -eq $Scenario.steps -or $Scenario.steps.Count -eq 0) {
         throw 'scenario requires at least one step'
     }
-    $allowed = @('launch', 'wait_event', 'assert_event_count', 'assert_event_sequence', 'type_text', 'key', 'resize', 'screenshot', 'assert_file', 'remove_file', 'sleep', 'close_window')
+    $allowed = @('launch', 'wait_event', 'assert_event_count', 'assert_event_sequence', 'type_text', 'key', 'resize', 'screenshot', 'write_file', 'assert_file', 'remove_file', 'sleep', 'close_window')
     $labels = @{}
     foreach ($step in $Scenario.steps) {
         $type = [string](Get-RequiredProperty $step 'type' 'step')
@@ -66,6 +66,10 @@ function Test-Scenario($Scenario) {
             'type_text' { [void](Get-RequiredProperty $step 'text' "step '$label'") }
             'key' { [void](Get-RequiredProperty $step 'key' "step '$label'") }
             'screenshot' { [void](Get-RequiredProperty $step 'file' "step '$label'") }
+            'write_file' {
+                [void](Get-RequiredProperty $step 'path' "step '$label'")
+                [void](Get-RequiredProperty $step 'text' "step '$label'")
+            }
             'assert_file' { [void](Get-RequiredProperty $step 'path' "step '$label'") }
             'remove_file' { [void](Get-RequiredProperty $step 'path' "step '$label'") }
         }
@@ -286,6 +290,12 @@ try {
             'screenshot' {
                 $target = Resolve-ContainedPath ([string]$step.file) $resolvedArtifacts 'screenshot'
                 Save-WindowScreenshot $windowHandle $target
+            }
+            'write_file' {
+                $target = Resolve-ContainedPath ([string]$step.path) $resolvedWorkspace 'written file'
+                $parent = Split-Path -Parent $target
+                [void](New-Item -ItemType Directory -Force -Path $parent)
+                [IO.File]::WriteAllText($target, [string]$step.text, [Text.UTF8Encoding]::new($false))
             }
             'assert_file' {
                 $target = Resolve-ContainedPath ([string]$step.path) $resolvedWorkspace 'asserted file'

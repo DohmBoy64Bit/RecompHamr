@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "name": "workspace-state-refresh-clear",
+  "app_path": "../../../../dist/recomphamr.exe",
+  "workspace": "../../../../.acceptance-fixture",
+  "artifact_directory": "../../../../artifacts/tui-acceptance/workspace-state-refresh",
+  "debug_log": ".rehamr/log.txt",
+  "terminal": {
+    "columns": 100,
+    "rows": 30
+  },
+  "steps": [
+    { "type": "write_file", "label": "seed initial workspace state", "path": ".rehamr/REPHAMR_STATE.md", "text": "# Project State\n\nProject codename: STATE_ALPHA_741\n" },
+    { "type": "launch", "label": "launch application", "timeout_seconds": 20 },
+    { "type": "wait_event", "label": "wait for debug session", "category": "session", "minimum": 2, "timeout_seconds": 20 },
+    { "type": "type_text", "label": "ask for initial state", "text": "What project codename is recorded in persistent memory? Reply with only the codename." },
+    { "type": "key", "label": "submit initial state question", "key": "enter" },
+    { "type": "wait_event", "label": "wait for initial answer", "category": "assistant", "minimum": 1, "timeout_seconds": 300 },
+    { "type": "wait_event", "label": "wait for initial turn end", "category": "turn_end", "minimum": 1, "timeout_seconds": 30 },
+    { "type": "screenshot", "label": "capture initial state answer", "file": "state-alpha.png" },
+    { "type": "write_file", "label": "replace workspace state while running", "path": ".rehamr/REPHAMR_STATE.md", "text": "# Project State\n\nProject codename: STATE_BETA_852\n" },
+    { "type": "type_text", "label": "ask for refreshed state", "text": "What project codename is now recorded in persistent memory? Reply with only the codename." },
+    { "type": "key", "label": "submit refreshed state question", "key": "enter" },
+    { "type": "wait_event", "label": "wait for refreshed answer", "category": "assistant", "minimum": 2, "timeout_seconds": 300 },
+    { "type": "wait_event", "label": "wait for refreshed turn end", "category": "turn_end", "minimum": 2, "timeout_seconds": 30 },
+    { "type": "screenshot", "label": "capture refreshed state answer", "file": "state-beta.png" },
+    { "type": "remove_file", "label": "remove workspace state", "path": ".rehamr/REPHAMR_STATE.md" },
+    { "type": "type_text", "label": "enter clear command", "text": "/clear" },
+    { "type": "key", "label": "clear conversation", "key": "enter" },
+    { "type": "type_text", "label": "ask after state removal", "text": "If persistent memory contains no project codename, reply exactly STATE_ABSENT_963." },
+    { "type": "key", "label": "submit absent state question", "key": "enter" },
+    { "type": "wait_event", "label": "wait for absent answer", "category": "assistant", "minimum": 3, "timeout_seconds": 300 },
+    { "type": "wait_event", "label": "wait for absent turn end", "category": "turn_end", "minimum": 3, "timeout_seconds": 30 },
+    { "type": "screenshot", "label": "capture absent state answer", "file": "state-absent.png" },
+    { "type": "key", "label": "exit application", "key": "ctrl_d" },
+    { "type": "sleep", "label": "allow terminal restoration", "milliseconds": 500 },
+    { "type": "type_text", "label": "write shell restoration sentinel", "text": "Set-Content -LiteralPath '.harness-shell-restored' -Value 'restored' -NoNewline" },
+    { "type": "key", "label": "execute restoration probe", "key": "enter" },
+    { "type": "assert_file", "label": "verify restored shell command", "path": ".harness-shell-restored", "text": "restored", "timeout_seconds": 10 },
+    { "type": "remove_file", "label": "remove restoration sentinel", "path": ".harness-shell-restored" },
+    { "type": "close_window", "label": "close restored shell", "timeout_seconds": 10 }
+  ]
+}
