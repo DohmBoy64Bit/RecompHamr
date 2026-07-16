@@ -1,6 +1,6 @@
 # Current Transitional Architecture
 
-Stage A and all four Stage C slices are accepted. Stage D has not begun.
+Stage A and all four Stage C slices are accepted. Stage D is active; its first workspace-state slice is implemented and awaiting complete acceptance evidence.
 
 ```text
 cmd/recomphamr
@@ -16,6 +16,7 @@ internal/app
     +--> internal/session
     +--> internal/frontend
     +--> internal/app/controller
+    +--> internal/workspace
 
 internal/agent
     +--> internal/ctx
@@ -49,3 +50,7 @@ Stage C slice 3 is accepted. Checkpoint 3A moved the complete prompt-history fil
 Stage C slice 4 is accepted. Backend-neutral `internal/frontend` contracts route every session and agent action through `internal/app/controller`, and `internal/app/terminal` isolates concrete terminal composition. The controller owns model reads, stream reduction, sequential tools, close policy, cancellation, stale work draining/rejection, and final accounting. Production TUI code imports only `internal/frontend` among project runtime packages. Core `internal/app` imports neither TUI nor Bubble Tea and exposes only a neutral controller plus idempotent cleanup; deleting the terminal adapter removes the runnable presentation target without removing buildable application/backend behavior. Canonical verification, the positive deletion graph, dual-platform CI, and exact-build Windows Terminal evidence close the separation boundary.
 
 Backend packages do not import `internal/tui`. `internal/app/terminal` is the sole concrete TUI/Bubble Tea wiring edge.
+
+## Active Stage D ownership
+
+`internal/workspace` owns canonical absolute project identity and bounded optional reads of `.rehamr/REPHAMR_STATE.md`. It refuses links/reparse points, non-regular files, replacement races, invalid UTF-8, oversize state, and security/I/O failures; it creates no files or directories. Core `internal/app` is its only production consumer and supplies a refreshable system-prompt function to `internal/app/controller`. The controller refreshes before startup accounting and every model round. Missing, empty, or unsafe optional state leaves the embedded prompt and working-directory anchor intact and does not cross the frontend boundary.

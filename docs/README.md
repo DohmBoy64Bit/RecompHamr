@@ -9,6 +9,7 @@ Repository-wide always-on instructions live in [`../AGENTS.md`](../AGENTS.md). C
 ## User documentation
 
 - [`user/configuration.md`](user/configuration.md)
+- [`user/workspace.md`](user/workspace.md)
 - [`user/tools.md`](user/tools.md)
 
 ## Developer documentation

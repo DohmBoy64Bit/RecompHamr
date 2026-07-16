@@ -40,7 +40,7 @@ func scriptedController(t *testing.T, rounds [][]llm.Event, execute func(context
 		execute = func(context.Context, chmctx.ToolCall) chmctx.Message { return chmctx.Message{Role: chmctx.RoleTool} }
 	}
 	runtime := agent.NewRuntime(&scriptedClient{rounds: rounds}, agent.NewToolExecutor(execute))
-	controller := NewController(sessionRuntime, runtime, "system", "test")
+	controller := NewController(sessionRuntime, runtime, func() string { return "system" }, "test")
 	controller.now = func() time.Time { return time.Unix(20, 0) }
 	return controller
 }
@@ -79,7 +79,21 @@ func controllerFixture(t *testing.T) (*Controller, *config.Config, *httptest.Ser
 	}
 	sessionRuntime := session.NewRuntime(cfg)
 	agentRuntime := agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor())
-	return NewController(sessionRuntime, agentRuntime, "system", "test"), cfg, server
+	return NewController(sessionRuntime, agentRuntime, func() string { return "system" }, "test"), cfg, server
+}
+
+func TestControllerRefreshesSystemPromptForBootstrapAndEveryRound(t *testing.T) {
+	controller := scriptedController(t, [][]llm.Event{{{Kind: llm.EventDone}}}, nil)
+	calls := 0
+	controller.system = func() string {
+		calls++
+		return fmt.Sprintf("system-%d", calls)
+	}
+	controller.Bootstrap()
+	transition := controller.Dispatch(frontend.SubmitGoal("goal", time.Unix(1, 0)))
+	if calls != 2 || transition.Work == nil {
+		t.Fatalf("prompt calls = %d, work=%v", calls, transition.Work)
+	}
 }
 
 func TestControllerSnapshotBootstrapAndCompletions(t *testing.T) {

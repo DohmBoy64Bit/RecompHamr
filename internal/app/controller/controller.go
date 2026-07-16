@@ -23,7 +23,7 @@ const (
 type Controller struct {
 	session   *session.Runtime
 	agent     agent.Runtime
-	system    string
+	system    func() string
 	version   string
 	nextID    uint64
 	pending   map[uint64]struct{}
@@ -32,7 +32,7 @@ type Controller struct {
 }
 
 // NewController constructs the stable application/frontend boundary.
-func NewController(sessionRuntime *session.Runtime, agentRuntime agent.Runtime, system, version string) *Controller {
+func NewController(sessionRuntime *session.Runtime, agentRuntime agent.Runtime, system func() string, version string) *Controller {
 	return &Controller{
 		session: sessionRuntime,
 		agent:   agentRuntime,
@@ -78,7 +78,7 @@ func (c *Controller) Snapshot() frontend.Snapshot {
 func (c *Controller) Bootstrap() frontend.Transition {
 	snapshot := c.Snapshot()
 	contextSize := c.activeContextSize(snapshot)
-	c.agent.ObserveSession(c.version, snapshot.Active, snapshot.ActiveModel, snapshot.ActiveURL, contextSize, chmctx.Tokens(c.system))
+	c.agent.ObserveSession(c.version, snapshot.Active, snapshot.ActiveModel, snapshot.ActiveURL, contextSize, chmctx.Tokens(c.system()))
 	events := []frontend.Event{{Kind: frontend.EventHistory, Values: c.session.LoadHistory()}}
 	return frontend.Transition{Snapshot: c.Snapshot(), Events: events, Work: c.connectivityWork(snapshot, true)}
 }
@@ -180,7 +180,7 @@ type toolCompletion struct{ delivery agent.ToolDelivery }
 
 func (c *Controller) startRound() frontend.Work {
 	snapshot := c.Snapshot()
-	stream, _ := c.agent.StartRound(c.system, snapshot.ActiveModel, c.activeContextSize(snapshot))
+	stream, _ := c.agent.StartRound(c.system(), snapshot.ActiveModel, c.activeContextSize(snapshot))
 	return c.readStream(stream)
 }
 

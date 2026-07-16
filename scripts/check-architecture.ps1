@@ -8,7 +8,7 @@ function Fail([string]$Message) {
 }
 
 # Backend packages must never depend on the concrete presentation.
-$BackendRoots = @('internal/agent', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/logging', 'internal/provider', 'internal/session', 'internal/tools')
+$BackendRoots = @('internal/agent', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/logging', 'internal/provider', 'internal/session', 'internal/tools', 'internal/workspace')
 foreach ($Relative in $BackendRoots) {
     $Dir = Join-Path $Root $Relative
     if (-not (Test-Path $Dir)) { continue }
@@ -35,7 +35,7 @@ foreach ($Pattern in @('internal/tui', 'charmbracelet/bubbletea')) {
 # runtime packages and may only schedule opaque Work values.
 $TuiProduction = Get-ChildItem -Path (Join-Path $Root 'internal/tui') -File -Filter '*.go' |
     Where-Object { $_.Name -notlike '*_test.go' }
-foreach ($Pattern in @('internal/agent', 'internal/session', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/provider', 'internal/tools', 'internal/logging', '.ApplyDelivery(', '.ApplyToolResult(', '.StartRound(', '.NextTool(', '.DecideClose(', '.CancelTurn(', '.ResetConversation(', '.Reachability(', 'ProbeWork', 'ToolDelivery', 'StreamDelivery', 'TurnState', 'StreamState', 'LoopState', 'cancelFunc', 'processHandle')) {
+foreach ($Pattern in @('internal/agent', 'internal/session', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/provider', 'internal/tools', 'internal/logging', 'internal/workspace', '.ApplyDelivery(', '.ApplyToolResult(', '.StartRound(', '.NextTool(', '.DecideClose(', '.CancelTurn(', '.ResetConversation(', '.Reachability(', 'ProbeWork', 'ToolDelivery', 'StreamDelivery', 'TurnState', 'StreamState', 'LoopState', 'cancelFunc', 'processHandle')) {
     $Hit = $TuiProduction | Select-String -SimpleMatch $Pattern | Select-Object -First 1
     if ($null -ne $Hit) {
         Fail "presentation imports backend lifecycle at $($Hit.Path):$($Hit.LineNumber): $Pattern"
@@ -45,7 +45,7 @@ foreach ($Pattern in @('internal/agent', 'internal/session', 'internal/config', 
 # The neutral contract must import neither backend packages nor Bubble Tea.
 $FrontendProduction = Get-ChildItem -Path (Join-Path $Root 'internal/frontend') -File -Filter '*.go' |
     Where-Object { $_.Name -notlike '*_test.go' }
-foreach ($Pattern in @('internal/agent', 'internal/app', 'internal/session', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/provider', 'internal/tools', 'internal/logging', 'charmbracelet/bubbletea')) {
+foreach ($Pattern in @('internal/agent', 'internal/app', 'internal/session', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/provider', 'internal/tools', 'internal/logging', 'internal/workspace', 'charmbracelet/bubbletea')) {
     $Hit = $FrontendProduction | Select-String -SimpleMatch $Pattern | Select-Object -First 1
     if ($null -ne $Hit) {
         Fail "frontend contract imports concrete runtime at $($Hit.Path):$($Hit.LineNumber): $Pattern"
@@ -53,7 +53,7 @@ foreach ($Pattern in @('internal/agent', 'internal/app', 'internal/session', 'in
 }
 
 $Entrypoint = Join-Path $Root 'cmd/recomphamr/main.go'
-foreach ($Pattern in @('internal/config', 'internal/ctx', 'internal/llm', 'internal/provider', 'internal/tools', 'internal/tui', 'internal/agent', 'internal/session')) {
+foreach ($Pattern in @('internal/config', 'internal/ctx', 'internal/llm', 'internal/provider', 'internal/tools', 'internal/tui', 'internal/agent', 'internal/session', 'internal/workspace')) {
     $Hit = Select-String -Path $Entrypoint -SimpleMatch $Pattern | Select-Object -First 1
     if ($null -ne $Hit) {
         Fail "process entrypoint bypasses internal/app at $($Hit.Path):$($Hit.LineNumber): $Pattern"
@@ -69,7 +69,7 @@ if ($null -ne $DirectAppImport) {
 
 # go list is the positive deletion-boundary proof: core application and all
 # backend owners resolve without either concrete TUI or Bubble Tea dependencies.
-$CorePackages = @('./internal/app', './internal/app/controller', './internal/frontend', './internal/agent', './internal/session', './internal/config', './internal/ctx', './internal/llm', './internal/provider', './internal/tools', './internal/logging')
+$CorePackages = @('./internal/app', './internal/app/controller', './internal/frontend', './internal/agent', './internal/session', './internal/config', './internal/ctx', './internal/llm', './internal/provider', './internal/tools', './internal/logging', './internal/workspace')
 $Deps = & go list -deps @CorePackages
 if ($LASTEXITCODE -ne 0) { Fail 'core/backend package graph does not build' }
 foreach ($Pattern in @('github.com/DohmBoy64Bit/RecompHamr/internal/tui', 'github.com/charmbracelet/bubbletea')) {
@@ -85,5 +85,15 @@ foreach ($Pattern in @('/mcp', '/skills', '/update', '/classifier', '/doctor', '
     }
 }
 
-Write-Host 'architecture (Stage C frontend boundary): PASS'
-Write-Host 'core/backend deletion graph excludes internal/tui and Bubble Tea.'
+# Workspace filesystem/state capability belongs only to core application
+# composition. It must not enter agent, session, frontend, or presentation.
+$WorkspaceImports = $AllGo |
+    Where-Object { $_.Name -notlike '*_test.go' -and $_.FullName -ne (Join-Path $Root 'internal/app/app.go') } |
+    Select-String -SimpleMatch 'internal/workspace'
+if ($null -ne $WorkspaceImports) {
+    $Hit = $WorkspaceImports | Select-Object -First 1
+    Fail "workspace capability bypasses core app at $($Hit.Path):$($Hit.LineNumber)"
+}
+
+Write-Host 'architecture (Stage D workspace + Stage C frontend boundary): PASS'
+Write-Host 'workspace ownership is app-only; core/backend deletion graph excludes internal/tui and Bubble Tea.'

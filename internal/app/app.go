@@ -11,6 +11,7 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/workspace"
 )
 
 var (
@@ -22,9 +23,10 @@ var (
 	newAgentRuntime     = func(client agent.ChatClient) agent.Runtime {
 		return agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver())
 	}
-	newController = func(sessionRuntime *session.Runtime, runtime agent.Runtime, system, version string) frontend.Controller {
+	newController = func(sessionRuntime *session.Runtime, runtime agent.Runtime, system func() string, version string) frontend.Controller {
 		return appcontroller.NewController(sessionRuntime, runtime, system, version)
 	}
+	newWorkspace  = workspace.Open
 	openDebugLog  = logging.Open
 	closeDebugLog = logging.Close
 )
@@ -61,6 +63,14 @@ func Bootstrap(version string) (*Runtime, error) {
 		return nil, err
 	}
 	applyEnvOverrides(cfg)
+	projectDir, err := absolutePath(cwd)
+	if err != nil {
+		projectDir = cwd
+	}
+	projectWorkspace, err := newWorkspace(projectDir)
+	if err != nil {
+		return nil, err
+	}
 
 	close := func() {}
 	if cfg.Logging {
@@ -69,11 +79,13 @@ func Bootstrap(version string) (*Runtime, error) {
 	}
 	sessionRuntime := newSessionRuntime(cfg)
 	agentRuntime := newAgentRuntime(sessionRuntime)
-	projectDir, err := absolutePath(cwd)
-	if err != nil {
-		projectDir = cwd
+	system := func() string {
+		prompt, promptErr := projectWorkspace.SystemPrompt(config.DefaultSystemPrompt)
+		if promptErr != nil {
+			return config.DefaultSystemPrompt + "\n\nWorking directory: " + projectWorkspace.Root()
+		}
+		return prompt
 	}
-	system := config.DefaultSystemPrompt + "\n\nWorking directory: " + projectDir
 	return &Runtime{controller: newController(sessionRuntime, agentRuntime, system, version), close: close}, nil
 }
 

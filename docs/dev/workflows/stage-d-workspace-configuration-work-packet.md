@@ -81,3 +81,33 @@ Stage D as a whole remains open until later work packets disposition the remaini
 - Security: unsafe Legacy permissions and mixed-stage artifacts are explicitly rejected from the direct-port scope.
 - Evidence: current and Legacy source/tests/docs named above.
 - Known limits: all first-slice implementation, canonical verification, runtime acceptance, CI, and later Stage D scheduling remain open.
+
+### Checkpoint D1B — secure workspace identity and state reader
+
+- Changed: added immutable `internal/workspace` ownership for canonical absolute project identity and optional `REPHAMR_STATE.md` reads. The reader is bounded at 64 KiB before and during allocation, preserves valid UTF-8, is concurrent-safe, tightens private protection, and rejects links/reparse points, non-regular files, replacement races, invalid UTF-8, and filesystem/security failures.
+- Documented: package/exported-symbol contracts, D-016, active architecture, workspace user contract, configuration security, holding-pen status, and behavioral rows agree with the implementation.
+- Verified: focused workspace tests exercise every statement and applicable success/failure/malformed/boundary/platform-simulated/Unicode/persistence/concurrency/security branch at 100.0% statements.
+- Coverage: Stage D behavioral rows remain unverified until application integration, canonical verification, runtime evidence, and CI complete.
+- Security: file contents never appear in errors; the path is fixed beneath the private `.rehamr` root and verified before reading.
+- Evidence: current source/tests and strengthened architecture checks.
+- Known limits: exact-build runtime and cross-platform CI remain open.
+
+### Checkpoint D1C — application prompt refresh
+
+- Changed: core application composition is the only production workspace consumer and supplies a refreshable system-prompt function to the controller. Startup accounting and every model round refresh optional state. Missing, empty, or securely rejected state falls back silently to the unchanged embedded prompt plus working-directory anchor.
+- Documented: D-016 and current architecture record lower-trust prompt placement and the app-only capability edge. The frontend/TUI contract and command help are unchanged.
+- Verified: focused app/controller/TUI tests pass at 100.0% statements and prove changing state refresh, silent unsafe-state fallback, bootstrap/round refresh, and unchanged presentation contracts.
+- Coverage: runtime-dependent Stage D rows remain unverified pending canonical and exact-build acceptance.
+- Security: state content, path capabilities, errors, and file handles never enter frontend snapshots/events or orchestration logs.
+- Evidence: app composition, controller prompt-source, workspace prompt, and agent request contract tests.
+- Known limits: canonical gate, runtime acceptance, CI, and slice closure remain open.
+
+### Checkpoint D1D — architecture and documentation boundary
+
+- Changed: architecture enforcement makes workspace an app-only backend owner, excludes it from TUI/frontend/entrypoint imports, and includes it in the positive deletion graph.
+- Documented: current architecture, D-016, user workspace/configuration security, documentation map/contract, parity holding pen, work packet, and behavioral inventory are synchronized.
+- Verified: focused architecture and affected package checks pass; canonical verification remains required before checkpoint acceptance.
+- Coverage: meaningful package/exported-symbol and user/developer contract documentation is present; final docscheck/link/canonical results remain open.
+- Security: later-stage initializer, doctor, RE templates, skills, MCP, and tool artifacts remain absent.
+- Evidence: architecture script and documentation contract.
+- Known limits: runtime, CI, and final first-slice acceptance remain open.

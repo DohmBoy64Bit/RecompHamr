@@ -25,6 +25,7 @@
     "docs/dev/workflows/baseline-gate.md",
     "docs/dev/workflows/change-control.md",
     "docs/user/configuration.md",
+    "docs/user/workspace.md",
     "docs/user/tools.md",
     "docs/AGENTS.md",
     "internal/tui/AGENTS.md",
@@ -132,6 +133,14 @@
       "RECOMPHAMR_URL",
       "RECOMPHAMR_IDLE_TIMEOUT",
       "/models"
+    ],
+    "docs/user/workspace.md": [
+      "REPHAMR_STATE.md",
+      "Persistent Memory",
+      "64 KiB",
+      "untrusted project-maintained context",
+      "Symlinks",
+      "Stage G"
     ],
     "docs/user/tools.md": [
       "powershell",

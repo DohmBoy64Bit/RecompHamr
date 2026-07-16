@@ -49,7 +49,7 @@ func setTestPhase(m *Model, phase frontend.Phase) {
 }
 
 func newModelWithRuntime(sessionRuntime *session.Runtime, runtime agent.Runtime, system, version string) Model {
-	return New(appcontroller.NewController(sessionRuntime, runtime, system, version), version)
+	return New(appcontroller.NewController(sessionRuntime, runtime, func() string { return system }, version), version)
 }
 
 // newTestModel wires a model against a mock OpenAI-compatible SSE server so

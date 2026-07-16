@@ -64,3 +64,7 @@ Separation preserves every accepted Stage A behavior. Move existing responsibili
 ## D-015 — The frontend boundary is neutral and terminal wiring is isolated
 
 `internal/frontend` defines the only project-runtime contract imported by production TUI code. An application-owned controller translates typed intents, owns asynchronous work identity and backend lifecycle, and emits immutable display-safe snapshots and ordered semantic events. Core `internal/app` exposes only that neutral controller and cleanup lifetime; `internal/app/terminal` is the sole concrete TUI and Bubble Tea wiring edge. This preserves the runnable terminal while allowing application and backend packages to build and test without the presentation implementation.
+
+## D-016 — Workspace state is optional lower-trust model context
+
+Stage D preserves the Legacy-compatible `.rehamr/REPHAMR_STATE.md` filename and optional persistent-context behavior without porting the mixed Legacy initializer. `internal/workspace` owns canonical identity and bounded secure reads; core application composition is its only consumer. State is labeled untrusted project-maintained context beneath the embedded application contract, refreshes for each model round, and is silently omitted on absence or secure-read failure. Commands, RE templates, tools, skills, and MCP configuration remain in their authorized later stages.
