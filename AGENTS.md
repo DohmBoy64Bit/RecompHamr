@@ -11,7 +11,7 @@ Order of work:
 3. integrate RecompHamr capabilities one coherent subsystem at a time;
 4. verify each capability against evidence, tests, docs, and runtime behavior.
 
-**Stage A: fresh-source barebones baseline** and **Stage C: separation of concerns** are accepted. Stage D is the next permitted work and has not begun. Preserve every accepted behavior and the established ownership boundary; do not add Legacy feature families, MCP, skills, new command families, project memory, diagnostics systems, reverse-engineering helpers, or a TUI redesign outside an approved later-stage work packet.
+**Stage A: fresh-source barebones baseline** and **Stage C: separation of concerns** are accepted. **Stage D: workspace and configuration foundations** is active under its work packet. Preserve every accepted behavior and the established ownership boundary; do not add Legacy feature families, MCP, skills, new command families, diagnostics systems, reverse-engineering helpers, or a TUI redesign outside an approved later-stage work packet.
 
 ## Codex reading route
 
@@ -73,6 +73,8 @@ Do not widen scope because adjacent work is convenient.
 ## Legacy parity is behavioral, not structural
 
 RecompHamr-Legacy is a feature and behavior reference, not a base tree and not an architecture mandate.
+
+User reaffirmation for Stage D and later parity work: do not implement Legacy internals one-to-one when the current design can be cleaner, safer, simpler, or faster. Improvements and optimizations are preferred when evidence supports them, but every verified required observable behavior must remain equivalent unless the user explicitly approves an intentional behavior change and that change is tested and documented.
 
 When integrating a Legacy capability:
 

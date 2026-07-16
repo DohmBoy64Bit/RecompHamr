@@ -24,4 +24,4 @@ Stage A was accepted on 2026-07-15. The accepted implementation commit is `71f70
 
 ## Next allowed work
 
-Stage C separation was accepted at implementation commit `72e6b43215cc14f91eb6547de15a7386bc77b927`. Stage D workspace and configuration foundations are the next permitted work but have not begun; feature integration remains governed by the documented integration order and change-control gates.
+Stage C separation was accepted at implementation commit `72e6b43215cc14f91eb6547de15a7386bc77b927`. Stage D workspace and configuration foundations are active under the Stage D work packet; feature integration remains governed by the documented integration order and change-control gates.

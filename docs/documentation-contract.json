@@ -36,6 +36,8 @@
     ,"docs/dev/workflows/tui-acceptance-harness.md"
     ,"docs/dev/workflows/tui-acceptance-harness-work-packet.md"
     ,"docs/dev/workflows/stage-c-separation-work-packet.md"
+    ,"docs/dev/workflows/stage-d-workspace-configuration-work-packet.md"
+    ,"docs/dev/verification/stage-d-behavioral-surface.md"
     ,"docs/dev/workflows/default-gemma-profile-work-packet.md"
   ],
   "required_content": {
@@ -258,6 +260,20 @@
       "internal/agent",
       "Deleting `internal/tui`",
       "Stop condition"
+    ],
+    "docs/dev/workflows/stage-d-workspace-configuration-work-packet.md": [
+      "Outcome",
+      "In scope",
+      "Out of scope",
+      "Legacy evidence",
+      "Security impact",
+      "Stop condition"
+    ],
+    "docs/dev/verification/stage-d-behavioral-surface.md": [
+      "WORKSPACE-01",
+      "MEMORY-01",
+      "Runtime/manual evidence",
+      "unverified"
     ],
     "docs/dev/workflows/default-gemma-profile-work-packet.md": [
       "Outcome",

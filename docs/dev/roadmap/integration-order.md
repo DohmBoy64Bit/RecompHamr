@@ -14,7 +14,7 @@ Pass automated checks and complete real Windows/TUI/manual acceptance.
 
 Extract application orchestration and agent-loop ownership from the TUI without changing accepted behavior or layout.
 
-Accepted at implementation commit `72e6b43215cc14f91eb6547de15a7386bc77b927`. Stage D is next but has not begun.
+Accepted at implementation commit `72e6b43215cc14f91eb6547de15a7386bc77b927`.
 
 Required outcome:
 
@@ -27,6 +27,8 @@ Required outcome:
 ## Stage D — Workspace and configuration foundations
 
 Integrate verified RecompHamr capability contracts that belong to configuration and workspace ownership.
+
+Active. The first slice establishes secure application-owned workspace identity and bounded persistent-state loading without adding later-stage commands, tools, skills, or MCP configuration.
 
 Use `legacy-parity-policy.md`: preserve required behavior and compatibility, but improve internal architecture when the new design is better supported by evidence.
 

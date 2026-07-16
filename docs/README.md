@@ -32,6 +32,7 @@ Repository-wide always-on instructions live in [`../AGENTS.md`](../AGENTS.md). C
 - [`dev/verification/behavioral-surface-coverage.md`](dev/verification/behavioral-surface-coverage.md) — 100% old-and-new behavioral surface coverage and meaningful documentation coverage contract
 - [`dev/verification/stage-a-behavioral-surface.md`](dev/verification/stage-a-behavioral-surface.md) — active Stage A surface inventory and acceptance evidence map
 - [`dev/verification/stage-c-behavioral-surface.md`](dev/verification/stage-c-behavioral-surface.md) — accepted separation-of-concerns ownership and equivalence inventory
+- [`dev/verification/stage-d-behavioral-surface.md`](dev/verification/stage-d-behavioral-surface.md) — active workspace/configuration foundation and Legacy parity inventory
 - [`dev/verification/stage-a-runtime-acceptance.md`](dev/verification/stage-a-runtime-acceptance.md) — sanitized Windows Terminal, LM Studio, tool, cancellation, security, and screenshot evidence
 
 ### Architecture
@@ -48,6 +49,7 @@ Repository-wide always-on instructions live in [`../AGENTS.md`](../AGENTS.md). C
 - [`dev/workflows/tui-acceptance-harness.md`](dev/workflows/tui-acceptance-harness.md) — state-aware Windows Terminal scenario runner, evidence channels, security, and usage
 - [`dev/workflows/tui-acceptance-harness-work-packet.md`](dev/workflows/tui-acceptance-harness-work-packet.md)
 - [`dev/workflows/stage-c-separation-work-packet.md`](dev/workflows/stage-c-separation-work-packet.md) — accepted application/agent/presentation ownership extraction packet
+- [`dev/workflows/stage-d-workspace-configuration-work-packet.md`](dev/workflows/stage-d-workspace-configuration-work-packet.md) — active Stage D scope, evidence, security, verification, and stop conditions
 - [`dev/workflows/default-gemma-profile-work-packet.md`](dev/workflows/default-gemma-profile-work-packet.md) — fresh-project LM Studio Gemma default change
 
 ### Roadmap
