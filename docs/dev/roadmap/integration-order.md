@@ -36,13 +36,15 @@ Use `legacy-parity-policy.md`: preserve required behavior and compatibility, but
 
 Integrate verified agent-loop capabilities below the TUI.
 
-Active under `../workflows/stage-e-agent-runtime-work-packet.md`. The first checkpoint audits the complete Legacy agent/runtime contract against the accepted Stage C backend before authorizing any production delta.
+Accepted at implementation/parity-audit commit `b4fee3c02b6178aa9e2d1e2a7cdf843b13281355`. The complete Legacy agent/runtime contract was audited against the accepted Stage C backend; no genuine production gap was found, and equivalent or improved behavior was verified without a redundant rewrite.
 
 Do not copy Legacy orchestration into presentation merely to achieve superficial parity.
 
 ## Stage F — RecompHamr tools
 
 Add reverse-engineering/recompilation tool families through typed tool contracts, tests, security boundaries, and docs.
+
+Stage F is next but is not active until its own evidence-backed work packet defines the exact tool families and acceptance boundary.
 
 ## Stage G — Commands and Agent Skills
 

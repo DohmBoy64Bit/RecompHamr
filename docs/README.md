@@ -33,8 +33,8 @@ Repository-wide always-on instructions live in [`../AGENTS.md`](../AGENTS.md). C
 - [`dev/verification/behavioral-surface-coverage.md`](dev/verification/behavioral-surface-coverage.md) — 100% old-and-new behavioral surface coverage and meaningful documentation coverage contract
 - [`dev/verification/stage-a-behavioral-surface.md`](dev/verification/stage-a-behavioral-surface.md) — active Stage A surface inventory and acceptance evidence map
 - [`dev/verification/stage-c-behavioral-surface.md`](dev/verification/stage-c-behavioral-surface.md) — accepted separation-of-concerns ownership and equivalence inventory
-- [`dev/verification/stage-d-behavioral-surface.md`](dev/verification/stage-d-behavioral-surface.md) — active workspace/configuration foundation and Legacy parity inventory
-- [`dev/verification/stage-e-behavioral-surface.md`](dev/verification/stage-e-behavioral-surface.md) — active agent/runtime parity audit and evidence map
+- [`dev/verification/stage-d-behavioral-surface.md`](dev/verification/stage-d-behavioral-surface.md) — accepted workspace/configuration foundation and Legacy parity inventory
+- [`dev/verification/stage-e-behavioral-surface.md`](dev/verification/stage-e-behavioral-surface.md) — accepted agent/runtime parity audit and evidence map
 - [`dev/verification/stage-a-runtime-acceptance.md`](dev/verification/stage-a-runtime-acceptance.md) — sanitized Windows Terminal, LM Studio, tool, cancellation, security, and screenshot evidence
 
 ### Architecture
@@ -52,7 +52,7 @@ Repository-wide always-on instructions live in [`../AGENTS.md`](../AGENTS.md). C
 - [`dev/workflows/tui-acceptance-harness-work-packet.md`](dev/workflows/tui-acceptance-harness-work-packet.md)
 - [`dev/workflows/stage-c-separation-work-packet.md`](dev/workflows/stage-c-separation-work-packet.md) — accepted application/agent/presentation ownership extraction packet
 - [`dev/workflows/stage-d-workspace-configuration-work-packet.md`](dev/workflows/stage-d-workspace-configuration-work-packet.md) — accepted Stage D scope, evidence, security, verification, and closure record
-- [`dev/workflows/stage-e-agent-runtime-work-packet.md`](dev/workflows/stage-e-agent-runtime-work-packet.md) — active Stage E scope, Legacy evidence audit, verification, and stop conditions
+- [`dev/workflows/stage-e-agent-runtime-work-packet.md`](dev/workflows/stage-e-agent-runtime-work-packet.md) — accepted Stage E scope, Legacy evidence audit, verification, and closure record
 - [`dev/workflows/default-gemma-profile-work-packet.md`](dev/workflows/default-gemma-profile-work-packet.md) — fresh-project LM Studio Gemma default change
 
 ### Roadmap

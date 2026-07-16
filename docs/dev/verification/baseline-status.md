@@ -24,4 +24,4 @@ Stage A was accepted on 2026-07-15. The accepted implementation commit is `71f70
 
 ## Next allowed work
 
-Stage C separation was accepted at implementation commit `72e6b43215cc14f91eb6547de15a7386bc77b927`. Stage D workspace and configuration foundations were accepted at implementation commit `449a83cb379e79fd84b817b0e95f63de7472578a`; its evidence is recorded in the Stage D packet and inventory. Stage E agent/runtime capability auditing is active under its evidence-backed work packet; production changes require a demonstrated parity gap.
+Stage C separation was accepted at implementation commit `72e6b43215cc14f91eb6547de15a7386bc77b927`. Stage D workspace and configuration foundations were accepted at implementation commit `449a83cb379e79fd84b817b0e95f63de7472578a`. Stage E agent/runtime parity was accepted at implementation/audit commit `b4fee3c02b6178aa9e2d1e2a7cdf843b13281355`; its packet and inventory record the source, test, runtime, and CI evidence. Stage F is next but requires its own work packet before implementation.

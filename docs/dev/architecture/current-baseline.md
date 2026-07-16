@@ -1,6 +1,6 @@
 # Current Transitional Architecture
 
-Stage A, all four Stage C slices, and Stage D are accepted. The accepted Stage D implementation commit is `449a83cb379e79fd84b817b0e95f63de7472578a`.
+Stage A, all four Stage C slices, Stage D, and Stage E are accepted. The accepted Stage E implementation/parity-audit commit is `b4fee3c02b6178aa9e2d1e2a7cdf843b13281355`.
 
 ```text
 cmd/recomphamr
@@ -57,6 +57,6 @@ Backend packages do not import `internal/tui`. `internal/app/terminal` is the so
 
 Focused and canonical tests, architecture enforcement, dual-platform CI, and exact-build Windows Terminal evidence with LM Studio Gemma verify absent/present/changed/cleared state, frozen rendering, model and tool cancellation, stale-result rejection, recovery, and restored shell control.
 
-## Active Stage E audit
+## Accepted Stage E parity
 
-Stage E audits the accepted `internal/agent`, `internal/ctx`, and `internal/llm` owners against the complete Legacy agent/runtime contract before authorizing a production delta. The current evidence indicates that Stage C already preserved the observed loop policies and lifecycle while strengthening typed ownership and deterministic testing. This remains an unverified parity conclusion until every branch is mapped to exact current tests and runtime evidence. The Legacy skills-template classifier remains outside this graph until Stage G.
+Stage E audited the accepted `internal/agent`, `internal/ctx`, and `internal/llm` owners against every in-scope Legacy agent/runtime branch. Exact source/test traceability and runtime evidence established that Stage C already preserved the required loop policies and lifecycle while improving typed ownership, cancellation cleanup, context pairing, stream error handling, and deterministic testing. No genuine production gap existed, so Stage E made no redundant runtime change. The Legacy skills-template classifier remains outside this graph until Stage G.

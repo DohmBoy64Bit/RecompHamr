@@ -44,7 +44,7 @@ Use an audit-first adapted-compatibility approach. Build a line-of-evidence matr
 
 ## Behavioral surface inventory
 
-The active inventory is [`../verification/stage-e-behavioral-surface.md`](../verification/stage-e-behavioral-surface.md). `AGENT-03`, `CTX-02`, and `LLM-02` begin unverified and cannot close from source resemblance alone.
+The accepted inventory is [`../verification/stage-e-behavioral-surface.md`](../verification/stage-e-behavioral-surface.md). `AGENT-03`, `CTX-02`, and `LLM-02` began unverified and closed only after source/test traceability, exact-build runtime evidence, canonical verification, and dual-platform CI agreed.
 
 ## Verification
 
@@ -101,3 +101,12 @@ Stage E closes only when every in-scope Legacy agent/runtime contract is disposi
 - Security: credentials remain headers only, response/log diagnostics remain bounded and redacted, and retries never replay after content has begun streaming.
 - Evidence: D-017 and the Stage E inventory contain the complete parity dispositions. The Legacy classifier is confirmed as a Stage G skill-document surface.
 - Known limits: canonical verification, exact-build Gemma scenarios, CI, final docs audit, and Stage E closure remain open.
+
+### Checkpoint E1F — Stage E closure
+
+- Changed: closure records only; no production code changed anywhere in Stage E because the complete audit demonstrated no genuine missing capability.
+- Disposition: Stage E is accepted at implementation/parity-audit commit `b4fee3c02b6178aa9e2d1e2a7cdf843b13281355`. Required behavior is equivalent or improved except the documented one-hour idle default, which remains an intentional accepted change; hosted quota behavior is not applicable and the skills classifier remains deferred to Stage G.
+- Verified: focused agent/context/LLM/provider/controller coverage is 100.0%. The canonical gate passed on the clean exact commit and again after closure documentation, with repository coverage exactly 100.0% (`2250/2250` statements). GitHub Actions run `29511090792` passed independently on `windows-latest` and `ubuntu-latest`.
+- Runtime: the exact build completed committed `smoke`, `model-stream-cancel`, and `agent-tool-loop-cancel` scenarios with LM Studio `google/gemma-4-12b-qat`. Evidence is retained outside the repository under `E:\ReProject\StageA-Acceptance\StageE-Agent-Runtime\b4fee3c`; the accepted clean smoke rerun is `smoke-clean-rerun`, and reviewed screenshots cover 120×36, 80×24, 50×16, streaming recovery, ordered tools, running-tool cancellation, and recovery.
+- Security: retained reports contain categories and outcomes only; screenshots were reviewed for synthetic prompts and contained no keys or unrelated user data. Cancellation suppressed the delayed tool result and side effect, and restored-shell checks passed.
+- Stop condition: met. `AGENT-03`, `CTX-02`, and `LLM-02` are verified, with no blocked or unverified Stage E surface. Stage F remains inactive until a separate packet authorizes it.

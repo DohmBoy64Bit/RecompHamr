@@ -7,7 +7,7 @@ Everything in this document is intentionally **excluded** from the barebones bas
 | classifier | excluded | after Stage C, when a verified owner/use case is defined |
 | doctor/environment diagnostics | excluded | Stage D or later |
 | project memory/workspace state | Stage D foundation accepted: secure optional state loading and refresh are verified; initialization/status commands and RE templates remain deferred | Stage D foundation accepted; Stage F/G for template/command exposure |
-| expanded agent-loop behavior | Stage E audit active; current Stage C backend already contains the observed Legacy policies, pending complete parity proof | Stage E |
+| expanded agent-loop behavior | accepted: Stage E verified the required Legacy policies as equivalent or improved in the current backend; no redundant port was needed | Stage E accepted at `b4fee3c` |
 | `repomixr` | excluded | Stage F |
 | `recomp_reference` | excluded | Stage F |
 | extra RE-specific built-in tools | excluded | Stage F |
