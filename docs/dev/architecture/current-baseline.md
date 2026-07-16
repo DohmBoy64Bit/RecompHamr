@@ -1,6 +1,6 @@
 # Current Transitional Architecture
 
-Stage A and all four Stage C slices are accepted. Stage D is active; its first workspace-state slice is implemented and awaiting complete acceptance evidence.
+Stage A, all four Stage C slices, and Stage D are accepted. The accepted Stage D implementation commit is `449a83cb379e79fd84b817b0e95f63de7472578a`.
 
 ```text
 cmd/recomphamr
@@ -51,6 +51,8 @@ Stage C slice 4 is accepted. Backend-neutral `internal/frontend` contracts route
 
 Backend packages do not import `internal/tui`. `internal/app/terminal` is the sole concrete TUI/Bubble Tea wiring edge.
 
-## Active Stage D ownership
+## Accepted Stage D ownership
 
 `internal/workspace` owns canonical absolute project identity and bounded optional reads of `.rehamr/REPHAMR_STATE.md`. It refuses links/reparse points, non-regular files, replacement races, invalid UTF-8, oversize state, and security/I/O failures; it creates no files or directories. Core `internal/app` is its only production consumer and supplies a refreshable system-prompt function to `internal/app/controller`. The controller refreshes before startup accounting and every model round. Missing, empty, or unsafe optional state leaves the embedded prompt and working-directory anchor intact and does not cross the frontend boundary.
+
+Focused and canonical tests, architecture enforcement, dual-platform CI, and exact-build Windows Terminal evidence with LM Studio Gemma verify absent/present/changed/cleared state, frozen rendering, model and tool cancellation, stale-result rejection, recovery, and restored shell control.

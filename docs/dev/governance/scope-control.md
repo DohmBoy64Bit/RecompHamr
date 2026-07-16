@@ -1,10 +1,11 @@
 # Scope Control
 
-The accepted Stage A/Stage C gates and the active Stage D work packet define the current project boundary.
+The accepted Stage A, Stage C, and Stage D gates define the current project boundary. Stage E is next but has no active implementation packet.
 
 ## Allowed now
 
-- implement the workspace and configuration foundations explicitly listed in the active Stage D packet;
+- preserve and fix evidence-backed defects in the accepted workspace and configuration foundations;
+- prepare an evidence-backed Stage E work packet without adding production capability before approval;
 - preserve or improve verified Legacy behavior within its current architecture owner;
 - improve tests, verification, rules, or documentation without changing the frozen TUI contract;
 - fix evidence-backed defects in accepted behavior;
@@ -20,7 +21,7 @@ The accepted Stage A/Stage C gates and the active Stage D work packet define the
 - TUI redesign;
 - Bubble Tea framework migration.
 
-Blocked work belongs in the roadmap, policy, or holding pen, not in placeholder production code. Stage D optional workspace-state loading is the only active project-memory surface.
+Blocked work belongs in the roadmap, policy, or holding pen, not in placeholder production code. The accepted Stage D optional workspace-state loader remains the only implemented project-memory surface.
 
 ## Future parity scope
 

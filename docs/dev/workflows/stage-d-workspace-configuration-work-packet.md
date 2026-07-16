@@ -70,7 +70,7 @@ Persistent state is model-facing untrusted project content. It must never be tre
 
 The first slice closes only when application-owned workspace identity and optional persistent-state refresh are implemented without TUI/backend-boundary regression; all three active rows are verified; statement, behavioral, and meaningful documentation coverage are 100%; security/platform cases pass; exact-build Windows evidence and both CI platforms pass; and no Stage E/F/G/H surface has entered production.
 
-Stage D as a whole remains open until later work packets disposition the remaining workspace/configuration/diagnostic foundations with no blocked or unverified Stage D row.
+Stage D is closed: the remaining workspace/configuration/diagnostic evidence is dispositioned below and no Stage D row is blocked or unverified.
 
 ## Completion evidence
 
@@ -131,3 +131,14 @@ Stage D as a whole remains open until later work packets disposition the remaini
 - Security: removal is restricted to the scenario's already-contained debug-log path inside its disposable workspace; reports still retain categories only.
 - Evidence: review of the first `6a0c422` wide screenshot exposed a blank pre-render capture even though stale `session` events had satisfied the wait.
 - Known limits: real Gemma state-refresh and cancellation evidence still requires the LM Studio endpoint.
+
+## Final Stage D closure
+
+- Changed: accepted application-owned canonical workspace identity, secure bounded optional `.rehamr/REPHAMR_STATE.md` loading, per-round prompt refresh, and existing improved configuration foundations. No Stage E/F/G/H production surface was added.
+- Documented: AGENTS, architecture, integration order, scope control, holding pen, user contracts, decisions, documentation map/contract, this packet, and all three Stage D inventory rows agree on accepted scope and later owners.
+- Verified: implementation commit `449a83cb379e79fd84b817b0e95f63de7472578a` passes `pwsh -NoProfile -File ./scripts/verify.ps1` at exactly 100.0% (`2250/2250`) statements. GitHub Actions run `29508988025` passes independently on `windows-latest` and `ubuntu-latest`.
+- Runtime: Windows Terminal with LM Studio `google/gemma-4-12b-qat` passed exact-build startup/resize/exit, present/changed/absent workspace state in one process, stream cancellation/recovery, and a clean ordered-tool/cancel/recovery retry. Reports and reviewed screenshots are retained under `E:\ReProject\StageA-Acceptance\StageD-Workspace-Slice1\449a83c`.
+- Evidence integrity: the initial `6a0c422` wide screenshot was blank and was rejected, leading to fresh per-run debug-log isolation. The first `449a83c` tool scenario truthfully remains as a failed report because Gemma generated a fifth call; the separately retained clean retry passed every exact-count, pairing, cancellation, side-effect, recovery, and shell-restoration assertion.
+- Security: reports contain event categories and step outcomes only; state content appears only in reviewed local screenshots. No keys, raw logs, prompts, model payloads, or unrelated user data were committed. POSIX owner-only modes and Windows current-user-only DACL checks pass.
+- Closure: `WORKSPACE-01`, `MEMORY-01`, and `APP-03` are verified; the remaining Legacy evidence is improved, intentionally changed, decomposed, or deferred to its documented later owner. Stage D has no blocked or unverified row.
+- Known limits: Stage E/F/G/H capabilities remain intentionally unimplemented. Stage E is next but requires its own approved work packet.

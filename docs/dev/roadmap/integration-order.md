@@ -28,13 +28,15 @@ Required outcome:
 
 Integrate verified RecompHamr capability contracts that belong to configuration and workspace ownership.
 
-Active. The first slice establishes secure application-owned workspace identity and bounded persistent-state loading without adding later-stage commands, tools, skills, or MCP configuration.
+Accepted at implementation commit `449a83cb379e79fd84b817b0e95f63de7472578a`. Secure application-owned workspace identity, bounded persistent-state loading, and the existing configuration foundations are verified without adding later-stage commands, tools, skills, or MCP configuration.
 
 Use `legacy-parity-policy.md`: preserve required behavior and compatibility, but improve internal architecture when the new design is better supported by evidence.
 
 ## Stage E — Agent/runtime capabilities
 
 Integrate verified agent-loop capabilities below the TUI.
+
+Next in sequence, but not active until an evidence-backed work packet defines the exact Legacy capability contract, owners, tests, security boundary, runtime evidence, and stop condition.
 
 Do not copy Legacy orchestration into presentation merely to achieve superficial parity.
 

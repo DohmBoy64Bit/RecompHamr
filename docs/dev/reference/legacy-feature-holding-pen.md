@@ -6,7 +6,7 @@ Everything in this document is intentionally **excluded** from the barebones bas
 |---|---|---|
 | classifier | excluded | after Stage C, when a verified owner/use case is defined |
 | doctor/environment diagnostics | excluded | Stage D or later |
-| project memory/workspace state | Stage D first slice active: secure optional state loading implemented, acceptance pending; initialization/status commands and RE templates remain deferred | Stage D foundation; Stage F/G for template/command exposure |
+| project memory/workspace state | Stage D foundation accepted: secure optional state loading and refresh are verified; initialization/status commands and RE templates remain deferred | Stage D foundation accepted; Stage F/G for template/command exposure |
 | expanded agent-loop behavior | excluded except retained upstream baseline behavior | Stage E |
 | `repomixr` | excluded | Stage F |
 | `recomp_reference` | excluded | Stage F |

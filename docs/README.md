@@ -50,7 +50,7 @@ Repository-wide always-on instructions live in [`../AGENTS.md`](../AGENTS.md). C
 - [`dev/workflows/tui-acceptance-harness.md`](dev/workflows/tui-acceptance-harness.md) — state-aware Windows Terminal scenario runner, evidence channels, security, and usage
 - [`dev/workflows/tui-acceptance-harness-work-packet.md`](dev/workflows/tui-acceptance-harness-work-packet.md)
 - [`dev/workflows/stage-c-separation-work-packet.md`](dev/workflows/stage-c-separation-work-packet.md) — accepted application/agent/presentation ownership extraction packet
-- [`dev/workflows/stage-d-workspace-configuration-work-packet.md`](dev/workflows/stage-d-workspace-configuration-work-packet.md) — active Stage D scope, evidence, security, verification, and stop conditions
+- [`dev/workflows/stage-d-workspace-configuration-work-packet.md`](dev/workflows/stage-d-workspace-configuration-work-packet.md) — accepted Stage D scope, evidence, security, verification, and closure record
 - [`dev/workflows/default-gemma-profile-work-packet.md`](dev/workflows/default-gemma-profile-work-packet.md) — fresh-project LM Studio Gemma default change
 
 ### Roadmap

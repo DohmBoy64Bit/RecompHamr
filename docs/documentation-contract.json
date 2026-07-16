@@ -282,7 +282,7 @@
       "WORKSPACE-01",
       "MEMORY-01",
       "Runtime/manual evidence",
-      "unverified"
+      "verified"
     ],
     "docs/dev/workflows/default-gemma-profile-work-packet.md": [
       "Outcome",
