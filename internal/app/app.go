@@ -11,6 +11,7 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/tools"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/workspace"
 )
 
@@ -20,8 +21,9 @@ var (
 	absolutePath        = filepath.Abs
 	getEnvironment      = os.Getenv
 	newSessionRuntime   = session.NewRuntime
-	newAgentRuntime     = func(client agent.ChatClient) agent.Runtime {
-		return agent.NewRuntime(client, agent.LocalToolExecutor()).WithObserver(logging.NewObserver())
+	newAgentRuntime     = func(client agent.ChatClient, privateRoot string) agent.Runtime {
+		toolSet := tools.NewSet(privateRoot, config.RestrictPrivatePath)
+		return agent.NewRuntime(client, agent.NewToolExecutor(toolSet.Execute)).WithObserver(logging.NewObserver())
 	}
 	newController = func(sessionRuntime *session.Runtime, runtime agent.Runtime, system func() string, version string) frontend.Controller {
 		return appcontroller.NewController(sessionRuntime, runtime, system, version)
@@ -78,7 +80,7 @@ func Bootstrap(version string) (*Runtime, error) {
 		close = closeDebugLog
 	}
 	sessionRuntime := newSessionRuntime(cfg)
-	agentRuntime := newAgentRuntime(sessionRuntime)
+	agentRuntime := newAgentRuntime(sessionRuntime, cfg.Dir)
 	system := func() string {
 		prompt, promptErr := projectWorkspace.SystemPrompt(config.DefaultSystemPrompt)
 		if promptErr != nil {

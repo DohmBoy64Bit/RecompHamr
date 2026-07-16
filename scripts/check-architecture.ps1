@@ -95,5 +95,20 @@ if ($null -ne $WorkspaceImports) {
     Fail "workspace capability bypasses core app at $($Hit.Path):$($Hit.LineNumber)"
 }
 
-Write-Host 'architecture (Stage D workspace + Stage C frontend boundary): PASS'
-Write-Host 'workspace ownership is app-only; core/backend deletion graph excludes internal/tui and Bubble Tea.'
+# Concrete Stage F cache configuration belongs only to core application
+# composition. Agent policy sees an injected executor and presentation sees
+# only display-safe statuses; neither may construct a privileged tool set.
+$ToolSetConstruction = $AllGo |
+    Where-Object { $_.Name -notlike '*_test.go' -and $_.FullName -ne (Join-Path $Root 'internal/app/app.go') } |
+    Select-String -SimpleMatch 'tools.NewSet('
+if ($null -ne $ToolSetConstruction) {
+    $Hit = $ToolSetConstruction | Select-Object -First 1
+    Fail "tool-set cache authority bypasses core app at $($Hit.Path):$($Hit.LineNumber)"
+}
+foreach ($Pattern in @('RepomixrDir', 'RecompRefDir', 'MCPExec')) {
+    $Hit = $AllGo | Where-Object { $_.Name -notlike '*_test.go' } | Select-String -SimpleMatch $Pattern | Select-Object -First 1
+    if ($null -ne $Hit) { Fail "unsafe/deferred tool extension state remains at $($Hit.Path):$($Hit.LineNumber): $Pattern" }
+}
+
+Write-Host 'architecture (Stage F tools + Stage D workspace + Stage C frontend boundary): PASS'
+Write-Host 'workspace/tool cache authority is app-only; core/backend deletion graph excludes internal/tui and Bubble Tea.'

@@ -18,11 +18,11 @@ The order of work is intentionally strict:
 2. preserve the inherited TUI framework, layout, and interaction model;
 3. prove the barebones baseline still works;
 4. separate presentation from orchestration without changing observable behavior;
-5. only then integrate verified RecompHamr capabilities.
+5. only then integrate verified RecompHamr capabilities one stage at a time.
 
 There is **no Bubble Tea v2 migration** in this template and no planned TUI redesign. The inherited dependency versions are frozen until an explicit future decision changes that policy.
 
-## Barebones runtime surface
+## Current runtime surface
 
 The current template retains:
 
@@ -36,6 +36,9 @@ The current template retains:
 - `read_file`;
 - `write_file`;
 - `edit_file`.
+- `repomixr` for bounded public-GitHub source packing;
+- `recomp_reference` for bounded public-reference caching;
+- application-owned optional `.rehamr/REPHAMR_STATE.md` context.
 
 The current template removes:
 
@@ -44,7 +47,7 @@ The current template removes:
 - self-update logic and re-exec support;
 - installers, promotional media, demo material, and upstream release automation;
 - the inherited `bash` tool and its WSL/POSIX-shell requirement;
-- MCP, skills, RecompHamr reverse-engineering tools, project memory, doctor flows, classifiers, and other Legacy feature families.
+- MCP, skills, command expansion, doctor flows, classifiers, and other later-stage Legacy feature families.
 
 Those RecompHamr capabilities are **not placeholders**. They are simply not part of the accepted barebones baseline yet.
 
@@ -94,14 +97,14 @@ internal/config/       configuration persistence
 internal/ctx/          context packing
 internal/llm/          OpenAI-compatible transport
 internal/provider/     generic endpoint/auth error helpers
-internal/tools/        four barebones tools
+internal/tools/        six application-owned local tools
 internal/tui/          inherited presentation and current Stage A orchestration
 docs/user/             user-facing baseline docs
 docs/dev/              governance, memory, verification, architecture, workflows, roadmap
 scripts/               reproducible baseline checks
 ```
 
-Stage A intentionally keeps some inherited orchestration inside `internal/tui`. That is documented temporary debt. The next architectural stage, after baseline acceptance, moves runtime orchestration behind application contracts while keeping the TUI visually and behaviorally unchanged.
+Stage C moved runtime orchestration behind application/frontend contracts while keeping the TUI visually and behaviorally unchanged. Stage D added the secure workspace-state foundation, Stage E verified agent/runtime parity, and active Stage F adds the two verified Legacy cache tools without introducing Stage G skills/commands or Stage H MCP.
 
 ## Start here
 

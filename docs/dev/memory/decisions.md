@@ -72,3 +72,7 @@ Stage D preserves the Legacy-compatible `.rehamr/REPHAMR_STATE.md` filename and 
 ## D-017 — Stage E parity is satisfied by the accepted backend, not a rewrite
 
 The complete Legacy agent/runtime audit maps the required turn policy, context packing, and model-stream resilience contracts to the accepted Stage C backend. Where current behavior is equivalent, it remains untouched; where it is safer or more robust, the improvement is retained and documented. Stage E does not recreate Legacy TUI orchestration or add parallel abstractions merely to produce a code delta. The Legacy skills-template classifier remains Stage G because it classifies skill documents and is not an agent-turn decision service.
+
+## D-018 — Stage F tools use configured capabilities and public-only ingestion
+
+Stage F preserves the useful `repomixr` and `recomp_reference` contracts without restoring Legacy global directories or permissive I/O. Core application composition supplies an immutable tool set with protected cache identity. Repository import is limited to strict public GitHub HTTPS URLs; reference retrieval revalidates redirects and resolved addresses and refuses non-public networks. Both paths are cancellable, bounded, link-safe, atomically persisted, and treated as untrusted external content. This is improved behavioral parity, not a source-level port.

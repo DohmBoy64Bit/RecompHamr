@@ -1,5 +1,5 @@
-// Package tools holds the four baseline local executors: powershell,
-// read_file, write_file, and edit_file.
+// Package tools holds the four baseline local executors plus the configured
+// repomixr and recomp_reference project-cache tools.
 package tools
 
 import (
@@ -117,7 +117,7 @@ func PowerShellSchema() map[string]any {
 // extension fallback: unknown names fail explicitly instead of reaching MCP,
 // skills, plugins, or deferred feature hooks.
 func Execute(parent context.Context, call chmctx.ToolCall) chmctx.Message {
-	raw := runRaw(parent, call)
+	raw := runBaselineRaw(parent, call)
 	return chmctx.Message{
 		Role:       chmctx.RoleTool,
 		Content:    chmctx.Truncate(raw),
@@ -127,8 +127,16 @@ func Execute(parent context.Context, call chmctx.ToolCall) chmctx.Message {
 }
 
 func runRaw(parent context.Context, call chmctx.ToolCall) string {
+	return runBaselineRaw(parent, call)
+}
+
+func parseErrorResult(msg string) string {
+	return fmt.Sprintf("(tool arguments were not valid JSON: %s, most likely the content was too large and the server truncated the call at its output-token limit. Do NOT retry the same oversized whole-file call. Build the file in smaller verified write_file/edit_file steps, or use PowerShell here-strings with Set-Content/Add-Content when appropriate, then verify the result.)", msg)
+}
+
+func runBaselineRaw(parent context.Context, call chmctx.ToolCall) string {
 	if msg, ok := call.Arguments["_parse_error"].(string); ok {
-		return fmt.Sprintf("(tool arguments were not valid JSON: %s, most likely the content was too large and the server truncated the call at its output-token limit. Do NOT retry the same oversized whole-file call. Build the file in smaller verified write_file/edit_file steps, or use PowerShell here-strings with Set-Content/Add-Content when appropriate, then verify the result.)", msg)
+		return parseErrorResult(msg)
 	}
 
 	switch call.Name {
@@ -159,6 +167,8 @@ func runRaw(parent context.Context, call chmctx.ToolCall) string {
 	case ReadFileName:
 		path, _ := call.Arguments["path"].(string)
 		return ReadFile(path)
+	case RepomixrName, RecompReferenceName:
+		return fmt.Sprintf("(%s: output directory not configured)", call.Name)
 	default:
 		return fmt.Sprintf("(unknown tool: %s)", call.Name)
 	}
@@ -179,6 +189,12 @@ func InlineStatus(call chmctx.ToolCall) string {
 	case ReadFileName:
 		path, _ := call.Arguments["path"].(string)
 		return "▶ read_file: " + path
+	case RepomixrName:
+		repoURL, _ := call.Arguments["repo_url"].(string)
+		return "▶ repomixr: " + firstLine(repoURL)
+	case RecompReferenceName:
+		refURL, _ := call.Arguments["url"].(string)
+		return "▶ recomp_reference: " + firstLine(refURL)
 	default:
 		for _, value := range call.Arguments {
 			if s, ok := value.(string); ok && s != "" {

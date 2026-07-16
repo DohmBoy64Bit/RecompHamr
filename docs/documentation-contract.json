@@ -42,6 +42,8 @@
     ,"docs/dev/verification/stage-e-behavioral-surface.md"
     ,"docs/dev/verification/stage-d-behavioral-surface.md"
     ,"docs/dev/workflows/default-gemma-profile-work-packet.md"
+    ,"docs/dev/workflows/stage-f-recomp-tools-work-packet.md"
+    ,"docs/dev/verification/stage-f-behavioral-surface.md"
   ],
   "required_content": {
     "README.md": [
@@ -153,7 +155,14 @@
       "Windows PowerShell",
       "read_file",
       "write_file",
-      "edit_file"
+      "edit_file",
+      "repomixr",
+      "recomp_reference",
+      "10,000",
+      "64 MiB",
+      "512 KiB",
+      "current-user-only DACL",
+      "untrusted external content"
     ],
     "docs/dev/governance/engineering-workflow-rules.md": [
       "Work packets and stage discipline",
@@ -307,6 +316,23 @@
       "Out of scope",
       "google/gemma-4-12b-qat",
       "Stop condition"
+    ],
+    "docs/dev/workflows/stage-f-recomp-tools-work-packet.md": [
+      "Outcome",
+      "In scope",
+      "Out of scope",
+      "Legacy evidence",
+      "Security impact",
+      "Stop condition",
+      "repomixr",
+      "recomp_reference"
+    ],
+    "docs/dev/verification/stage-f-behavioral-surface.md": [
+      "TOOLSET-01",
+      "REPOMIX-01",
+      "REFERENCE-01",
+      "Runtime/manual evidence",
+      "unverified"
     ],
     "docs/README.md": [
       "behavioral-surface-coverage.md",

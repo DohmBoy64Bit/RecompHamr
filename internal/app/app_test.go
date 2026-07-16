@@ -61,7 +61,10 @@ func TestBootstrapCompositionAndClose(t *testing.T) {
 		}
 		return session.NewRuntime(got)
 	}
-	newAgentRuntime = func(client agent.ChatClient) agent.Runtime {
+	newAgentRuntime = func(client agent.ChatClient, privateRoot string) agent.Runtime {
+		if privateRoot != cfg.Dir {
+			t.Fatalf("private root = %q", privateRoot)
+		}
 		return agent.NewRuntime(client, agent.LocalToolExecutor())
 	}
 	createdController := false

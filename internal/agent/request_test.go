@@ -14,7 +14,7 @@ func TestBuildMessagesAndTools(t *testing.T) {
 		t.Fatalf("messages = %#v", messages)
 	}
 	definitions := Tools()
-	want := []string{tools.PowerShellName, tools.ReadFileName, tools.WriteFileName, tools.EditFileName}
+	want := []string{tools.PowerShellName, tools.ReadFileName, tools.WriteFileName, tools.EditFileName, tools.RepomixrName, tools.RecompReferenceName}
 	if len(definitions) != len(want) {
 		t.Fatalf("tools = %d", len(definitions))
 	}

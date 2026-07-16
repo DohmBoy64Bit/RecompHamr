@@ -31,7 +31,7 @@ func TestRuntimeStartsPackedRound(t *testing.T) {
 		{Role: chmctx.RoleUser, Content: "───── truncated: " + strings.Repeat("x", 20)},
 	}
 	stream, summary := runtime.StartRound("system", "model", 200)
-	if stream == nil || runtime.Stream.Stream != stream || len(client.messages) == 0 || len(client.tools) != 4 {
+	if stream == nil || runtime.Stream.Stream != stream || len(client.messages) == 0 || len(client.tools) != 6 {
 		t.Fatal("round dependencies were not applied")
 	}
 	if summary.ContextSize != 200 || summary.Budget != chmctx.Budget(200) || summary.History != 1 || summary.Packed != len(client.messages)-1 || summary.Dropped != summary.History-summary.Packed || summary.Truncated != 1 {

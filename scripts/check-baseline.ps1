@@ -56,13 +56,15 @@ foreach ($Pattern in $ForbiddenCodePatterns) {
     }
 }
 
-$ToolSource = Get-Content -Raw (Join-Path $Root 'internal/tools/powershell.go')
-foreach ($Name in @('powershell', 'read_file', 'write_file', 'edit_file')) {
+$ToolSource = (Get-ChildItem -Path (Join-Path $Root 'internal/tools') -File -Filter '*.go' |
+    Where-Object { $_.Name -notlike '*_test.go' } |
+    ForEach-Object { Get-Content -Raw $_.FullName }) -join "`n"
+foreach ($Name in @('powershell', 'read_file', 'write_file', 'edit_file', 'repomixr', 'recomp_reference')) {
     if (-not $ToolSource.Contains($Name)) {
-        Fail "baseline tool surface is missing $Name"
+        Fail "accepted tool surface is missing $Name"
     }
 }
-foreach ($RemovedTool in @('repomixr', 'recomp_reference', 'MCPExec')) {
+foreach ($RemovedTool in @('MCPExec')) {
     if ($ToolSource.Contains($RemovedTool)) {
         Fail "removed tool/extension hook is still active: $RemovedTool"
     }

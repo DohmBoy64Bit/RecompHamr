@@ -17,20 +17,23 @@ func BuildMessages(system string, history []chmctx.Message, contextSize int) []c
 	return append(messages, packed.Messages...)
 }
 
-// Tools returns the four local tool definitions exposed on every model round
-// in their accepted order: powershell, read_file, write_file, and edit_file.
+// Tools returns the six local tool definitions exposed on every model round
+// in stable order: the four accepted baseline tools followed by repomixr and
+// recomp_reference.
 func Tools() []llm.Tool {
 	return []llm.Tool{
 		schemaToTool(tools.PowerShellSchema()),
 		schemaToTool(tools.ReadFileSchema()),
 		schemaToTool(tools.WriteFileSchema()),
 		schemaToTool(tools.EditFileSchema()),
+		schemaToTool(tools.RepomixrSchema()),
+		schemaToTool(tools.RecompReferenceSchema()),
 	}
 }
 
-// ToolNames returns the four exposed local tool names in request order.
+// ToolNames returns the six exposed local tool names in request order.
 func ToolNames() []string {
-	return []string{tools.PowerShellName, tools.ReadFileName, tools.WriteFileName, tools.EditFileName}
+	return []string{tools.PowerShellName, tools.ReadFileName, tools.WriteFileName, tools.EditFileName, tools.RepomixrName, tools.RecompReferenceName}
 }
 
 func schemaToTool(schema map[string]any) llm.Tool {

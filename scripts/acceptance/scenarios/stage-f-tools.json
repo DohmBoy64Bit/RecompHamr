@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "name": "real-model-stage-f-cache-tools",
+  "app_path": "../../../../dist/recomphamr.exe",
+  "workspace": "../../../../.acceptance-fixture",
+  "artifact_directory": "../../../../artifacts/tui-acceptance/stage-f-tools",
+  "debug_log": ".rehamr/log.txt",
+  "terminal": {
+    "columns": 100,
+    "rows": 30
+  },
+  "steps": [
+    { "type": "launch", "label": "launch application", "timeout_seconds": 20 },
+    { "type": "wait_event", "label": "wait for six-tool session", "category": "session", "minimum": 2, "timeout_seconds": 20 },
+    { "type": "type_text", "label": "request Stage F cache tools", "text": "Use exactly these two tools in order and no others: first repomixr with repo_url https://github.com/octocat/Hello-World and branch master; then recomp_reference with url https://example.com/. After both succeed, reply exactly STAGE_F_OK." },
+    { "type": "key", "label": "submit Stage F cache tools", "key": "enter" },
+    { "type": "wait_event", "label": "wait for two tool starts", "category": "tool_start", "minimum": 2, "timeout_seconds": 300 },
+    { "type": "wait_event", "label": "wait for two paired results", "category": "tool_result", "minimum": 2, "timeout_seconds": 300 },
+    { "type": "wait_event", "label": "wait for Stage F turn end", "category": "turn_end", "minimum": 1, "timeout_seconds": 300 },
+    { "type": "assert_event_count", "label": "require exactly two starts", "category": "tool_start", "count": 2 },
+    { "type": "assert_event_count", "label": "require exactly two results", "category": "tool_result", "count": 2 },
+    { "type": "assert_file", "label": "verify packed repository cache", "path": ".rehamr/repos/octocat-Hello-World/packed.xml", "timeout_seconds": 10 },
+    { "type": "assert_file", "label": "verify reference cache", "path": ".rehamr/reference/example.com-0f115db062b7.txt", "timeout_seconds": 10 },
+    { "type": "screenshot", "label": "capture completed Stage F tools", "file": "stage-f-tools-complete.png" },
+    { "type": "key", "label": "exit application", "key": "ctrl_d" },
+    { "type": "sleep", "label": "allow terminal restoration", "milliseconds": 500 },
+    { "type": "type_text", "label": "write shell restoration sentinel", "text": "Set-Content -LiteralPath '.harness-shell-restored' -Value 'restored' -NoNewline" },
+    { "type": "key", "label": "execute restoration probe", "key": "enter" },
+    { "type": "assert_file", "label": "verify restored shell command", "path": ".harness-shell-restored", "text": "restored", "timeout_seconds": 10 },
+    { "type": "remove_file", "label": "remove restoration sentinel", "path": ".harness-shell-restored" },
+    { "type": "close_window", "label": "close restored shell", "timeout_seconds": 10 }
+  ]
+}
