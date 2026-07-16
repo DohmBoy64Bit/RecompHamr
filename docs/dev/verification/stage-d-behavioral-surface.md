@@ -9,3 +9,16 @@ This active inventory supplements the accepted Stage A and Stage C inventories. 
 | APP-03 | Application composition constructs the workspace owner and model-facing prompt source while the TUI continues to receive only existing display-safe frontend contracts. New Stage D ownership surface preserving all Stage C rows. | `internal/app`, `internal/workspace`, `internal/app/controller` | success, failure, malformed input, boundary, cleanup, platform, Unicode, persistence, compatibility, concurrency, security; cancellation and timeout apply only to the existing turn work and must remain unchanged; migration is not applicable | App/controller/frontend/TUI tests at 100%, architecture/deletion checks, current architecture, D-016, and Stage D packet | Exact-build frozen TUI, real response, cancellation, clean exit, and restored shell required | unverified |
 
 Deferred Legacy evidence is not an active implementation claim: `/init-re` and `/status-re` await Stage G command authorization and a Stage F-safe template subset; `/doctor` must be decomposed among Stage D configuration/environment foundations and later Stage F/G/H owners; project memory is limited in this slice to secure optional loading and does not authorize agent self-maintenance policy.
+
+## Remaining Stage D audit dispositions
+
+| Legacy evidence | Disposition | Evidence and next owner |
+|---|---|---|
+| Editable named profiles, strict `active`/`models`/`logging` schema, sorted names, atomic activation, arbitrary OpenAI-compatible endpoints | improved | Current `internal/config` and `internal/session` already preserve these behaviors with atomic saves, resolved environment keys, URL override isolation, POSIX/Windows private-path enforcement, rollback, probe capture, and complete accepted tests/docs. |
+| Four Legacy AMD/Qwen/Ollama/Vulkan seeded profiles at 32K | intentionally changed | The user-selected and runtime-accepted fresh default is one LM Studio `google/gemma-4-12b-qat` profile at 16,177 tokens. Existing user configurations remain untouched; obsolete Legacy defaults will not be reintroduced. |
+| `/doctor` system/profile/endpoint summary | deferred | The configuration/profile/reachability facts already have backend owners. A new presentation command remains Stage G; any future diagnostic view must consume typed display-safe facts rather than import backend/process capabilities into TUI. |
+| `/doctor` GPU/toolchain/PCRECOMP checks | deferred | These are environment/tool-family diagnostics, not required workspace/configuration persistence foundations. Reassess with their Stage F tools and Stage G command exposure. |
+| `/doctor` MCP/skill/server/cache checks | deferred | MCP belongs to Stage H and Agent Skills to Stage G. They are explicitly excluded from Stage D production code. |
+| `/init-re`, `/status-re`, and mixed RE workspace templates | decomposed | Optional state reading is Stage D. RE evidence/recomp/decomp template ownership belongs with Stage F capabilities; command exposure belongs to Stage G; `skills/` and `mcp.json` remain Stage G/H. |
+
+This audit leaves no additional configuration schema or workspace-state foundation required for Stage D closure. It does not claim the deferred user commands or later feature families are implemented.

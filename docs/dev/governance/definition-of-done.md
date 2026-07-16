@@ -1,6 +1,6 @@
 # Definition of Done
 
-A Stage A change is complete only when:
+A change or stage slice is complete only when:
 
 - the intended behavior is implemented without placeholders or fake success paths;
 - affected tests are updated or added;

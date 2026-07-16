@@ -111,3 +111,13 @@ Stage D as a whole remains open until later work packets disposition the remaini
 - Security: later-stage initializer, doctor, RE templates, skills, MCP, and tool artifacts remain absent.
 - Evidence: architecture script and documentation contract.
 - Known limits: runtime, CI, and final first-slice acceptance remain open.
+
+### Checkpoint D2 — remaining foundation audit
+
+- Changed: no production behavior changed. Compared every Legacy configuration export/default and the complete doctor/project-memory evidence against current owners and the integration order.
+- Documented: the Stage D inventory records improved current configuration parity, the intentional user-approved Gemma default, and exact later owners for command, environment/tool, skills, and MCP diagnostics.
+- Verified: current configuration/session tests and accepted Stage A/C evidence already cover named profiles, strict parsing, persistence, overrides, resolved keys, rollback, reachability, and cross-platform private-path security.
+- Coverage: no uncovered Stage D configuration schema or workspace-state foundation remains; deferred rows are assigned to later stages and are not represented as implemented.
+- Security: obsolete broad-permission Legacy templates, environment-value dumping, process execution, MCP configuration, and skill enumeration remain outside Stage D.
+- Evidence: Legacy `internal/config`, `internal/project`, `internal/doctor`, `docs/profiles.md`, `docs/memory.md`, and `docs/doctor.md`; current config/session/app/workspace source, tests, and user docs.
+- Known limits: Stage F/G/H capabilities remain intentionally deferred. Stage D closure still requires the exact-build Gemma workspace-state scenario and final CI/docs acceptance record.

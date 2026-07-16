@@ -1,27 +1,26 @@
 # Scope Control
 
-The baseline gate is the active project boundary.
+The accepted Stage A/Stage C gates and the active Stage D work packet define the current project boundary.
 
 ## Allowed now
 
-- fix defects introduced by stripping;
-- restore behavior that direct upstream evidence proves was accidentally broken;
+- implement the workspace and configuration foundations explicitly listed in the active Stage D packet;
+- preserve or improve verified Legacy behavior within its current architecture owner;
 - improve tests, verification, rules, or documentation without changing the frozen TUI contract;
-- make the four retained tools correct and secure;
+- fix evidence-backed defects in accepted behavior;
 - prepare durable future-stage policy that does not add runtime placeholders or prematurely implement blocked subsystems.
 
-## Blocked until baseline acceptance
+## Still blocked by integration order
 
-- RecompHamr-Legacy feature integration;
 - MCP;
 - skills runtime support;
 - reverse-engineering helper tools;
-- project memory and diagnostics systems;
+- diagnostics or project-workspace commands not authorized by the Stage D packet;
 - command-surface expansion;
 - TUI redesign;
 - Bubble Tea framework migration.
 
-Blocked work belongs in the roadmap, policy, or holding pen, not in placeholder production code.
+Blocked work belongs in the roadmap, policy, or holding pen, not in placeholder production code. Stage D optional workspace-state loading is the only active project-memory surface.
 
 ## Future parity scope
 
