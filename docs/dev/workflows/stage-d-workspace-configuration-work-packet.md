@@ -121,3 +121,13 @@ Stage D as a whole remains open until later work packets disposition the remaini
 - Security: obsolete broad-permission Legacy templates, environment-value dumping, process execution, MCP configuration, and skill enumeration remain outside Stage D.
 - Evidence: Legacy `internal/config`, `internal/project`, `internal/doctor`, `docs/profiles.md`, `docs/memory.md`, and `docs/doctor.md`; current config/session/app/workspace source, tests, and user docs.
 - Known limits: Stage F/G/H capabilities remain intentionally deferred. Stage D closure still requires the exact-build Gemma workspace-state scenario and final CI/docs acceptance record.
+
+### Checkpoint D1E — acceptance evidence integrity
+
+- Changed: the Windows Terminal harness now removes the disposable workspace's previous append-only debug log before launch, so event readiness/count/sequence assertions cannot pass on stale sessions.
+- Documented: the harness contract records the fresh-run event boundary.
+- Verified: canonical scenario validation and an exact-build smoke rerun are required after this change; screenshots must be reviewed rather than accepted from process exit alone.
+- Coverage: production statement coverage is unchanged; this PowerShell boundary is verified through parser/schema checks and real Windows execution.
+- Security: removal is restricted to the scenario's already-contained debug-log path inside its disposable workspace; reports still retain categories only.
+- Evidence: review of the first `6a0c422` wide screenshot exposed a blank pre-render capture even though stale `session` events had satisfied the wait.
+- Known limits: real Gemma state-refresh and cancellation evidence still requires the LM Studio endpoint.

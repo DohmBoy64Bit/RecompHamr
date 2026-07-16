@@ -96,6 +96,14 @@ if (-not (Test-Path -LiteralPath $resolvedApp -PathType Leaf)) { throw "applicat
 if (-not (Test-Path -LiteralPath $resolvedWorkspace -PathType Container)) { throw "workspace not found: $resolvedWorkspace" }
 [void](New-Item -ItemType Directory -Force -Path $resolvedArtifacts)
 
+# Event counts and sequences are assertions about this process, not an earlier
+# acceptance run. RecompHamr appends to its protected debug log, so remove the
+# disposable fixture's prior log before launching the new terminal session.
+if (Test-Path -LiteralPath $debugLog) {
+    if (-not (Test-Path -LiteralPath $debugLog -PathType Leaf)) { throw 'debug log path is not a file' }
+    Remove-Item -LiteralPath $debugLog -Force
+}
+
 Add-Type -AssemblyName System.Drawing
 Add-Type -TypeDefinition @'
 using System;

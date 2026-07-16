@@ -12,6 +12,8 @@ The harness combines three independent channels:
 
 Reports contain scenario/step labels, durations, terminal size, the last event categories, and failure text. They never copy event bodies, prompts, model responses, configuration values, or debug logs.
 
+Each execution removes the prior debug log inside its disposable workspace before launch. Event waits, counts, and sequences therefore describe only the newly launched process; a stale append-only log cannot satisfy readiness or behavioral assertions.
+
 ## Running a scenario
 
 Build first, prepare a disposable workspace with logging enabled, and keep credentials out of the repository. Then run:
