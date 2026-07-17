@@ -50,7 +50,7 @@ Accepted at implementation commit `d7286bee7a00b0debacc4708e9b5807550e3b7ba`. Di
 
 Add command registries and standards-based skills support after their backend owners exist.
 
-Stage G is next but is not active until its evidence-backed packet is established and the current mandatory Agent Skills authorities have been read.
+Stage G is active. Its evidence-backed packet is established and the mandatory current Agent Skills authorities were read before implementation and individual migration work. The application-owned registry/client, 21 bundled migrations, direct case review, exact-build Devstral acceptance, and 3183/3183 canonical gate are complete; dual-platform CI and accepted-commit closure remain open.
 
 Skills requirements:
 

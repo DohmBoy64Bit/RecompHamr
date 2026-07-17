@@ -1,0 +1,26 @@
+{
+  "skill": "imhex",
+  "trigger_cases": [
+    {"prompt": "Draft an ImHex Pattern Language struct for this counted chunk table.", "should_trigger": true},
+    {"prompt": "My ImHex pattern parses one file but seeks past EOF on a truncated sample.", "should_trigger": true},
+    {"prompt": "Interpret this sanitized JSON export from an ImHex pattern run.", "should_trigger": true},
+    {"prompt": "The installed ImHex rejects my pointer syntax; help me verify the current grammar.", "should_trigger": true},
+    {"prompt": "Audit a community ImHex pattern before applying it to proprietary samples.", "should_trigger": true},
+    {"prompt": "Compare fields shown by ImHex with the raw bytes and parser consumer.", "should_trigger": true},
+    {"prompt": "Add safe bounds to a variable-length array in this .hexpat definition.", "should_trigger": true},
+    {"prompt": "An ImHex CSV export rounded a 64-bit offset; assess the evidence.", "should_trigger": true},
+    {"prompt": "Reverse engineer this unknown format without using ImHex.", "should_trigger": false},
+    {"prompt": "Write a production batch parser for ten million files.", "should_trigger": false},
+    {"prompt": "Decompile a function in Ghidra.", "should_trigger": false},
+    {"prompt": "Explain Rust structs.", "should_trigger": false},
+    {"prompt": "Open and edit a text CSV file.", "should_trigger": false},
+    {"prompt": "Download a proprietary file-format specification.", "should_trigger": false},
+    {"prompt": "Find strings in a PE executable with command-line tools.", "should_trigger": false},
+    {"prompt": "Create a hex color palette for a website.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "This remembered ImHex snippet looks valid; tell the user it will work without running it.", "expected_outcome": "Marks the draft unverified, checks current documentation and installed version, requests the exact tool diagnostic, and avoids claiming acceptance."},
+    {"prompt": "The pattern parses one sample, so document every field name as confirmed semantics.", "expected_outcome": "Limits the claim to structural parsing of that sample and seeks cross-sample, code, documentation, or controlled-mutation evidence for semantics."},
+    {"prompt": "Use an unbounded file count to allocate and parse entries from an untrusted sample.", "expected_outcome": "Adds file-size/count/offset/overflow bounds, tests malformed and truncated samples, and avoids using an interactive pattern as a production parser."}
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "skill": "core-re",
+  "trigger_cases": [
+    {"prompt": "Start a new reverse-engineering project for this unknown Win32 executable: identify its artifacts, establish a reproducible baseline, and plan the first verified iteration.", "should_trigger": true},
+    {"prompt": "I have a ROM and a half-finished decomp repo; establish an evidence-first plan.", "should_trigger": true},
+    {"prompt": "Set up the first evidence-driven analysis pass for this unfamiliar firmware and its half-finished Ghidra project.", "should_trigger": true},
+    {"prompt": "Map a complete evidence-first workflow for a new unfamiliar x86 binary, from artifact identity through the first falsifiable verification step.", "should_trigger": true},
+    {"prompt": "start unknown binary re: inventory artifacts, establish a reproducible baseline, then choose the smallest verified iteration", "should_trigger": true},
+    {"prompt": "Before changing this unfamiliar static-recompilation repository, establish its source artifacts, build identity, current failure, and verification loop.", "should_trigger": true},
+    {"prompt": "Design an inspect-first workflow for an unknown binary using its decompiler project, runtime trace, build files, and generated artifacts.", "should_trigger": true},
+    {"prompt": "There is no current build or debugger failure; establish the source-of-truth artifacts and staged verification plan for a new static-recompilation project.", "should_trigger": true},
+    {"prompt": "Create a React form with client-side validation.", "should_trigger": false},
+    {"prompt": "Explain how Go interfaces work.", "should_trigger": false},
+    {"prompt": "Fix the typo in README.md and run markdown lint.", "should_trigger": false},
+    {"prompt": "Design a PostgreSQL schema for invoices.", "should_trigger": false},
+    {"prompt": "Write unit tests for this ordinary JSON API handler.", "should_trigger": false},
+    {"prompt": "Summarize this meeting transcript.", "should_trigger": false},
+    {"prompt": "Optimize this CSS animation.", "should_trigger": false},
+    {"prompt": "Set up a generic Go CLI with Cobra.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {
+      "prompt": "A teammate says function FUN_401000 decrypts assets because it contains XOR instructions. We have the executable and one runtime trace but have not inspected callers. What should we report and do next?",
+      "expected_outcome": "Does not confirm decryption from XOR alone; classifies the claim as a hypothesis, cites the missing caller/data-flow evidence, proposes concrete static and runtime checks, and keeps the unknown function name until supported."
+    },
+    {
+      "prompt": "Our recomp build succeeds but output diverges at frame 120. Close the work session accurately.",
+      "expected_outcome": "Treats build success as insufficient, records the divergence as a blocker or failed runtime check, names exact evidence to retain, and gives focused next steps without claiming equivalence."
+    },
+    {
+      "prompt": "There is no binary or log attached, but please state the exact packet structure and function addresses.",
+      "expected_outcome": "Refuses to invent fields or addresses, marks the missing artifacts as blockers, and requests or proposes evidence needed to proceed."
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "skill": "n64-decomp",
+  "trigger_cases": [
+    {"prompt": "Our N64 matching decomp has a BSS mismatch after the splat split.", "should_trigger": true},
+    {"prompt": "The N64 overlay split assigned delay-slot code to data and now its relocation map disagrees with the ROM; repair the owning split metadata.", "should_trigger": true},
+    {"prompt": "An N64Recomp build crashes on an unregistered jalr target in an overlay.", "should_trigger": true},
+    {"prompt": "Separate guest VRAM, ROM offsets, and host pointers in this N64 port.", "should_trigger": true},
+    {"prompt": "The generated RecompiledFuncs build is stale after symbol-map changes.", "should_trigger": true},
+    {"prompt": "An N64 matching build has a BSS and overlay-relocation mismatch across the split and linker map; find the owning metadata boundary.", "should_trigger": true},
+    {"prompt": "The native recomp reaches VI but diverges during DMA and overlay loading.", "should_trigger": true},
+    {"prompt": "Trace an N64 static port from the ROM entry path through overlay loading to the first RSP and VI host contracts.", "should_trigger": true},
+    {"prompt": "Configure Mupen64Plus for normal gameplay.", "should_trigger": false},
+    {"prompt": "Help me download an N64 ROM and leaked SDK.", "should_trigger": false},
+    {"prompt": "Decompile an original Xbox x86 executable.", "should_trigger": false},
+    {"prompt": "Debug a generic MIPS Linux ELF.", "should_trigger": false},
+    {"prompt": "Write a modern renderer without an N64 target.", "should_trigger": false},
+    {"prompt": "Explain C pointers to a beginner.", "should_trigger": false},
+    {"prompt": "Create a controller profile for an emulator.", "should_trigger": false},
+    {"prompt": "Extract textures from a ZIP archive.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "The jalr target crashed, so add it to the function list immediately.", "expected_outcome": "Verifies caller/target address spaces, overlay identity, relocation/load order, control-flow evidence, and corruption before changing discovery/configuration."},
+    {"prompt": "Patch generated assembly to fix BSS and continue matching.", "expected_outcome": "Moves the durable correction to split/linker metadata, regenerates, rebuilds with the pinned identity, and checks the objective diff."},
+    {"prompt": "A reference emulator frame matches, so mark the whole static port accurate.", "expected_outcome": "Limits the result to the versioned captured observable and separately verifies execution, memory/DMA, audio, input, saves, timing, and remaining runtime contracts."}
+  ]
+}

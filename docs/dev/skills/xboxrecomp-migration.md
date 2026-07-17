@@ -1,0 +1,9 @@
+# `xboxrecomp` Skill Migration Record
+
+Legacy `RecompHamr-Legacy-main/internal/skills/xboxrecomp.md` was read completely; its pipeline commands, generated/runtime layout, maps/traces, address classifications, known gaps, and library inventory were project-dependent and no separate Legacy resource file was supplied. The mandatory current Agent Skills authority set and official Codex guidance had been read before this individual edit.
+
+Trigger for original-Xbox XBE static recompilation: XBE loader/import identity, x86 discovery/lifting, generated configuration, ICALL/vtable/object provenance, kernel/runtime services, D3D8/NV2A/APU/audio/input bring-up, and native validation. Exclude Xbox 360, generic Win32, ordinary emulator work, and unauthorized content acquisition.
+
+**Improved.** The migration preserves layered XBE/x86/generated/runtime diagnosis, guest/host separation, ICALL map/trace evidence, vtable/middleware handling, kernel/graphics/audio/input ownership, legal artifacts, and iterative validation. It removes automatic cloning/installing/extraction, fixed commands/flags/layout, kernel counts and magic address ranges, backend/library inventories, known build-gap prescriptions, build-as-strongest-evidence, and MCP calls. It adds certificate/TLS/protection/import provenance, x87/SSE/exceptions/self-modification, corruption and object-lifetime alternatives, service failure/callback/cleanup contracts, and bounded scenario evidence. No script is bundled because toolchain/runtime contracts vary.
+
+Final skill: `internal/skills/builtin/xboxrecomp/SKILL.md`. Its eval set has eight positive, eight negative, and three ICALL/generated/evidence cases. Automated parser/client checks apply. Direct agent review on 2026-07-17 passed 8/8 positive, 8/8 negative, and 3/3 output contracts. No original-Xbox target/tool runtime is claimed because none was available.

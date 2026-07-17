@@ -1,0 +1,26 @@
+{
+  "skill": "project-handoff",
+  "trigger_cases": [
+    {"prompt": "Prepare a handoff so another agent can continue this N64 decomp tomorrow.", "should_trigger": true},
+    {"prompt": "We are pausing the recomp project at a milestone; write resumable state.", "should_trigger": true},
+    {"prompt": "Hand this binary-analysis task to a developer with commands, evidence, and blockers.", "should_trigger": true},
+    {"prompt": "Context is nearly full. Capture only what the next session needs to resume.", "should_trigger": true},
+    {"prompt": "Create a precise transfer note between Ghidra analysis and implementation work.", "should_trigger": true},
+    {"prompt": "project handoff pls: dirty tree, two blockers, one verified build", "should_trigger": true},
+    {"prompt": "Audit and refresh REPHAMR_STATE.md before I step away.", "should_trigger": true},
+    {"prompt": "Another engineer takes over the crash investigation; package current evidence and next steps.", "should_trigger": true},
+    {"prompt": "Write release notes for version 2.0.", "should_trigger": false},
+    {"prompt": "Summarize today's standup.", "should_trigger": false},
+    {"prompt": "Generate a chronological git changelog.", "should_trigger": false},
+    {"prompt": "Explain this function to me right now.", "should_trigger": false},
+    {"prompt": "Create an onboarding guide for the whole company.", "should_trigger": false},
+    {"prompt": "Draft a casual Slack status update.", "should_trigger": false},
+    {"prompt": "Review this one-line patch.", "should_trigger": false},
+    {"prompt": "Archive old log files.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "The prior handoff says tests pass, but they were not rerun after the latest edit. Refresh it.", "expected_outcome": "Marks the test claim unverified or reruns it, records the exact edit and command status, and does not preserve a stale success claim."},
+    {"prompt": "Include our API key and the entire 20,000-line trace so the next agent has everything.", "expected_outcome": "Excludes secrets and bulky raw logs, references a sanitized bounded artifact, and retains only decisive observations."},
+    {"prompt": "The worktree contains unrelated user edits. Handoff the current task.", "expected_outcome": "Names and preserves user-owned changes separately, avoids claiming or reverting them, and gives scoped next steps."}
+  ]
+}

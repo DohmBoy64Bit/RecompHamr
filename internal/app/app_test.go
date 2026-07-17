@@ -11,6 +11,7 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/config"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/skills"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/workspace"
 )
 
@@ -21,12 +22,12 @@ func (fakeController) Dispatch(frontend.Intent) frontend.Transition { return fro
 func (fakeController) Snapshot() frontend.Snapshot                  { return frontend.Snapshot{} }
 
 func restoreAppHooks(t *testing.T) {
-	origCwd, origBootstrap, origAbs, origEnv := getWorkingDirectory, bootstrapConfig, absolutePath, getEnvironment
-	origSession, origAgent, origController, origWorkspace := newSessionRuntime, newAgentRuntime, newController, newWorkspace
+	origCwd, origBootstrap, origAbs, origEnv, origHome := getWorkingDirectory, bootstrapConfig, absolutePath, getEnvironment, getUserHome
+	origSession, origAgent, origController, origWorkspace, origBundled := newSessionRuntime, newAgentRuntime, newController, newWorkspace, installBundled
 	origOpen, origClose := openDebugLog, closeDebugLog
 	t.Cleanup(func() {
-		getWorkingDirectory, bootstrapConfig, absolutePath, getEnvironment = origCwd, origBootstrap, origAbs, origEnv
-		newSessionRuntime, newAgentRuntime, newController, newWorkspace = origSession, origAgent, origController, origWorkspace
+		getWorkingDirectory, bootstrapConfig, absolutePath, getEnvironment, getUserHome = origCwd, origBootstrap, origAbs, origEnv, origHome
+		newSessionRuntime, newAgentRuntime, newController, newWorkspace, installBundled = origSession, origAgent, origController, origWorkspace, origBundled
 		openDebugLog, closeDebugLog = origOpen, origClose
 	})
 }
@@ -61,14 +62,20 @@ func TestBootstrapCompositionAndClose(t *testing.T) {
 		}
 		return session.NewRuntime(got)
 	}
-	newAgentRuntime = func(client agent.ChatClient, privateRoot string) agent.Runtime {
+	newAgentRuntime = func(client agent.ChatClient, privateRoot string, skillRuntime *skills.Runtime) agent.Runtime {
 		if privateRoot != cfg.Dir {
 			t.Fatalf("private root = %q", privateRoot)
+		}
+		if skillRuntime == nil {
+			t.Fatal("skills runtime is nil")
 		}
 		return agent.NewRuntime(client, agent.LocalToolExecutor())
 	}
 	createdController := false
-	newController = func(sessionRuntime *session.Runtime, runtime agent.Runtime, system func() string, version string) frontend.Controller {
+	newController = func(sessionRuntime *session.Runtime, runtime agent.Runtime, _ *skills.Runtime, _ func() skills.Catalog, initEvidence func() error, evidenceStatus func() (string, error), system func() string, version string) frontend.Controller {
+		if initEvidence == nil || evidenceStatus == nil {
+			t.Fatal("workspace command services are nil")
+		}
 		first := system()
 		if err := os.WriteFile(statePath, []byte("second state"), 0o600); err != nil {
 			t.Fatal(err)
@@ -136,6 +143,18 @@ func TestBootstrapFailuresAndNoLogging(t *testing.T) {
 			t.Fatalf("runtime=%#v err=%v", runtime, err)
 		}
 	})
+	t.Run("bundled skills", func(t *testing.T) {
+		restoreAppHooks(t)
+		root := t.TempDir()
+		getWorkingDirectory = func() (string, error) { return root, nil }
+		cfg := config.Default()
+		cfg.Dir = filepath.Join(root, config.DirName)
+		bootstrapConfig = func(string) (*config.Config, bool, error) { return cfg, false, nil }
+		installBundled = func(string) (string, error) { return "", boom }
+		if runtime, err := Bootstrap("test"); runtime != nil || !errors.Is(err, boom) {
+			t.Fatalf("runtime=%#v err=%v", runtime, err)
+		}
+	})
 	t.Run("invalid optional state falls back", func(t *testing.T) {
 		restoreAppHooks(t)
 		root := t.TempDir()
@@ -146,7 +165,7 @@ func TestBootstrapFailuresAndNoLogging(t *testing.T) {
 			t.Fatal(err)
 		}
 		bootstrapConfig = func(string) (*config.Config, bool, error) { return cfg, false, nil }
-		newController = func(_ *session.Runtime, _ agent.Runtime, system func() string, _ string) frontend.Controller {
+		newController = func(_ *session.Runtime, _ agent.Runtime, _ *skills.Runtime, _ func() skills.Catalog, _ func() error, _ func() (string, error), system func() string, _ string) frontend.Controller {
 			prompt := system()
 			if !strings.Contains(prompt, "Working directory: "+root) || strings.Contains(prompt, "Persistent Memory") {
 				t.Fatalf("fallback prompt = %q", prompt)
@@ -159,4 +178,31 @@ func TestBootstrapFailuresAndNoLogging(t *testing.T) {
 		}
 		runtime.Close()
 	})
+}
+
+func TestDefaultAgentCompositionAndSkillActivation(t *testing.T) {
+	root := t.TempDir()
+	skillDir := filepath.Join(root, "example")
+	if err := os.MkdirAll(skillDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: example\ndescription: Use for an example workflow.\n---\nFollow the example.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	skillRuntime := skills.NewRuntime(skills.Discover([]skills.Root{{Path: root, Scope: skills.ScopeUser, Trusted: true}}))
+	activate := skillActivator(skillRuntime)
+	if got, err := activate("example"); err != nil || got != "activated skill: example" {
+		t.Fatalf("first activation = %q, %v", got, err)
+	}
+	if got, err := activate("example"); err != nil || got != "skill already active: example" {
+		t.Fatalf("duplicate activation = %q, %v", got, err)
+	}
+	if got, err := activate("missing"); err == nil || got != "" {
+		t.Fatalf("missing activation = %q, %v", got, err)
+	}
+
+	runtime := newAgentRuntime(nil, t.TempDir(), skillRuntime)
+	if runtime.Client != nil {
+		t.Fatalf("client = %#v", runtime.Client)
+	}
 }

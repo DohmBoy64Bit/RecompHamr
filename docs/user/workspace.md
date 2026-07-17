@@ -18,4 +18,6 @@ The state is refreshed before every model round. It therefore survives conversat
 - The file is tightened with the same POSIX owner-only mode or Windows current-user-only protected DACL used for other private state.
 - The 64 KiB limit is checked before and during reading, preventing misleading metadata or concurrent growth from creating unbounded prompt input.
 
-Stage D does not automatically create this file and does not add `/init-re`, `/status-re`, or `/doctor`. New slash commands remain Stage G work; reverse-engineering templates, tools, skills, and MCP configuration remain in their separately authorized stages. You may create or edit `REPHAMR_STATE.md` manually if you want persistent project context now.
+Stage G adds `/init-re`, which creates the evidence directories and canonical project, evidence, hypothesis, blocker, changelog, command, toolchain, function, format, recompilation, decompilation, and state files without overwriting existing content. Created and retained paths are tightened to the same POSIX owner-only modes or Windows current-user-only DACL as other private state; unsafe links and non-regular paths are refused. It deliberately does not create Legacy `mcp.json` or flat `.rehamr/skills` artifacts.
+
+`/status-re` reads a fixed set of canonical evidence files, limits each displayed section to 1,800 UTF-8-safe bytes, and reports missing or unavailable files without exposing their contents through errors. `/doctor` remains unsupported in Stage G because its Legacy behavior mixed blocking environment probes and Stage H MCP details.

@@ -27,6 +27,7 @@
     "docs/user/configuration.md",
     "docs/user/workspace.md",
     "docs/user/tools.md",
+    "docs/user/commands-and-skills.md",
     "docs/AGENTS.md",
     "internal/tui/AGENTS.md",
     "docs/dev/governance/engineering-workflow-rules.md",
@@ -42,8 +43,39 @@
     ,"docs/dev/verification/stage-e-behavioral-surface.md"
     ,"docs/dev/verification/stage-d-behavioral-surface.md"
     ,"docs/dev/workflows/default-gemma-profile-work-packet.md"
+    ,"docs/dev/workflows/default-devstral-profile-work-packet.md"
     ,"docs/dev/workflows/stage-f-recomp-tools-work-packet.md"
     ,"docs/dev/verification/stage-f-behavioral-surface.md"
+    ,"docs/dev/workflows/stage-g-commands-skills-work-packet.md"
+    ,"docs/dev/verification/stage-g-behavioral-surface.md"
+    ,"docs/dev/skills/core-re-migration.md"
+    ,"docs/dev/skills/evidence-mode-migration.md"
+    ,"docs/dev/skills/build-fix-loop-migration.md"
+    ,"docs/dev/skills/function-discovery-migration.md"
+    ,"docs/dev/skills/file-format-reversing-migration.md"
+    ,"docs/dev/skills/project-handoff-migration.md"
+    ,"docs/dev/skills/recomp-foundations-disposition.md"
+    ,"docs/dev/skills/cdb-debug-migration.md"
+    ,"docs/dev/skills/gb-recomp-migration.md"
+    ,"docs/dev/skills/gc-decomp-migration.md"
+    ,"docs/dev/skills/gen-decomp-migration.md"
+    ,"docs/dev/skills/bizhawk-stage-h-disposition.md"
+    ,"docs/dev/skills/ghidra-mcp-stage-h-disposition.md"
+    ,"docs/dev/skills/mcp-pine-stage-h-disposition.md"
+    ,"docs/dev/skills/imhex-migration.md"
+    ,"docs/dev/skills/n64-debug-mcp-stage-h-disposition.md"
+    ,"docs/dev/skills/n64-decomp-migration.md"
+    ,"docs/dev/skills/objdiff-migration.md"
+    ,"docs/dev/skills/pcrecomp-migration.md"
+    ,"docs/dev/skills/pcsx2-stage-h-disposition.md"
+    ,"docs/dev/skills/ps2recomp-migration.md"
+    ,"docs/dev/skills/ps3recomp-migration.md"
+    ,"docs/dev/skills/sega2asm-merge-disposition.md"
+    ,"docs/dev/skills/snesrecomp-migration.md"
+    ,"docs/dev/skills/vb-decomp-migration.md"
+    ,"docs/dev/skills/windows-game-decomp-migration.md"
+    ,"docs/dev/skills/xbox360-decomp-migration.md"
+    ,"docs/dev/skills/xboxrecomp-migration.md"
   ],
   "required_content": {
     "README.md": [
@@ -163,6 +195,23 @@
       "512 KiB",
       "current-user-only DACL",
       "untrusted external content"
+    ],
+    "docs/user/commands-and-skills.md": [
+      "/skills",
+      "/skill <name>",
+      "/init-re",
+      "/status-re",
+      ".agents/skills",
+      "trust_project",
+      "disabled",
+      "activate_skill",
+      "read_skill_resource",
+      "Progressive disclosure",
+      "8 KiB",
+      "2 MiB",
+      "/skill-audit",
+      "/skill-new",
+      "Stage H"
     ],
     "docs/dev/governance/engineering-workflow-rules.md": [
       "Work packets and stage discipline",
@@ -317,6 +366,13 @@
       "google/gemma-4-12b-qat",
       "Stop condition"
     ],
+    "docs/dev/workflows/default-devstral-profile-work-packet.md": [
+      "Outcome",
+      "mistralai/devstral-small-2-2512",
+      "google/gemma-4-12b-qat",
+      "Existing user configuration remains untouched",
+      "Verification and stop condition"
+    ],
     "docs/dev/workflows/stage-f-recomp-tools-work-packet.md": [
       "Outcome",
       "In scope",
@@ -331,6 +387,24 @@
       "TOOLSET-01",
       "REPOMIX-01",
       "REFERENCE-01",
+      "Runtime/manual evidence",
+      "unverified"
+    ],
+    "docs/dev/workflows/stage-g-commands-skills-work-packet.md": [
+      "Outcome",
+      "In scope",
+      "Out of scope",
+      "Agent Skills",
+      "Security impact",
+      "Stop condition",
+      "Per-skill"
+    ],
+    "docs/dev/verification/stage-g-behavioral-surface.md": [
+      "COMMAND-01",
+      "SKILLS-CLIENT-01",
+      "SKILLS-ACTIVATE-01",
+      "SKILL-MIGRATION-01",
+      "COMMAND-PARITY-01",
       "Runtime/manual evidence",
       "unverified"
     ],

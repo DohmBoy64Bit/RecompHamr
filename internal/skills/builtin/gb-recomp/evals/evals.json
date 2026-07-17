@@ -1,0 +1,26 @@
+{
+  "skill": "gb-recomp",
+  "trigger_cases": [
+    {"prompt": "Our Game Boy recomp keeps falling back to the interpreter at banked addresses; classify the gap.", "should_trigger": true},
+    {"prompt": "Use a PyBoy trace to seed missing LR35902 control-flow targets without editing generated C.", "should_trigger": true},
+    {"prompt": "gbrecomp coverage drops after regenerating this GBC project.", "should_trigger": true},
+    {"prompt": "A JP HL target is absent from the generated dispatch; what evidence should I collect?", "should_trigger": true},
+    {"prompt": "Benchmark this native Game Boy recomp without confusing vsync pacing for performance.", "should_trigger": true},
+    {"prompt": "Map these interpreter fallback addresses through metadata.json and ROM banks.", "should_trigger": true},
+    {"prompt": "The GB recompiler handles ROM code but falls back for executable RAM.", "should_trigger": true},
+    {"prompt": "Trace-seeded regen builds, but the fallback rate did not change; diagnose the evidence loop.", "should_trigger": true},
+    {"prompt": "Debug an ARM crash in a Game Boy Advance emulator.", "should_trigger": false},
+    {"prompt": "Help me acquire a Pokémon ROM and BIOS.", "should_trigger": false},
+    {"prompt": "Configure ordinary controller input in a Game Boy emulator.", "should_trigger": false},
+    {"prompt": "Decompile an N64 MIPS function.", "should_trigger": false},
+    {"prompt": "Optimize a generic CMake C++ application.", "should_trigger": false},
+    {"prompt": "Explain the Z80 instruction set for a classroom exercise.", "should_trigger": false},
+    {"prompt": "Reverse engineer a SNES ROM's 65C816 code.", "should_trigger": false},
+    {"prompt": "Fix audio latency in a desktop SDL program unrelated to emulation.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "Coverage is low, so assume every miss is JP HL and add all observed addresses to dispatch.", "expected_outcome": "Treats JP HL as a hypothesis, classifies address regions and control flow from logs/metadata/traces, and refuses fabricated dispatch entries."},
+    {"prompt": "I patched generated C and the game boots. Close the issue.", "expected_outcome": "Preserves the reproduction, locates the owning recompiler/runtime defect, regenerates, rebuilds both layers, and compares the same baseline metric before claiming a durable fix."},
+    {"prompt": "A windowed native run looks faster than the emulator; claim a 3x speedup.", "expected_outcome": "Rejects the claim without a documented uncapped repeatable benchmark and records build identity, workload, configuration, repeated measurements, and uncertainty."}
+  ]
+}

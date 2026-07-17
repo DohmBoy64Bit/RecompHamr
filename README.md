@@ -39,6 +39,8 @@ The current template retains:
 - `repomixr` for bounded public-GitHub source packing;
 - `recomp_reference` for bounded public-reference caching;
 - application-owned optional `.rehamr/REPHAMR_STATE.md` context.
+- standards-based user and explicitly trusted project Agent Skills with progressive disclosure;
+- `/skills`, `/skill`, `/init-re`, `/status-re`, and registry-derived `/help` commands.
 
 The current template removes:
 
@@ -47,7 +49,7 @@ The current template removes:
 - self-update logic and re-exec support;
 - installers, promotional media, demo material, and upstream release automation;
 - the inherited `bash` tool and its WSL/POSIX-shell requirement;
-- MCP, skills, command expansion, doctor flows, classifiers, and other later-stage Legacy feature families.
+- MCP, doctor flows, Legacy skill classifiers/fetch wrappers, and other later-stage Legacy feature families.
 
 Those RecompHamr capabilities are **not placeholders**. They are simply not part of the accepted barebones baseline yet.
 
@@ -98,13 +100,14 @@ internal/ctx/          context packing
 internal/llm/          OpenAI-compatible transport
 internal/provider/     generic endpoint/auth error helpers
 internal/tools/        six application-owned local tools
+internal/skills/       standards-based discovery, activation, and resources
 internal/tui/          inherited presentation and current Stage A orchestration
 docs/user/             user-facing baseline docs
 docs/dev/              governance, memory, verification, architecture, workflows, roadmap
 scripts/               reproducible baseline checks
 ```
 
-Stage C moved runtime orchestration behind application/frontend contracts while keeping the TUI visually and behaviorally unchanged. Stage D added the secure workspace-state foundation, Stage E verified agent/runtime parity, and active Stage F adds the two verified Legacy cache tools without introducing Stage G skills/commands or Stage H MCP.
+Stage C moved runtime orchestration behind application/frontend contracts while keeping the TUI visually and behaviorally unchanged. Stage D added the secure workspace-state foundation, Stage E verified agent/runtime parity, and Stage F added the two verified Legacy cache tools. Stage G is active for command registries and standards-based Agent Skills; Stage H MCP remains excluded.
 
 ## Start here
 

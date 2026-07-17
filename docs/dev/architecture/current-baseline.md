@@ -1,6 +1,6 @@
 # Current Transitional Architecture
 
-Stage A, all four Stage C slices, Stage D, Stage E, and Stage F are accepted. The accepted Stage F implementation commit is `d7286bee7a00b0debacc4708e9b5807550e3b7ba`.
+Stage A, all four Stage C slices, Stage D, Stage E, and Stage F are accepted. Stage G command registries and Agent Skills are implemented, runtime-verified, and canonical-gate clean but remain open pending dual-platform CI and accepted-commit evidence.
 
 ```text
 cmd/recomphamr
@@ -17,6 +17,7 @@ internal/app
     +--> internal/frontend
     +--> internal/app/controller
     +--> internal/workspace
+    +--> internal/skills
 
 internal/agent
     +--> internal/ctx
@@ -32,6 +33,11 @@ internal/session
     +--> internal/config
     +--> internal/llm
     +--> internal/provider
+
+internal/skills
+    +--> strict Agent Skills parsing and validation
+    +--> bounded user/project/bundled discovery and precedence
+    +--> activation-time revalidation and exact resource reads
 ```
 
 ## Completed ownership
@@ -65,4 +71,14 @@ Stage E audited the accepted `internal/agent`, `internal/ctx`, and `internal/llm
 
 Core `internal/app` constructs an immutable `internal/tools.Set` with the protected `.rehamr` root and platform-native path protection, then injects its executor into `internal/agent`. The agent exposes six stable schemas and retains sequential execution, cancellation, stale-result rejection, and bounded conversation output. `internal/tools` privately owns Git/process, public-network policy, deterministic packing/reduction, and protected atomic cache persistence. Frontend/TUI contracts are unchanged and receive only the existing one-line status and semantic tool events.
 
-Stage F scope is exactly `repomixr` and `recomp_reference`. Unknown tools still fail closed; skills/commands and MCP remain absent. Complete focused/canonical verification, exact-build Gemma runtime evidence, Windows cache ACL inspection, and dual-platform CI accept the boundary and both improved Legacy parity contracts.
+Stage F scope is exactly `repomixr` and `recomp_reference`. Unknown tools still fail closed. Complete focused/canonical verification, exact-build Gemma runtime evidence, Windows cache ACL inspection, and dual-platform CI accept the boundary and both improved Legacy parity contracts.
+
+## Active Stage G ownership
+
+`internal/frontend` owns one immutable ordered seven-command registry used by dispatch, CLI/TUI help, completion, and argument metadata. The TUI renders registry facts and translates input to typed intents; `internal/app/controller` dispatches command semantics and composes `internal/workspace`, `internal/session`, and `internal/skills` behavior below presentation.
+
+`internal/skills` owns bounded immediate-child discovery from bundled, user, and explicitly trusted project `.agents/skills` roots; strict specification parsing; deterministic precedence and disable filtering; path-free display diagnostics; activation-time replacement-race checks; deduplication; and exact on-demand resource reads. Catalog disclosure is capped at 8 KiB, skill bodies load only on activation, and resources remain names-only until an activated skill requests one. Discovery and activation never execute scripts.
+
+Core `internal/app` restores bundled skills into a protected content-addressed directory and composes the skills runtime with the controller/agent. `internal/agent` exposes constrained activation/resource tools and incorporates activated instructions into the system-context budget. Production TUI code imports no skills, filesystem, process, network, persistence, or trust owner.
+
+Exact-build Windows Terminal acceptance with LM Studio Devstral verified the full registry, retained Gemma profile, explicit and implicit activation, exact resource loading, evidence-workspace commands, three representative sizes, and terminal restoration. The documentation-synchronized canonical gate passed at 3183/3183 statements; dual-platform CI and accepted-commit evidence remain required before Stage G acceptance.

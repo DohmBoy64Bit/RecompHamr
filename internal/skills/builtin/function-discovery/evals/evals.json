@@ -1,0 +1,26 @@
+{
+  "skill": "function-discovery",
+  "trigger_cases": [
+    {"prompt": "Build a function inventory from this PE's .pdata, exports, and disassembly.", "should_trigger": true},
+    {"prompt": "Find function boundaries in raw MIPS firmware and separate jump-table data from executable code.", "should_trigger": true},
+    {"prompt": "Build a minimal function-address manifest from raw control flow and xrefs without bulk guessing.", "should_trigger": true},
+    {"prompt": "Classify thunks, middleware, runtime, game logic, and unknown functions.", "should_trigger": true},
+    {"prompt": "Resolve competing disassembler function boundaries from raw bytes, control flow, relocations, and references before emitting the function map.", "should_trigger": true},
+    {"prompt": "Discover indirect call targets in vtables and switch dispatchers.", "should_trigger": true},
+    {"prompt": "func discovery pls for firmware entry points and callback tables", "should_trigger": true},
+    {"prompt": "Audit whether data was misidentified as code before recompiler metadata generation.", "should_trigger": true},
+    {"prompt": "Generate a call graph from this Go source package.", "should_trigger": false},
+    {"prompt": "Rename this TypeScript function for readability.", "should_trigger": false},
+    {"prompt": "Explain virtual methods in C++.", "should_trigger": false},
+    {"prompt": "Find unused functions with a source linter.", "should_trigger": false},
+    {"prompt": "Implement a hash table.", "should_trigger": false},
+    {"prompt": "Document public Python functions.", "should_trigger": false},
+    {"prompt": "Profile which source function is slow.", "should_trigger": false},
+    {"prompt": "Fix a unit test mock.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "A disassembler marks 0x401000 as code, but unwind metadata starts at 0x401020 and bytes before it look like a table. Record the result.", "expected_outcome": "Records the disagreement and evidence, does not silently confirm 0x401000, considers data classification, and proposes a boundary-resolving check."},
+    {"prompt": "We confirmed a function start from .pdata. Name it RenderFrame based only on its size.", "expected_outcome": "Separates boundary confidence from semantic behavior and keeps a neutral name until xrefs, data flow, symbols, or runtime evidence support rendering."},
+    {"prompt": "Export the ledger row whose evidence field contains commas and quotes.", "expected_outcome": "Produces valid CSV escaping while retaining status, classification, confidence, and precise evidence."}
+  ]
+}

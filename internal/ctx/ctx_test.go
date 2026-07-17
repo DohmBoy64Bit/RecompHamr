@@ -604,6 +604,16 @@ func TestBudget(t *testing.T) {
 	if Budget(1000) != 0 {
 		t.Fatal("budget must floor at 0")
 	}
+	base := Budget(65_536)
+	if BudgetForSystem(65_536, FixedSystem) != base || BudgetForSystem(65_536, FixedSystem-1) != base {
+		t.Fatal("system content inside the fixed reservation changed the budget")
+	}
+	if BudgetForSystem(65_536, FixedSystem+100) != base-100 {
+		t.Fatal("oversized system content was not charged to history")
+	}
+	if BudgetForSystem(1000, FixedSystem+100) != 0 || BudgetForSystem(65_536, FixedSystem+base) != 0 {
+		t.Fatal("system-adjusted budget must floor at zero")
+	}
 }
 
 // TestResponseReserveScales pins the reserve curve: floored until ctxSize/8

@@ -12,9 +12,14 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host 'documentation contract: PASS'
 
-# Then independently verify that local Markdown links resolve.
-$MarkdownFiles = Get-ChildItem -Path $Root -Recurse -File -Filter '*.md' |
-    Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }
+# Then independently verify that local Markdown links resolve. Repository
+# Markdown lives at the root plus docs/ and internal/ (including bundled
+# SKILL.md files). Do not traverse private runtime state such as .rehamr.
+$MarkdownFiles = @(
+    Get-Item -LiteralPath (Join-Path $Root 'README.md'), (Join-Path $Root 'AGENTS.md')
+    Get-Item -LiteralPath (Join-Path $Root 'internal/tui/AGENTS.md'), (Join-Path $Root 'internal/config/PROMPT_SYS.md')
+    Get-ChildItem -LiteralPath (Join-Path $Root 'docs'), (Join-Path $Root 'internal/skills') -Recurse -File -Filter '*.md'
+)
 
 $Broken = New-Object System.Collections.Generic.List[string]
 $LinkPattern = [regex]'\[[^\]]+\]\(([^)]+)\)'

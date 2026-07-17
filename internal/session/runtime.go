@@ -76,6 +76,16 @@ func (r *Runtime) Snapshot() Snapshot {
 	return snapshotOf(r.cfg)
 }
 
+// SkillSettings returns a copy of the current non-secret skills discovery
+// settings for application-owned catalog refresh.
+func (r *Runtime) SkillSettings() config.SkillsConfig {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	settings := r.cfg.Skills
+	settings.Disabled = append([]string(nil), settings.Disabled...)
+	return settings
+}
+
 func snapshotOf(cfg *config.Config) Snapshot {
 	active := cfg.ActiveProfile()
 	snapshot := Snapshot{

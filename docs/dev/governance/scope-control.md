@@ -1,12 +1,13 @@
 # Scope Control
 
-The accepted Stage A, Stage C, Stage D, Stage E, and Stage F gates define the current project boundary. Stage G is next but has no active packet yet.
+The accepted Stage A, Stage C, Stage D, Stage E, and Stage F gates plus the active Stage G work packet define the current project boundary. Stage G commands and standards-based Agent Skills are implemented, runtime-verified, and canonical-gate clean but remain open pending dual-platform CI and accepted-commit evidence.
 
 ## Allowed now
 
 - preserve and fix evidence-backed defects in the accepted workspace and configuration foundations;
 - preserve and fix evidence-backed defects in the accepted agent/runtime contracts;
 - preserve and fix evidence-backed defects in the accepted six-tool boundary;
+- finish and verify the active Stage G command registry, skills client, migrations, documentation, and closure evidence;
 - preserve or improve verified Legacy behavior within its current architecture owner;
 - improve tests, verification, rules, or documentation without changing the frozen TUI contract;
 - fix evidence-backed defects in accepted behavior;
@@ -15,14 +16,12 @@ The accepted Stage A, Stage C, Stage D, Stage E, and Stage F gates define the cu
 ## Still blocked by integration order
 
 - MCP;
-- skills runtime support;
 - reverse-engineering helper tools;
-- diagnostics or project-workspace commands not authorized by the Stage D packet;
-- command-surface expansion;
+- diagnostics or command-surface expansion beyond the active Stage G packet;
 - TUI redesign;
 - Bubble Tea framework migration.
 
-Blocked work belongs in the roadmap, policy, or holding pen, not in placeholder production code. The accepted Stage D optional workspace-state loader remains the only implemented project-memory surface.
+Blocked work belongs in the roadmap, policy, or holding pen, not in placeholder production code. Stage G adds only the approved secure evidence-workspace initialization/status commands over the accepted Stage D owner.
 
 ## Future parity scope
 

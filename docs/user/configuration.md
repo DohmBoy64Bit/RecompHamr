@@ -2,14 +2,19 @@
 
 On first run, RecompHamr creates `.rehamr/config.yaml` in the current project directory.
 
-The baseline seeds one LM Studio OpenAI-compatible profile for the accepted
-Gemma runtime. Start LM Studio's local server and load the named model before
-the first real turn:
+Fresh projects seed two LM Studio OpenAI-compatible profiles. Devstral is the
+active default and Gemma remains available for explicit switching. Start LM
+Studio's local server and load the selected model before the first real turn:
 
 ```yaml
 active: local
 models:
   local:
+    llm: mistralai/devstral-small-2-2512
+    url: http://localhost:1234
+    key: ""
+    context_size: 16177
+  gemma:
     llm: google/gemma-4-12b-qat
     url: http://localhost:1234
     key: ""
@@ -17,7 +22,8 @@ models:
 ```
 
 The values are editable. Any endpoint used by the baseline must expose the OpenAI-compatible chat-completions interface expected by `internal/llm`.
-Changing these source defaults affects newly created configuration files only;
+The conservative `context_size` fallback is seeded for both profiles; update it
+to the context window actually loaded by LM Studio. Changing these source defaults affects newly created configuration files only;
 RecompHamr never overwrites an existing `.rehamr/config.yaml`.
 
 ## Switching profiles
@@ -37,6 +43,19 @@ The active selection is persisted to `.rehamr/config.yaml`.
 - `RECOMPHAMR_IDLE_TIMEOUT` overrides the inter-frame stream idle timeout using a Go duration such as `90m` or `1h`.
 
 The baseline does not ship a hosted provider profile or bundled credentials.
+
+## Agent Skills
+
+Stage G adds optional standards-based skill settings:
+
+```yaml
+skills:
+  trust_project: false
+  disabled:
+    - example-skill
+```
+
+`trust_project` defaults to false and must be enabled before repository-provided `.agents/skills/` instructions are disclosed or activated. `disabled` removes exact skill names from discovery. Valid edits are reloaded before slash commands. Full discovery, precedence, activation, resource, and security behavior is documented in [Commands and Agent Skills](commands-and-skills.md).
 
 ## Local configuration security
 

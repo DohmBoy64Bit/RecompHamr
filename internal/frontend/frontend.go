@@ -45,6 +45,13 @@ type Profile struct {
 	Keyed       bool
 }
 
+// Skill is display-safe tier-one Agent Skill metadata.
+type Skill struct {
+	Name        string
+	Description string
+	Active      bool
+}
+
 // Snapshot is an immutable, display-safe application state. Profiles returns
 // a fresh slice on every controller snapshot so presentation cannot mutate
 // application state through shared backing storage.
@@ -60,6 +67,8 @@ type Snapshot struct {
 	ContextSize       int
 	ActiveKeyed       bool
 	Profiles          []Profile
+	Skills            []Skill
+	SkillDiagnostics  []string
 }
 
 // Profile finds a named profile in the immutable snapshot.
@@ -94,6 +103,12 @@ const (
 	IntentSubmitGoal
 	// IntentComplete returns opaque asynchronous work.
 	IntentComplete
+	// IntentActivateSkill activates one exact discovered Agent Skill.
+	IntentActivateSkill
+	// IntentInitializeEvidence creates the secure evidence workspace.
+	IntentInitializeEvidence
+	// IntentEvidenceStatus reads the bounded evidence workspace status.
+	IntentEvidenceStatus
 )
 
 // Completion is an opaque asynchronous result. Presentation may carry it back
@@ -138,6 +153,15 @@ func Complete(completion Completion) Intent {
 	return Intent{kind: IntentComplete, completion: completion}
 }
 
+// ActivateSkill requests explicit activation of one discovered Agent Skill.
+func ActivateSkill(name string) Intent { return Intent{kind: IntentActivateSkill, text: name} }
+
+// InitializeEvidence requests idempotent secure evidence workspace creation.
+func InitializeEvidence() Intent { return Intent{kind: IntentInitializeEvidence} }
+
+// EvidenceStatus requests a bounded evidence workspace summary.
+func EvidenceStatus() Intent { return Intent{kind: IntentEvidenceStatus} }
+
 // Kind returns the intent discriminator.
 func (i Intent) Kind() IntentKind { return i.kind }
 
@@ -179,6 +203,10 @@ const (
 	EventToolStatus
 	// EventTurnFinished carries frozen duration/token outcome facts.
 	EventTurnFinished
+	// EventSkillActivated reports explicit skill activation or deduplication.
+	EventSkillActivated
+	// EventWorkspace carries bounded evidence initialization or status text.
+	EventWorkspace
 )
 
 // Event is an ordered presentation fact. It deliberately contains no
@@ -221,17 +249,45 @@ type Controller interface {
 	Snapshot() Snapshot
 }
 
-// Command describes one canonical slash-command help row.
+// CommandKind identifies the typed presentation behavior associated with one
+// canonical slash command without requiring adapters to switch on its text.
+type CommandKind uint8
+
+const (
+	// CommandClear resets the conversation.
+	CommandClear CommandKind = iota + 1
+	// CommandModels lists or activates profiles.
+	CommandModels
+	// CommandSkills lists discovered skills and diagnostics.
+	CommandSkills
+	// CommandSkill activates one discovered skill.
+	CommandSkill
+	// CommandHelp renders the canonical registry.
+	CommandHelp
+	// CommandInitEvidence initializes the evidence workspace.
+	CommandInitEvidence
+	// CommandEvidenceStatus summarizes the evidence workspace.
+	CommandEvidenceStatus
+)
+
+// Command describes one canonical slash-command help and dispatch row.
 type Command struct {
+	Kind        CommandKind
 	Name        string
 	Description string
+	Argument    string
 }
 
 // Commands returns the canonical command order and text shared by CLI help
 // and concrete presentation adapters.
 func Commands() []Command {
 	return []Command{
-		{Name: "/clear", Description: "reset the conversation"},
-		{Name: "/models", Description: "list · <name> set (Tab cycles in the popover)"},
+		{Kind: CommandClear, Name: "/clear", Description: "reset the conversation"},
+		{Kind: CommandModels, Name: "/models", Description: "list · <name> set (Tab cycles in the popover)"},
+		{Kind: CommandSkills, Name: "/skills", Description: "list discovered Agent Skills"},
+		{Kind: CommandSkill, Name: "/skill", Description: "activate <name> (Tab for list)", Argument: "skill"},
+		{Kind: CommandInitEvidence, Name: "/init-re", Description: "initialize the secure evidence workspace"},
+		{Kind: CommandEvidenceStatus, Name: "/status-re", Description: "summarize evidence workspace state"},
+		{Kind: CommandHelp, Name: "/help", Description: "show this help"},
 	}
 }

@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $Root = Split-Path -Parent $PSScriptRoot
-$GoFiles = @(Get-ChildItem -Path $Root -Recurse -File -Filter '*.go' | ForEach-Object { $_.FullName })
+$GoFiles = @(Get-ChildItem -Path @((Join-Path $Root 'cmd'), (Join-Path $Root 'internal')) -Recurse -File -Filter '*.go' -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
 if ($GoFiles.Count -eq 0) {
     throw 'format check failed: no Go files found'
 }

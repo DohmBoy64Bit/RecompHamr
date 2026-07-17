@@ -1,0 +1,26 @@
+{
+  "skill": "build-fix-loop",
+  "trigger_cases": [
+    {"prompt": "cmake --build build fails at the first linker error; diagnose and fix it one change at a time.", "should_trigger": true},
+    {"prompt": "cmake --build build now fails in generated recomp code after a metadata edit; diagnose the earliest cause.", "should_trigger": true},
+    {"prompt": "go test ./internal/parser fails consistently with this stack trace.", "should_trigger": true},
+    {"prompt": "MSBuild exits 1 after an SDK include cannot be found.", "should_trigger": true},
+    {"prompt": "The same codegen patch produced the identical error twice; change strategy.", "should_trigger": true},
+    {"prompt": "ninja broke; find the earliest real error, not the summary.", "should_trigger": true},
+    {"prompt": "ninja test-match fails only after regeneration; trace the owning decomp input and repair it.", "should_trigger": true},
+    {"prompt": "Capture and repair this reproducible linker/test failure without changing multiple things.", "should_trigger": true},
+    {"prompt": "Refactor this passing package for readability.", "should_trigger": false},
+    {"prompt": "Make the app start faster; all tests pass.", "should_trigger": false},
+    {"prompt": "Design a CI pipeline from scratch.", "should_trigger": false},
+    {"prompt": "Explain this compiler warning; the command exits zero.", "should_trigger": false},
+    {"prompt": "Upgrade every dependency to the newest version.", "should_trigger": false},
+    {"prompt": "Review this PR for security issues.", "should_trigger": false},
+    {"prompt": "Write a Makefile for a new hello-world program.", "should_trigger": false},
+    {"prompt": "Benchmark two JSON libraries.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "The final line says build failed, but the first compiler error is an unknown generated symbol. What is the next iteration?", "expected_outcome": "Uses the first actionable error, inspects generator metadata/source rather than patching output, makes one hypothesis-driven change, and reruns the same command."},
+    {"prompt": "The build now exits zero. Claim the recompilation is fully correct.", "expected_outcome": "Reports the build as verified but keeps runtime or binary equivalence unverified until their acceptance checks pass."},
+    {"prompt": "A required proprietary SDK is missing and cannot be installed in this environment.", "expected_outcome": "Records a named blocker and required external input instead of applying speculative code changes or claiming success."}
+  ]
+}

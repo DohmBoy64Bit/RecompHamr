@@ -22,6 +22,30 @@ func TestNewRuntimeComposesDependencies(t *testing.T) {
 	}
 }
 
+func TestRuntimeSkillToolIsOptionalAndConstrained(t *testing.T) {
+	runtime := NewRuntime(&fakeChatClient{}, NewToolExecutor(nil))
+	if got := runtime.WithSkillTool(nil); len(got.tools) != 6 || len(got.toolNames) != 6 {
+		t.Fatalf("empty skill tool = %d %v", len(got.tools), got.toolNames)
+	}
+	names := []string{"alpha"}
+	got := runtime.WithSkillTool(names)
+	names[0] = "source-mutated"
+	if len(got.tools) != 8 || len(got.toolNames) != 8 || got.toolNames[6] != "activate_skill" || got.toolNames[7] != "read_skill_resource" || len(runtime.tools) != 6 {
+		t.Fatalf("skill tools = %d %v", len(got.tools), got.toolNames)
+	}
+	properties := got.tools[6].Function.Parameters["properties"].(map[string]any)
+	values := properties["name"].(map[string]any)["enum"].([]string)
+	resourceProperties := got.tools[7].Function.Parameters["properties"].(map[string]any)
+	resourceValues := resourceProperties["name"].(map[string]any)["enum"].([]string)
+	if values[0] != "alpha" || resourceValues[0] != "alpha" {
+		t.Fatalf("schema names = %v %v", values, resourceValues)
+	}
+	removed := got.WithSkillTool(nil)
+	if len(removed.tools) != 6 || len(removed.toolNames) != 6 {
+		t.Fatalf("removed skill tools = %d %v", len(removed.tools), removed.toolNames)
+	}
+}
+
 func TestRuntimeStartsPackedRound(t *testing.T) {
 	events := make(chan llm.Event)
 	client := &fakeChatClient{events: events}

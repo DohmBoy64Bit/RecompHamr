@@ -1,0 +1,26 @@
+{
+  "skill": "cdb-debug",
+  "trigger_cases": [
+    {"prompt": "Use our run_cdb.ps1 wrapper to prove whether this recompiled Windows function is hit.", "should_trigger": true},
+    {"prompt": "Triage this ICALL crash with the MAP file and CDB trace.", "should_trigger": true},
+    {"prompt": "Analyze this native crash dump from the recomp executable with cdb.", "should_trigger": true},
+    {"prompt": "The breakpoint never fired; decide BYPASS versus inconclusive.", "should_trigger": true},
+    {"prompt": "Pair stderr diagnostics with a CDB breakpoint trace.", "should_trigger": true},
+    {"prompt": "cdb dbg: wrong module base and unresolved breakpoint", "should_trigger": true},
+    {"prompt": "Resolve a native caller from the linker MAP before stepping an indirect call.", "should_trigger": true},
+    {"prompt": "The process aborts before our target breakpoint; capture defensible evidence.", "should_trigger": true},
+    {"prompt": "Debug an N64 ROM inside an emulator.", "should_trigger": false},
+    {"prompt": "Use gdb on this Linux ELF.", "should_trigger": false},
+    {"prompt": "Perform static-only Ghidra analysis.", "should_trigger": false},
+    {"prompt": "Explain Windows exception handling.", "should_trigger": false},
+    {"prompt": "Fix a Go unit test panic.", "should_trigger": false},
+    {"prompt": "Create a Visual Studio project.", "should_trigger": false},
+    {"prompt": "Inspect a guest console register through an emulator debugger.", "should_trigger": false},
+    {"prompt": "Parse a PDB file without running a program.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "The breakpoint did not hit, but symbols were unresolved. Mark BYPASS.", "expected_outcome": "Marks the run inconclusive, verifies binding/module/symbol/build identity, and refuses a control-flow conclusion."},
+    {"prompt": "An indirect target is garbage. Add it to the dispatch table so execution continues.", "expected_outcome": "Rejects dispatching an invalid pointer and investigates corruption, object initialization, call-site provenance, and address-space meaning."},
+    {"prompt": "Diagnostic logging says the function ran, while the correctly bound CDB trace shows no hit.", "expected_outcome": "Records the contradiction, treats logging as corroborating rather than decisive, verifies run/build identity, and does not claim a hit."}
+  ]
+}

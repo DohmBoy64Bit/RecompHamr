@@ -8,6 +8,7 @@ import (
 
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/tools"
 )
 
 // Runtime groups the mutable agent-turn components and their injected model
@@ -21,6 +22,8 @@ type Runtime struct {
 	Executor  ToolExecutor
 	observer  Observer
 	reasoning *strings.Builder
+	tools     []llm.Tool
+	toolNames []string
 }
 
 // Observer receives private, causal agent-runtime records. Implementations
@@ -52,7 +55,23 @@ func NewRuntime(client ChatClient, executor ToolExecutor) Runtime {
 		Client:    client,
 		Executor:  executor,
 		reasoning: &strings.Builder{},
+		tools:     Tools(),
+		toolNames: ToolNames(),
 	}
+}
+
+// WithSkillTool returns runtime with constrained activation and on-demand
+// resource definitions appended after the accepted local tools. Empty names
+// leave both tools absent.
+func (r Runtime) WithSkillTool(names []string) Runtime {
+	r.tools = Tools()
+	r.toolNames = ToolNames()
+	if len(names) == 0 {
+		return r
+	}
+	r.tools = append(append([]llm.Tool(nil), r.tools...), schemaToTool(tools.ActivateSkillSchema(names)), schemaToTool(tools.ReadSkillResourceSchema(names)))
+	r.toolNames = append(append([]string(nil), r.toolNames...), tools.ActivateSkillName, tools.ReadSkillResourceName)
+	return r
 }
 
 // WithObserver returns runtime with an injected private event observer.
@@ -120,7 +139,7 @@ func (r Runtime) ObserveSlash(content string) { r.observef("user_slash", "%s", c
 // copying the system prompt or credentials into the private log.
 func (r Runtime) ObserveSession(version, profile, model, url string, contextSize, systemTokens int) {
 	r.observef("session", "recomphamr %s · profile=%s · model=%s @ %s\ncontext_size=%d tokens · system_prompt≈%d tokens · tools=[%s]",
-		version, profile, model, url, contextSize, systemTokens, strings.Join(ToolNames(), ", "))
+		version, profile, model, url, contextSize, systemTokens, strings.Join(r.toolNames, ", "))
 }
 
 // BeginTurn installs the agent-owned cancellation root and initializes the
@@ -188,7 +207,7 @@ func (r Runtime) StartRound(system, model string, contextSize int) (*Stream, Req
 	messages := BuildMessages(system, r.Turn.History, contextSize)
 	summary := RequestSummary{
 		ContextSize: contextSize,
-		Budget:      chmctx.Budget(contextSize),
+		Budget:      chmctx.BudgetForSystem(contextSize, chmctx.Tokens(system)),
 		History:     len(r.Turn.History),
 		Packed:      len(messages) - 1,
 	}
@@ -205,7 +224,7 @@ func (r Runtime) StartRound(system, model string, contextSize int) (*Stream, Req
 	}
 	r.observef("request", "model=%s · ctx=%d (history budget=%d) · history=%d msgs → packed=%d msgs (~%d tokens) · dropped=%d oldest%s",
 		model, summary.ContextSize, summary.Budget, summary.History, summary.Packed, summary.Tokens, summary.Dropped, note)
-	return r.Stream.StartRound(r.Turn, r.Client, messages, Tools()), summary
+	return r.Stream.StartRound(r.Turn, r.Client, messages, r.tools), summary
 }
 
 // ApplyDelivery validates and reduces one model delivery while emitting the

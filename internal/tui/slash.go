@@ -28,30 +28,54 @@ type command struct {
 	args        func(Model) []argOption
 }
 
-// commands lists every slash command, in popover/--help order. Keep it short.
-var commands = []command{
-	{
-		name:        "/clear",
-		description: "reset the conversation",
-		handler:     (Model).cmdClear,
-	},
-	{
-		name:        "/models",
-		description: "list · <name> set (Tab cycles in the popover)",
-		handler:     (Model).cmdModel,
-		args: func(m Model) []argOption {
-			facts := m.controller.Snapshot()
-			out := make([]argOption, 0, len(facts.Profiles))
-			for _, p := range facts.Profiles {
-				out = append(out, argOption{
-					value:       p.Name,
-					description: p.Model + " @ " + p.URL,
-					current:     p.Active,
-				})
-			}
-			return out
-		},
-	},
+// commands derives presentation handlers and argument providers from the one
+// neutral registry; names, descriptions, and ordering are never duplicated.
+var commands = buildCommands()
+
+func buildCommands() []command {
+	definitions := frontend.Commands()
+	out := make([]command, 0, len(definitions))
+	for _, definition := range definitions {
+		entry := command{name: definition.Name, description: definition.Description}
+		switch definition.Kind {
+		case frontend.CommandClear:
+			entry.handler = (Model).cmdClear
+		case frontend.CommandModels:
+			entry.handler = (Model).cmdModel
+			entry.args = modelArgs
+		case frontend.CommandSkills:
+			entry.handler = (Model).cmdSkills
+		case frontend.CommandSkill:
+			entry.handler = (Model).cmdSkill
+			entry.args = skillArgs
+		case frontend.CommandInitEvidence:
+			entry.handler = (Model).cmdInitEvidence
+		case frontend.CommandEvidenceStatus:
+			entry.handler = (Model).cmdEvidenceStatus
+		case frontend.CommandHelp:
+			entry.handler = (Model).cmdHelp
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+func modelArgs(m Model) []argOption {
+	facts := m.controller.Snapshot()
+	out := make([]argOption, 0, len(facts.Profiles))
+	for _, profile := range facts.Profiles {
+		out = append(out, argOption{value: profile.Name, description: profile.Model + " @ " + profile.URL, current: profile.Active})
+	}
+	return out
+}
+
+func skillArgs(m Model) []argOption {
+	facts := m.controller.Snapshot()
+	out := make([]argOption, 0, len(facts.Skills))
+	for _, skill := range facts.Skills {
+		out = append(out, argOption{value: skill.Name, description: skill.Description, current: skill.Active})
+	}
+	return out
 }
 
 // commandByName returns the registered command for a slash name, or nil.
@@ -186,4 +210,68 @@ func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
 	// owns the print), and every string handed to tea.Println must be wrapped
 	// or an over-width line drifts the renderer's cursor math.
 	return m, tea.Sequence(tea.ClearScreen, eraseScrollback, tea.Println(wrapForScrollback(line, m.width)))
+}
+
+func (m Model) cmdSkills(_ []string) (tea.Model, tea.Cmd) {
+	facts := m.controller.Snapshot()
+	if len(facts.Skills) == 0 {
+		m.appendLine(styleDim.Render("No Agent Skills discovered."))
+	} else {
+		m.appendLine("Agent Skills (* active):")
+		for _, skill := range facts.Skills {
+			mark := " "
+			if skill.Active {
+				mark = "*"
+			}
+			m.appendLine(fmt.Sprintf("%s %s  %s", mark, skill.Name, styleDim.Render(skill.Description)))
+		}
+	}
+	for _, diagnostic := range facts.SkillDiagnostics {
+		m.appendLine(styleWarn.Render("⚠ " + diagnostic))
+	}
+	return m, nil
+}
+
+func (m Model) cmdSkill(args []string) (tea.Model, tea.Cmd) {
+	if len(args) == 0 {
+		m.appendLine(styleError.Render("usage: /skill <name>"))
+		return m, nil
+	}
+	transition := m.controller.Dispatch(frontend.ActivateSkill(args[0]))
+	for _, event := range transition.Events {
+		switch event.Kind {
+		case frontend.EventWarning:
+			m.appendLine(styleError.Render(event.Text))
+		case frontend.EventSkillActivated:
+			m.appendLine(styleOK.Render(event.Text))
+		}
+	}
+	return m, nil
+}
+
+func (m Model) cmdInitEvidence(_ []string) (tea.Model, tea.Cmd) {
+	return m.applyWorkspaceTransition(m.controller.Dispatch(frontend.InitializeEvidence()))
+}
+
+func (m Model) cmdEvidenceStatus(_ []string) (tea.Model, tea.Cmd) {
+	return m.applyWorkspaceTransition(m.controller.Dispatch(frontend.EvidenceStatus()))
+}
+
+func (m Model) applyWorkspaceTransition(transition frontend.Transition) (tea.Model, tea.Cmd) {
+	for _, event := range transition.Events {
+		if event.Kind == frontend.EventWarning {
+			m.appendLine(styleError.Render(event.Text))
+		} else if event.Kind == frontend.EventWorkspace {
+			m.appendLine(event.Text)
+		}
+	}
+	return m, nil
+}
+
+func (m Model) cmdHelp(_ []string) (tea.Model, tea.Cmd) {
+	m.appendLine("Commands:")
+	for _, command := range frontend.Commands() {
+		m.appendLine(fmt.Sprintf("  %-10s %s", command.Name, command.Description))
+	}
+	return m, nil
 }

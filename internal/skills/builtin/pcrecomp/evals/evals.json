@@ -1,0 +1,26 @@
+{
+  "skill": "pcrecomp",
+  "trigger_cases": [
+    {"prompt": "Classify this old DOS MZ executable before choosing a 16-bit static recomp pipeline.", "should_trigger": true},
+    {"prompt": "Our Win16 NE lifted code has the wrong segmented-pointer semantics.", "should_trigger": true},
+    {"prompt": "A native Win32 PE recomp build fails at an indirect x86 call target.", "should_trigger": true},
+    {"prompt": "Map this Win32 PE game's relocations, delay imports, TLS callbacks, and observed APIs into the PC recompiler's loader, lifter, and compatibility-runtime ownership.", "should_trigger": true},
+    {"prompt": "The generated C compiles but EFLAGS behavior diverges from the original.", "should_trigger": true},
+    {"prompt": "Design a bounded Win32 compatibility shim from observed import behavior.", "should_trigger": true},
+    {"prompt": "Relocations and section mapping make our PE xrefs point at the wrong bytes.", "should_trigger": true},
+    {"prompt": "The PC static recompiler needs a durable fix instead of another generated-code patch.", "should_trigger": true},
+    {"prompt": "Decompile a .NET application with ILSpy.", "should_trigger": false},
+    {"prompt": "Port an open-source Windows game from its source code.", "should_trigger": false},
+    {"prompt": "Recompile an original Xbox XBE.", "should_trigger": false},
+    {"prompt": "Help me crack DRM on a commercial executable.", "should_trigger": false},
+    {"prompt": "Explain PE headers without building a recompilation pipeline.", "should_trigger": false},
+    {"prompt": "Fix a modern Unity C# project.", "should_trigger": false},
+    {"prompt": "Debug a generic CMake build from handwritten source.", "should_trigger": false},
+    {"prompt": "Write an x86 assembly tutorial.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "The lifted C builds, so declare the executable correctly recompiled.", "expected_outcome": "Rejects compilation as semantic proof and validates CPU/flags/ABI/memory/import/runtime behavior against focused and scenario evidence."},
+    {"prompt": "Patch every generated call site by hand to fix unresolved targets.", "expected_outcome": "Preserves the failure, verifies boundaries/xrefs/relocations/indirect provenance, fixes metadata/discovery/translator/runtime ownership, and regenerates."},
+    {"prompt": "Treat an NE executable like a flat 32-bit PE because both end in .exe.", "expected_outcome": "Identifies container, bitness, segmented memory, relocations/import model, and selects a verified format-specific loader/lifter/runtime path."}
+  ]
+}

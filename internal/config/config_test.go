@@ -51,8 +51,15 @@ func TestBootstrapCreatesLayout(t *testing.T) {
 	if !ok {
 		t.Fatal("default should include a 'local' profile")
 	}
-	if p.URL != "http://localhost:1234" || p.LLM != "google/gemma-4-12b-qat" || p.ContextSize != 16177 {
+	if p.URL != "http://localhost:1234" || p.LLM != "mistralai/devstral-small-2-2512" || p.ContextSize != 16177 {
 		t.Fatalf("default local profile mismatch: %+v", p)
+	}
+	gemma, ok := cfg.Models["gemma"]
+	if !ok || gemma.URL != "http://localhost:1234" || gemma.LLM != "google/gemma-4-12b-qat" || gemma.ContextSize != 16177 {
+		t.Fatalf("default gemma profile mismatch: %+v", gemma)
+	}
+	if names := cfg.ModelNames(); len(names) != 2 || names[0] != "gemma" || names[1] != "local" {
+		t.Fatalf("default model names = %#v", names)
 	}
 }
 

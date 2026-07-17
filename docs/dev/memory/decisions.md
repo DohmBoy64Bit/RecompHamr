@@ -76,3 +76,7 @@ The complete Legacy agent/runtime audit maps the required turn policy, context p
 ## D-018 — Stage F tools use configured capabilities and public-only ingestion
 
 Stage F preserves the useful `repomixr` and `recomp_reference` contracts without restoring Legacy global directories or permissive I/O. Core application composition supplies an immutable tool set with protected cache identity. Repository import is limited to strict public GitHub HTTPS URLs; reference retrieval revalidates redirects and resolved addresses and refuses non-public networks. Both paths are cancellable, bounded, link-safe, atomically persisted, and treated as untrusted external content. This is improved behavioral parity, not a source-level port.
+
+## D-019 — Commands and Agent Skills are application-owned and progressively disclosed
+
+Stage G uses one typed frontend registry for command facts while application/backend owners execute every side effect. `internal/skills` implements the current Agent Skills client lifecycle with bounded bundled/user/project discovery, explicit project trust, deterministic precedence, strict validation, activation-time revalidation, and exact on-demand resources. Skill metadata may enter the initial model context; instruction bodies enter only after explicit or model-driven activation; resource contents enter only after an exact activated-resource request. The Legacy flat loader, heuristic audit, remote fetch-and-wrap command, and TUI-owned lifecycle are intentionally not restored.

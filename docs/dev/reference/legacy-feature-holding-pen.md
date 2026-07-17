@@ -6,13 +6,13 @@ Everything in this document is intentionally **excluded** from the barebones bas
 |---|---|---|
 | classifier | excluded | after Stage C, when a verified owner/use case is defined |
 | doctor/environment diagnostics | excluded | Stage D or later |
-| project memory/workspace state | Stage D foundation accepted: secure optional state loading and refresh are verified; initialization/status commands and RE templates remain deferred | Stage D foundation accepted; Stage F/G for template/command exposure |
+| project memory/workspace state | Stage D foundation accepted; Stage G adds secure idempotent `/init-re` and bounded `/status-re` through the workspace owner | Stage D foundation plus Stage G command exposure |
 | expanded agent-loop behavior | accepted: Stage E verified the required Legacy policies as equivalent or improved in the current backend; no redundant port was needed | Stage E accepted at `b4fee3c` |
 | `repomixr` | accepted with improved strict public-GitHub, bounded, protected-cache behavior | Stage F accepted at `d7286be` |
 | `recomp_reference` | accepted with improved public-network-only, bounded, protected-cache behavior | Stage F accepted at `d7286be` |
 | extra RE-specific built-in tools | not applicable: direct Legacy inventory found no additional non-MCP built-ins | Stage F audit |
-| extended slash-command surface | excluded | Stage G |
-| built-in skills and skill loading | excluded; Legacy format is not the target | Stage G using the Agent Skills standard |
+| extended slash-command surface | Stage G implementation complete: seven application-owned commands; Legacy audit/new are intentionally replaced, doctor is not applicable, and MCP remains Stage H | Stage G closure pending CI |
+| built-in skills and skill loading | Stage G implementation complete: standards-based bounded progressive disclosure with 21 individually migrated built-ins; Legacy flat format is intentionally unsupported | Stage G closure pending CI |
 | MCP clients, servers, configuration, and tool exposure | excluded | Stage H |
 | updater/self-reexec/release delivery | excluded from reconstruction baseline | Stage I only if still desired |
 | installers and promotional assets | excluded | not required for core reconstruction |

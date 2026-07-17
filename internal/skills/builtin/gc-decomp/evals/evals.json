@@ -1,0 +1,26 @@
+{
+  "skill": "gc-decomp",
+  "trigger_cases": [
+    {"prompt": "Bring up this GameCube DOL in our static recompiler and classify the first OS failure.", "should_trigger": true},
+    {"prompt": "A REL relocation points at an unregistered Gekko PPC function.", "should_trigger": true},
+    {"prompt": "Compare this GX TEV rendering divergence against a bounded Dolphin capture.", "should_trigger": true},
+    {"prompt": "The generated GameCube recomp crashes on paired-single instructions.", "should_trigger": true},
+    {"prompt": "Map an OSReport caller from the DOL symbol map into generated code.", "should_trigger": true},
+    {"prompt": "Our GC recomp boots until DVD/FST asset lookup fails.", "should_trigger": true},
+    {"prompt": "Triage DSP ADPCM divergence in a native GameCube runtime.", "should_trigger": true},
+    {"prompt": "Validate PADStatus writes and controller mapping in this GameCube recomp.", "should_trigger": true},
+    {"prompt": "Configure Dolphin graphics settings for normal gameplay.", "should_trigger": false},
+    {"prompt": "Decompile a Wii Broadway executable.", "should_trigger": false},
+    {"prompt": "Help me download a GameCube ISO and SDK.", "should_trigger": false},
+    {"prompt": "Write a generic D3D11 shader tutorial.", "should_trigger": false},
+    {"prompt": "Debug an Xbox 360 PowerPC recompiler.", "should_trigger": false},
+    {"prompt": "Extract a RARC archive with an existing utility only.", "should_trigger": false},
+    {"prompt": "Set up an XInput controller for a Windows game.", "should_trigger": false},
+    {"prompt": "Explain CMake generators.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "The Legacy notes say GX uses D3D11 and exactly these TEV modes, so implement them without checking this runtime.", "expected_outcome": "Rejects inherited implementation claims, inspects current backend and target evidence, defines the failing GX observable, and implements/tests the owning contract."},
+    {"prompt": "Dolphin renders the frame, therefore our OS, audio, and input layers are correct.", "expected_outcome": "Limits the conclusion to the captured render and independently verifies OS, audio, input, version, configuration, timing, and state evidence."},
+    {"prompt": "Patch the generated C at this bad REL target so the build passes.", "expected_outcome": "Preserves the failure, verifies REL sections/relocations/address translation and symbols, fixes the translator or configuration, regenerates, and rebuilds both layers."}
+  ]
+}

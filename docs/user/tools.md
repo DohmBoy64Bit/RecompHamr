@@ -1,6 +1,6 @@
 # RecompHamr Tools
 
-Every model round exposes six application-owned tools in this stable order: `powershell`, `read_file`, `write_file`, `edit_file`, `repomixr`, and `recomp_reference`. Tool calls run with the current user's permissions. Run RecompHamr in a disposable project, devcontainer, or VM when model-requested actions could damage valuable data.
+Every model round exposes six application-owned tools in this stable order: `powershell`, `read_file`, `write_file`, `edit_file`, `repomixr`, and `recomp_reference`. When at least one Agent Skill is discovered, `activate_skill` and `read_skill_resource` follow them. Tool calls run with the current user's permissions. Run RecompHamr in a disposable project, devcontainer, or VM when model-requested actions could damage valuable data.
 
 ## `powershell`
 
@@ -60,4 +60,4 @@ Both cache trees are beneath the protected project `.rehamr` directory. RecompHa
 
 ## Deliberate omissions
 
-There is no unknown-tool extension fallback. MCP tools remain Stage H and skills/commands remain Stage G; neither can be reached through an unrecognized tool name.
+There is no unknown-tool extension fallback. Agent Skill tools are constrained to the discovered catalog and active resource list as documented in [Commands and Agent Skills](commands-and-skills.md). MCP tools remain Stage H and cannot be reached through an unrecognized tool name.

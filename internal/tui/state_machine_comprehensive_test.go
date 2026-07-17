@@ -65,6 +65,78 @@ func TestFrontendEventsReproducePresentationState(t *testing.T) {
 	}
 }
 
+func TestSkillCommandsRemainPresentationOnly(t *testing.T) {
+	snapshot := frontend.Snapshot{Skills: []frontend.Skill{{Name: "alpha", Description: "Use alpha.", Active: true}}, SkillDiagnostics: []string{"bad: invalid"}}
+	controller := &fakeFrontendController{snapshot: snapshot, transitions: []frontend.Transition{
+		{Snapshot: snapshot},
+		{Snapshot: snapshot},
+		{Snapshot: snapshot},
+		{Snapshot: snapshot, Events: []frontend.Event{{Kind: frontend.EventSkillActivated, Text: "loaded skill: alpha"}}},
+		{Snapshot: snapshot},
+		{Snapshot: snapshot, Events: []frontend.Event{{Kind: frontend.EventWarning, Text: "unknown skill: missing"}}},
+		{Snapshot: snapshot},
+	}}
+	m := presentationModel(controller)
+	args := skillArgs(m)
+	if len(args) != 1 || args[0].value != "alpha" || !args[0].current || args[0].description != "Use alpha." {
+		t.Fatalf("skill args = %#v", args)
+	}
+	next, _ := m.runSlash("/skills")
+	m = next.(Model)
+	if scroll := stripANSI(m.scroll.String()); !strings.Contains(scroll, "Agent Skills (* active):") || !strings.Contains(scroll, "* alpha") || !strings.Contains(scroll, "bad: invalid") {
+		t.Fatalf("skills output = %q", scroll)
+	}
+	next, _ = m.runSlash("/skill")
+	m = next.(Model)
+	if !strings.Contains(stripANSI(m.scroll.String()), "usage: /skill <name>") {
+		t.Fatal("missing skill usage absent")
+	}
+	next, _ = m.runSlash("/skill alpha")
+	m = next.(Model)
+	next, _ = m.runSlash("/skill missing")
+	m = next.(Model)
+	next, _ = m.runSlash("/help")
+	m = next.(Model)
+	activateCount := 0
+	for _, intent := range controller.intents {
+		if intent.Kind() == frontend.IntentActivateSkill {
+			activateCount++
+		}
+	}
+	if activateCount != 2 || !strings.Contains(stripANSI(m.scroll.String()), "loaded skill: alpha") || !strings.Contains(stripANSI(m.scroll.String()), "unknown skill: missing") || !strings.Contains(stripANSI(m.scroll.String()), "/skills") {
+		t.Fatalf("skill command intents=%#v scroll=%q", controller.intents, stripANSI(m.scroll.String()))
+	}
+
+	emptyController := &fakeFrontendController{}
+	empty := presentationModel(emptyController)
+	next, _ = empty.runSlash("/skills")
+	if !strings.Contains(stripANSI(next.(Model).scroll.String()), "No Agent Skills discovered.") {
+		t.Fatal("empty skill catalog message absent")
+	}
+}
+
+func TestEvidenceCommandsRemainPresentationOnly(t *testing.T) {
+	controller := &fakeFrontendController{transitions: []frontend.Transition{
+		{Events: []frontend.Event{{Kind: frontend.EventWorkspace, Text: ".rehamr/ evidence workspace initialized"}}},
+		{Events: []frontend.Event{{Kind: frontend.EventWorkspace, Text: "status text"}}},
+		{Events: []frontend.Event{{Kind: frontend.EventWarning, Text: "init-re: denied"}}},
+	}}
+	m := presentationModel(controller)
+	next, _ := m.cmdInitEvidence(nil)
+	m = next.(Model)
+	next, _ = m.cmdEvidenceStatus(nil)
+	m = next.(Model)
+	next, _ = m.cmdInitEvidence(nil)
+	m = next.(Model)
+	output := stripANSI(m.scroll.String())
+	if !strings.Contains(output, "evidence workspace initialized") || !strings.Contains(output, "status text") || !strings.Contains(output, "init-re: denied") {
+		t.Fatalf("evidence output = %q", output)
+	}
+	if len(controller.intents) != 3 || controller.intents[0].Kind() != frontend.IntentInitializeEvidence || controller.intents[1].Kind() != frontend.IntentEvidenceStatus {
+		t.Fatalf("evidence intents = %#v", controller.intents)
+	}
+}
+
 func TestFrontendCompletionAndNaturalQueueFireExactlyOnce(t *testing.T) {
 	controller := &fakeFrontendController{snapshot: frontend.Snapshot{Active: "local", Phase: frontend.PhaseThinking}}
 	controller.bootstrap = frontend.Transition{Snapshot: controller.snapshot, Events: []frontend.Event{{Kind: frontend.EventHistory, Values: []string{"remember"}}}, Work: fakeFrontendWork{completion: "startup"}}

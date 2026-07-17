@@ -399,3 +399,19 @@ func Budget(ctxSize int) int {
 	}
 	return b - b/budgetHeadroomDivisor
 }
+
+// BudgetForSystem reduces the retained history budget when the actual system
+// prompt exceeds FixedSystem. This keeps activated skill instructions inside
+// the declared context window instead of allowing them to consume response
+// headroom or silently displace the leading system message server-side.
+func BudgetForSystem(ctxSize, systemTokens int) int {
+	budget := Budget(ctxSize)
+	extra := systemTokens - FixedSystem
+	if extra <= 0 {
+		return budget
+	}
+	if extra >= budget {
+		return 0
+	}
+	return budget - extra
+}

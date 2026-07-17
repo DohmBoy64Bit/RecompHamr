@@ -50,9 +50,19 @@ func TestRuntimeSnapshotActivationAndReload(t *testing.T) {
 		t.Fatal(err)
 	}
 	runtime := NewRuntime(cfg)
+	cfg.Skills = config.SkillsConfig{TrustProject: true, Disabled: []string{"alpha"}}
+	settings := runtime.SkillSettings()
+	settings.Disabled[0] = "mutated"
+	if got := runtime.SkillSettings(); !got.TrustProject || got.Disabled[0] != "alpha" {
+		t.Fatalf("skill settings = %#v", got)
+	}
 	snapshot := runtime.Snapshot()
-	if snapshot.Active != "local" || snapshot.ActiveURL != "http://one" || snapshot.ActiveModel == "" || snapshot.ActiveKeyed || len(snapshot.Profiles) != 2 {
+	if snapshot.Active != "local" || snapshot.ActiveURL != "http://one" || snapshot.ActiveModel != "mistralai/devstral-small-2-2512" || snapshot.ActiveKeyed || len(snapshot.Profiles) != 3 {
 		t.Fatalf("initial snapshot = %#v", snapshot)
+	}
+	gemma, ok := snapshot.Profile("gemma")
+	if !ok || gemma.Model != "google/gemma-4-12b-qat" || gemma.Active {
+		t.Fatalf("gemma profile = %#v %v", gemma, ok)
 	}
 	other, ok := snapshot.Profile("other")
 	if !ok || !other.Keyed || other.URL != "http://two" || other.Active {

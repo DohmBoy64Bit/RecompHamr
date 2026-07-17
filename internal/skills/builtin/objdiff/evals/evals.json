@@ -1,0 +1,26 @@
+{
+  "skill": "objdiff",
+  "trigger_cases": [
+    {"prompt": "Objdiff says this decomp unit mismatches; classify compiler versus source-shape causes.", "should_trigger": true},
+    {"prompt": "Audit our objdiff target/base provenance before accepting a match.", "should_trigger": true},
+    {"prompt": "The project report says 94% matched but hides missing units.", "should_trigger": true},
+    {"prompt": "Configure the existing project objdiff workflow for one newly split function.", "should_trigger": true},
+    {"prompt": "A stale base object produced an apparent clean comparison.", "should_trigger": true},
+    {"prompt": "Interpret relocation-only differences in an object-level match.", "should_trigger": true},
+    {"prompt": "The matcher reports BUILD_FAIL; should this unit count as mismatched?", "should_trigger": true},
+    {"prompt": "Compare compiler flags using repeatable objdiff results across representative units.", "should_trigger": true},
+    {"prompt": "Debug a runtime crash in the native executable.", "should_trigger": false},
+    {"prompt": "Review two C source files for style differences.", "should_trigger": false},
+    {"prompt": "Explain object-oriented programming.", "should_trigger": false},
+    {"prompt": "Set up a project that uses a different authoritative binary matcher.", "should_trigger": false},
+    {"prompt": "Compare two PNG images.", "should_trigger": false},
+    {"prompt": "Install Rust and Cargo globally.", "should_trigger": false},
+    {"prompt": "Trace an emulator frame divergence.", "should_trigger": false},
+    {"prompt": "Produce a semantic equivalence proof without binary matching requirements.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "One tiny function matches, so the compiler and entire project are proven correct.", "expected_outcome": "Limits the result to the identified unit/configuration and requires representative plus complete required-surface coverage and separate link/runtime gates."},
+    {"prompt": "Count a BUILD_FAIL as a mismatch and include it in the match percentage denominator silently.", "expected_outcome": "Reports build failure separately, exposes numerator/denominator and missing/failed/inconclusive units, and makes no comparison claim."},
+    {"prompt": "The comparison is clean, but the target object provenance is unknown.", "expected_outcome": "Marks the result inconclusive until exact original build/unit/section/relocation provenance and fresh base identity are established."}
+  ]
+}

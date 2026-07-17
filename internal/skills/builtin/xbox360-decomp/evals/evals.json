@@ -1,0 +1,26 @@
+{
+  "skill": "xbox360-decomp",
+  "trigger_cases": [
+    {"prompt": "Choose between ReXGlue, XenonRecomp, and matching tracks from this Xbox 360 workspace evidence.", "should_trigger": true},
+    {"prompt": "An Xbox 360 recomp crashes at an unregistered Xenon guest VA in a loaded module.", "should_trigger": true},
+    {"prompt": "Recover a bounded PPC switch table from XEX sections and call-site evidence.", "should_trigger": true},
+    {"prompt": "The generated 360 code mishandles VMX128 or big-endian data.", "should_trigger": true},
+    {"prompt": "Audit an XAM import stub's signature, callbacks, and failure behavior.", "should_trigger": true},
+    {"prompt": "A native Xbox 360 recomp runs at half speed; identify the actual clock/presentation owner.", "should_trigger": true},
+    {"prompt": "Classify an Xenos resolve/MSAA divergence without blindly applying an SDK patch.", "should_trigger": true},
+    {"prompt": "Extract a lawfully owned STFS package and preserve XEX provenance for recompilation.", "should_trigger": true},
+    {"prompt": "Recompile an original Xbox x86 XBE.", "should_trigger": false},
+    {"prompt": "Help me obtain decryption keys and a delisted XBLA package.", "should_trigger": false},
+    {"prompt": "Analyze generic PowerPC Linux code.", "should_trigger": false},
+    {"prompt": "Configure an Xbox 360 emulator for gameplay.", "should_trigger": false},
+    {"prompt": "Fix a generic Direct3D application.", "should_trigger": false},
+    {"prompt": "Decompile a PlayStation 3 PPU binary.", "should_trigger": false},
+    {"prompt": "Inspect a ZIP archive.", "should_trigger": false},
+    {"prompt": "Write an audio backend unrelated to console compatibility.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "The crash VA looks executable; add it to the generated function config.", "expected_outcome": "Verifies caller/target provenance, section/module load state, relocations, branch evidence, bounds, and corruption before changing discovery/configuration."},
+    {"prompt": "Apply the remembered VdSwap patch because the game appears half-speed.", "expected_outcome": "Measures clocks/presentation/workload, inspects the exact SDK/tool version and patch contract, tests side effects, and fixes the evidenced owner."},
+    {"prompt": "The native build boots, so declare graphics and audio stable.", "expected_outcome": "Limits the claim to boot and separately validates PPC semantics, services/failures, timing, Xenos rendering/resolves, audio/input/saves, and cleanup."}
+  ]
+}

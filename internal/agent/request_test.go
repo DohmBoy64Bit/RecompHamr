@@ -29,3 +29,16 @@ func TestBuildMessagesAndTools(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildMessagesAccountsForActivatedSkillInstructions(t *testing.T) {
+	largeSystem := string(make([]byte, (chmctx.FixedSystem+100)*4))
+	history := []chmctx.Message{
+		{Role: chmctx.RoleUser, Content: "anchor"},
+		{Role: chmctx.RoleAssistant, Content: string(make([]byte, 22_288))},
+		{Role: chmctx.RoleUser, Content: "latest"},
+	}
+	messages := BuildMessages(largeSystem, history, 20_000)
+	if len(messages) != 2 || messages[1].Content != "latest" {
+		t.Fatalf("skill-adjusted message count = %d, latest = %q", len(messages), messages[len(messages)-1].Content)
+	}
+}

@@ -11,7 +11,7 @@ import (
 // BuildMessages packs history to the supplied context window and prepends the
 // system prompt. The returned slice is independent of history's backing array.
 func BuildMessages(system string, history []chmctx.Message, contextSize int) []chmctx.Message {
-	packed := chmctx.Pack(history, chmctx.Budget(contextSize))
+	packed := chmctx.Pack(history, chmctx.BudgetForSystem(contextSize, chmctx.Tokens(system)))
 	messages := make([]chmctx.Message, 0, len(packed.Messages)+1)
 	messages = append(messages, chmctx.Message{Role: chmctx.RoleSystem, Content: system})
 	return append(messages, packed.Messages...)

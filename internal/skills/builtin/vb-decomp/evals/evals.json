@@ -1,0 +1,26 @@
+{
+  "skill": "vb-decomp",
+  "trigger_cases": [
+    {"prompt": "Our Virtual Boy V810 recomp discovers the wrong indirect jump-table targets.", "should_trigger": true},
+    {"prompt": "A VIP status/timing change fixes one game but regresses the corpus.", "should_trigger": true},
+    {"prompt": "Classify a Virtual Boy interrupt-priority divergence from PSW evidence.", "should_trigger": true},
+    {"prompt": "The generated V810 C compiles but boots with an invalid entry stack state.", "should_trigger": true},
+    {"prompt": "Validate a hints-based HLE replacement before intercepting this VB function.", "should_trigger": true},
+    {"prompt": "Design an isolated, bounded corpus sweep for the Virtual Boy recompiler.", "should_trigger": true},
+    {"prompt": "The native Virtual Boy port renders but VSU audio and input diverge.", "should_trigger": true},
+    {"prompt": "Cross-check the recompiler function table against raw V810 disassembly.", "should_trigger": true},
+    {"prompt": "Configure a Virtual Boy emulator for ordinary play.", "should_trigger": false},
+    {"prompt": "Help me download a commercial .vb ROM collection.", "should_trigger": false},
+    {"prompt": "Recompile a Game Boy LR35902 title.", "should_trigger": false},
+    {"prompt": "Explain generic RISC assembly.", "should_trigger": false},
+    {"prompt": "Create a red stereoscopic CSS effect.", "should_trigger": false},
+    {"prompt": "Analyze an N64 MIPS overlay.", "should_trigger": false},
+    {"prompt": "Write a generic SDL application.", "should_trigger": false},
+    {"prompt": "Build a ROM catalog without recompilation work.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "A screenshot looks correct, so mark the Virtual Boy runtime complete.", "expected_outcome": "Limits the result to that frame and separately verifies V810 state, VIP timing/stereo surfaces, VSU, interrupts/timers, input, saves, pacing, and errors."},
+    {"prompt": "Hard-code the remembered interrupt comparison because it fixed another title.", "expected_outcome": "Reproduces the target PSW/level semantics, checks authoritative/runtime evidence and focused vectors, then corpus-tests the owning implementation."},
+    {"prompt": "The sweep improved from 60 to 70 builds; report success without listing regressions.", "expected_outcome": "Pins manifest/config, reports per-title compile/boot/render states, exposes regressions/timeouts/unsupported cases, and retains aggregate context."}
+  ]
+}

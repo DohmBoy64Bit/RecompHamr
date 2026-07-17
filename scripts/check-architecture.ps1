@@ -8,11 +8,11 @@ function Fail([string]$Message) {
 }
 
 # Backend packages must never depend on the concrete presentation.
-$BackendRoots = @('internal/agent', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/logging', 'internal/provider', 'internal/session', 'internal/tools', 'internal/workspace')
+$BackendRoots = @('internal/agent', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/logging', 'internal/provider', 'internal/session', 'internal/skills', 'internal/tools', 'internal/workspace')
 foreach ($Relative in $BackendRoots) {
     $Dir = Join-Path $Root $Relative
     if (-not (Test-Path $Dir)) { continue }
-    $Hit = Get-ChildItem -Path $Dir -Recurse -File -Filter '*.go' |
+    $Hit = Get-ChildItem -Path $Dir -Recurse -File -Filter '*.go' -ErrorAction SilentlyContinue |
         Select-String -SimpleMatch 'internal/tui' |
         Select-Object -First 1
     if ($null -ne $Hit) {
@@ -35,7 +35,7 @@ foreach ($Pattern in @('internal/tui', 'charmbracelet/bubbletea')) {
 # runtime packages and may only schedule opaque Work values.
 $TuiProduction = Get-ChildItem -Path (Join-Path $Root 'internal/tui') -File -Filter '*.go' |
     Where-Object { $_.Name -notlike '*_test.go' }
-foreach ($Pattern in @('internal/agent', 'internal/session', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/provider', 'internal/tools', 'internal/logging', 'internal/workspace', '.ApplyDelivery(', '.ApplyToolResult(', '.StartRound(', '.NextTool(', '.DecideClose(', '.CancelTurn(', '.ResetConversation(', '.Reachability(', 'ProbeWork', 'ToolDelivery', 'StreamDelivery', 'TurnState', 'StreamState', 'LoopState', 'cancelFunc', 'processHandle')) {
+foreach ($Pattern in @('internal/agent', 'internal/session', 'internal/config', 'internal/ctx', 'internal/llm', 'internal/provider', 'internal/skills', 'internal/tools', 'internal/logging', 'internal/workspace', '.ApplyDelivery(', '.ApplyToolResult(', '.StartRound(', '.NextTool(', '.DecideClose(', '.CancelTurn(', '.ResetConversation(', '.Reachability(', 'ProbeWork', 'ToolDelivery', 'StreamDelivery', 'TurnState', 'StreamState', 'LoopState', 'cancelFunc', 'processHandle')) {
     $Hit = $TuiProduction | Select-String -SimpleMatch $Pattern | Select-Object -First 1
     if ($null -ne $Hit) {
         Fail "presentation imports backend lifecycle at $($Hit.Path):$($Hit.LineNumber): $Pattern"
@@ -69,7 +69,7 @@ if ($null -ne $DirectAppImport) {
 
 # go list is the positive deletion-boundary proof: core application and all
 # backend owners resolve without either concrete TUI or Bubble Tea dependencies.
-$CorePackages = @('./internal/app', './internal/app/controller', './internal/frontend', './internal/agent', './internal/session', './internal/config', './internal/ctx', './internal/llm', './internal/provider', './internal/tools', './internal/logging', './internal/workspace')
+$CorePackages = @('./internal/app', './internal/app/controller', './internal/frontend', './internal/agent', './internal/session', './internal/config', './internal/ctx', './internal/llm', './internal/provider', './internal/skills', './internal/tools', './internal/logging', './internal/workspace')
 $Deps = & go list -deps @CorePackages
 if ($LASTEXITCODE -ne 0) { Fail 'core/backend package graph does not build' }
 foreach ($Pattern in @('github.com/DohmBoy64Bit/RecompHamr/internal/tui', 'github.com/charmbracelet/bubbletea')) {
@@ -77,8 +77,9 @@ foreach ($Pattern in @('github.com/DohmBoy64Bit/RecompHamr/internal/tui', 'githu
 }
 
 # Removed feature packages must not be imported under a different file layout.
-$AllGo = Get-ChildItem -Path $Root -Recurse -File -Filter '*.go'
-foreach ($Pattern in @('/mcp', '/skills', '/update', '/classifier', '/doctor', '/project')) {
+$AllGo = Get-ChildItem -Path @((Join-Path $Root 'cmd'), (Join-Path $Root 'internal')) -Recurse -File -Filter '*.go' -ErrorAction SilentlyContinue
+if ($AllGo.Count -eq 0) { Fail 'active Go source could not be enumerated' }
+foreach ($Pattern in @('/mcp', '/update', '/classifier', '/doctor', '/project')) {
     $Hit = $AllGo | Select-String -SimpleMatch $Pattern | Select-Object -First 1
     if ($null -ne $Hit) {
         Fail "removed feature dependency remains at $($Hit.Path):$($Hit.LineNumber): $Pattern"
@@ -110,5 +111,5 @@ foreach ($Pattern in @('RepomixrDir', 'RecompRefDir', 'MCPExec')) {
     if ($null -ne $Hit) { Fail "unsafe/deferred tool extension state remains at $($Hit.Path):$($Hit.LineNumber): $Pattern" }
 }
 
-Write-Host 'architecture (Stage F tools + Stage D workspace + Stage C frontend boundary): PASS'
-Write-Host 'workspace/tool cache authority is app-only; core/backend deletion graph excludes internal/tui and Bubble Tea.'
+Write-Host 'architecture (Stage G skills + Stage F tools + Stage D workspace + Stage C frontend boundary): PASS'
+Write-Host 'skills/workspace/tool authority remains below presentation; core/backend deletion graph excludes internal/tui and Bubble Tea.'

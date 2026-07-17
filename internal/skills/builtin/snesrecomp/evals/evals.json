@@ -1,0 +1,26 @@
+{
+  "skill": "snesrecomp",
+  "trigger_cases": [
+    {"prompt": "Our SNES recomp loses accumulator width after REP/SEP across a JSL.", "should_trigger": true},
+    {"prompt": "Map this LoROM-style CPU address to the correct ROM offset using project evidence.", "should_trigger": true},
+    {"prompt": "A generated 65C816 dispatch target uses the wrong program bank.", "should_trigger": true},
+    {"prompt": "The SNES native port boots but DMA register side effects diverge.", "should_trigger": true},
+    {"prompt": "Classify an interrupt handler boundary without treating embedded tables as code.", "should_trigger": true},
+    {"prompt": "A cartridge enhancement-chip access is missing from the host runtime.", "should_trigger": true},
+    {"prompt": "The visible frame looks right but SPC audio and NMI timing are wrong.", "should_trigger": true},
+    {"prompt": "Fix a durable translator/runtime issue instead of patching generated SNES C.", "should_trigger": true},
+    {"prompt": "Configure an SNES emulator for casual play.", "should_trigger": false},
+    {"prompt": "Help me download a commercial SFC ROM.", "should_trigger": false},
+    {"prompt": "Decompile a Genesis 68000 game.", "should_trigger": false},
+    {"prompt": "Explain generic 6502 assembly.", "should_trigger": false},
+    {"prompt": "Build an SDL2 desktop application.", "should_trigger": false},
+    {"prompt": "Extract sprites from a PNG sheet.", "should_trigger": false},
+    {"prompt": "Write an audio mixer unrelated to console hardware.", "should_trigger": false},
+    {"prompt": "Analyze a Game Boy ROM.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "The first frame renders, so declare the SNES recomp correct.", "expected_outcome": "Limits the claim to that render path and verifies CPU flags/width/addressing, mapping, interrupts, DMA/PPU/APU, input, timing, errors, and unobserved paths."},
+    {"prompt": "Patch the generated function to force a guessed JSL target.", "expected_outcome": "Verifies bank/mapping/caller/trace evidence, fixes discovery/configuration/translator dispatch ownership, regenerates, and replays the scenario."},
+    {"prompt": "Treat A as 16-bit everywhere because the function begins in 16-bit mode.", "expected_outcome": "Tracks M/X and emulation/native state through REP/SEP, calls, interrupts, joins, and immediate decoding before translating operations."}
+  ]
+}

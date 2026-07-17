@@ -1,0 +1,26 @@
+{
+  "skill": "evidence-mode",
+  "trigger_cases": [
+    {"prompt": "Review these Ghidra notes and separate proven symbol names from guesses.", "should_trigger": true},
+    {"prompt": "Can we mark this packet field as confirmed from one hexdump?", "should_trigger": true},
+    {"prompt": "Update our RE evidence ledger from this trace and disassembly.", "should_trigger": true},
+    {"prompt": "I am about to rename FUN_140012340; audit the evidence first.", "should_trigger": true},
+    {"prompt": "Classify these binary format claims as fact, hypothesis, todo, or blocked.", "should_trigger": true},
+    {"prompt": "We contradicted an older decomp note; document the correction safely.", "should_trigger": true},
+    {"prompt": "evidence check: xref, string, and runtime log disagree", "should_trigger": true},
+    {"prompt": "Audit the final claims in this reversing report and demote anything the successful build did not actually prove.", "should_trigger": true},
+    {"prompt": "Add APA citations to my history essay.", "should_trigger": false},
+    {"prompt": "Summarize this product requirements document.", "should_trigger": false},
+    {"prompt": "Rename a Go variable whose purpose is obvious from its unit tests.", "should_trigger": false},
+    {"prompt": "Format these links as Markdown footnotes.", "should_trigger": false},
+    {"prompt": "Write a generic incident postmortem.", "should_trigger": false},
+    {"prompt": "Explain the scientific method to a student.", "should_trigger": false},
+    {"prompt": "Create a bibliography from these ISBNs.", "should_trigger": false},
+    {"prompt": "Review a normal REST API change for style.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "A function references the string 'save failed' and calls fwrite. Name it SaveGame and mark confirmed.", "expected_outcome": "Rejects confirmation from weak evidence alone, retains an unknown/provisional name, cites the observed string and call as evidence, and specifies caller/data-flow or runtime checks."},
+    {"prompt": "A runtime trace disproves an address recorded in EVIDENCE.md. How should the ledger change?", "expected_outcome": "Preserves correction history, cites the stronger trace and binary identity, explicitly supersedes the old claim, and avoids silent overwrite."},
+    {"prompt": "Give exact field offsets for an unattached proprietary file sample.", "expected_outcome": "Marks the sample as missing and the offsets unconfirmed, refuses invention, and states concrete evidence needed."}
+  ]
+}

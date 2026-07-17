@@ -11,6 +11,7 @@ import (
 	chmctx "github.com/DohmBoy64Bit/RecompHamr/internal/ctx"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/skills"
 )
 
 const (
@@ -21,25 +22,40 @@ const (
 // Controller translates backend-neutral frontend intents into exactly-once
 // application actions while retaining all backend capabilities privately.
 type Controller struct {
-	session   *session.Runtime
-	agent     agent.Runtime
-	system    func() string
-	version   string
-	nextID    uint64
-	pending   map[uint64]struct{}
-	turnStart time.Time
-	now       func() time.Time
+	session        *session.Runtime
+	agent          agent.Runtime
+	system         func() string
+	version        string
+	nextID         uint64
+	pending        map[uint64]struct{}
+	turnStart      time.Time
+	now            func() time.Time
+	skills         *skills.Runtime
+	refresh        func() skills.Catalog
+	initEvidence   func() error
+	evidenceStatus func() (string, error)
 }
 
-// NewController constructs the stable application/frontend boundary.
+// NewController constructs the stable application/frontend boundary without
+// discovered skills. It remains the focused-test convenience constructor.
 func NewController(sessionRuntime *session.Runtime, agentRuntime agent.Runtime, system func() string, version string) *Controller {
+	return NewControllerWithSkills(sessionRuntime, agentRuntime, skills.NewRuntime(skills.Discover(nil)), nil, nil, nil, system, version)
+}
+
+// NewControllerWithSkills constructs the production application/frontend
+// boundary with an application-owned skills runtime.
+func NewControllerWithSkills(sessionRuntime *session.Runtime, agentRuntime agent.Runtime, skillRuntime *skills.Runtime, refresh func() skills.Catalog, initEvidence func() error, evidenceStatus func() (string, error), system func() string, version string) *Controller {
 	return &Controller{
-		session: sessionRuntime,
-		agent:   agentRuntime,
-		system:  system,
-		version: version,
-		pending: make(map[uint64]struct{}),
-		now:     time.Now,
+		session:        sessionRuntime,
+		agent:          agentRuntime,
+		system:         system,
+		version:        version,
+		pending:        make(map[uint64]struct{}),
+		now:            time.Now,
+		skills:         skillRuntime,
+		refresh:        refresh,
+		initEvidence:   initEvidence,
+		evidenceStatus: evidenceStatus,
 	}
 }
 
@@ -58,6 +74,24 @@ func (c *Controller) Snapshot() frontend.Snapshot {
 	if live, ok := c.agent.LiveContextSize(sessionSnapshot.Active); ok {
 		contextSize = live
 	}
+	activeNames := c.skills.ActiveNames()
+	activeSkills := make(map[string]bool, len(activeNames))
+	for _, name := range activeNames {
+		activeSkills[name] = true
+	}
+	skillEntries := c.skills.Entries()
+	skillFacts := make([]frontend.Skill, 0, len(skillEntries))
+	for _, entry := range skillEntries {
+		skillFacts = append(skillFacts, frontend.Skill{Name: entry.Name, Description: entry.Description, Active: activeSkills[entry.Name]})
+	}
+	diagnosticFacts := make([]string, 0, len(c.skills.Diagnostics()))
+	for _, diagnostic := range c.skills.Diagnostics() {
+		label := diagnostic.Name
+		if label == "" {
+			label = "skills"
+		}
+		diagnosticFacts = append(diagnosticFacts, label+": "+diagnostic.Message)
+	}
 	return frontend.Snapshot{
 		Phase:             frontend.Phase(agentSnapshot.Phase),
 		Connected:         agentSnapshot.Connected,
@@ -70,6 +104,8 @@ func (c *Controller) Snapshot() frontend.Snapshot {
 		ContextSize:       contextSize,
 		ActiveKeyed:       sessionSnapshot.ActiveKeyed,
 		Profiles:          profiles,
+		Skills:            skillFacts,
+		SkillDiagnostics:  diagnosticFacts,
 	}
 }
 
@@ -95,6 +131,14 @@ func (c *Controller) Dispatch(intent frontend.Intent) frontend.Transition {
 	case frontend.IntentReload:
 		if _, _, err := c.session.Reload(); err != nil {
 			transition.Events = []frontend.Event{{Kind: frontend.EventWarning, Text: err.Error()}}
+		} else if c.refresh != nil {
+			c.skills.ReplaceCatalog(c.refresh())
+			entries := c.skills.Entries()
+			names := make([]string, 0, len(entries))
+			for _, entry := range entries {
+				names = append(names, entry.Name)
+			}
+			c.agent = c.agent.WithSkillTool(names)
 		}
 	case frontend.IntentActivate:
 		if snapshot, err := c.session.Activate(intent.ProfileName()); err != nil {
@@ -105,6 +149,7 @@ func (c *Controller) Dispatch(intent frontend.Intent) frontend.Transition {
 		}
 	case frontend.IntentClearConversation:
 		c.agent.ResetConversation()
+		c.skills.Reset()
 		c.turnStart = time.Time{}
 		_ = c.session.ClearHistory()
 	case frontend.IntentComplete:
@@ -122,6 +167,33 @@ func (c *Controller) Dispatch(intent frontend.Intent) frontend.Transition {
 		if c.agent.Active() {
 			c.agent.ObserveCancel()
 			transition.Events = c.finishTurn(false, true, false, "✗ cancelled", intent.Time())
+		}
+	case frontend.IntentActivateSkill:
+		activation, fresh, err := c.skills.Activate(intent.Text())
+		if err != nil {
+			transition.Events = []frontend.Event{{Kind: frontend.EventWarning, Text: "unknown skill: " + intent.Text()}}
+		} else {
+			text := "loaded skill: " + activation.Name
+			if !fresh {
+				text = "skill " + activation.Name + " is already active"
+			}
+			transition.Events = []frontend.Event{{Kind: frontend.EventSkillActivated, Text: text}}
+		}
+	case frontend.IntentInitializeEvidence:
+		if c.initEvidence == nil {
+			transition.Events = []frontend.Event{{Kind: frontend.EventWarning, Text: "evidence workspace unavailable"}}
+		} else if err := c.initEvidence(); err != nil {
+			transition.Events = []frontend.Event{{Kind: frontend.EventWarning, Text: "init-re: " + err.Error()}}
+		} else {
+			transition.Events = []frontend.Event{{Kind: frontend.EventWorkspace, Text: ".rehamr/ evidence workspace initialized"}}
+		}
+	case frontend.IntentEvidenceStatus:
+		if c.evidenceStatus == nil {
+			transition.Events = []frontend.Event{{Kind: frontend.EventWarning, Text: "evidence workspace unavailable"}}
+		} else if status, err := c.evidenceStatus(); err != nil {
+			transition.Events = []frontend.Event{{Kind: frontend.EventWarning, Text: "status-re: " + err.Error()}}
+		} else {
+			transition.Events = []frontend.Event{{Kind: frontend.EventWorkspace, Text: status}}
 		}
 	case frontend.IntentInvalid:
 		// The zero-value malformed intent is a permanent no-op.

@@ -11,6 +11,7 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/logging"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/skills"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/tools"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/workspace"
 )
@@ -20,18 +21,42 @@ var (
 	bootstrapConfig     = config.Bootstrap
 	absolutePath        = filepath.Abs
 	getEnvironment      = os.Getenv
+	getUserHome         = os.UserHomeDir
 	newSessionRuntime   = session.NewRuntime
-	newAgentRuntime     = func(client agent.ChatClient, privateRoot string) agent.Runtime {
+	newAgentRuntime     = func(client agent.ChatClient, privateRoot string, skillRuntime *skills.Runtime) agent.Runtime {
 		toolSet := tools.NewSet(privateRoot, config.RestrictPrivatePath)
-		return agent.NewRuntime(client, agent.NewToolExecutor(toolSet.Execute)).WithObserver(logging.NewObserver())
+		entries := skillRuntime.Entries()
+		names := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			names = append(names, entry.Name)
+		}
+		toolSet = toolSet.WithSkillActivator(skillActivator(skillRuntime))
+		toolSet = toolSet.WithSkillResourceReader(skillRuntime.ReadResource)
+		return agent.NewRuntime(client, agent.NewToolExecutor(toolSet.Execute)).WithSkillTool(names).WithObserver(logging.NewObserver())
 	}
-	newController = func(sessionRuntime *session.Runtime, runtime agent.Runtime, system func() string, version string) frontend.Controller {
-		return appcontroller.NewController(sessionRuntime, runtime, system, version)
+	newController = func(sessionRuntime *session.Runtime, runtime agent.Runtime, skillRuntime *skills.Runtime, refresh func() skills.Catalog, initEvidence func() error, evidenceStatus func() (string, error), system func() string, version string) frontend.Controller {
+		return appcontroller.NewControllerWithSkills(sessionRuntime, runtime, skillRuntime, refresh, initEvidence, evidenceStatus, system, version)
 	}
-	newWorkspace  = workspace.Open
-	openDebugLog  = logging.Open
-	closeDebugLog = logging.Close
+	newWorkspace   = workspace.Open
+	installBundled = skills.InstallBundled
+	openDebugLog   = logging.Open
+	closeDebugLog  = logging.Close
 )
+
+// skillActivator adapts conversation-scoped skill activation to the bounded
+// text contract exposed by the model tool without exposing the skills runtime.
+func skillActivator(runtime *skills.Runtime) func(string) (string, error) {
+	return func(name string) (string, error) {
+		_, fresh, err := runtime.Activate(name)
+		if err != nil {
+			return "", err
+		}
+		if !fresh {
+			return "skill already active: " + name, nil
+		}
+		return "activated skill: " + name, nil
+	}
+}
 
 // Runtime is the application-owned backend lifetime exposed to concrete
 // frontend adapters. It reveals only the neutral controller and idempotent
@@ -80,15 +105,37 @@ func Bootstrap(version string) (*Runtime, error) {
 		close = closeDebugLog
 	}
 	sessionRuntime := newSessionRuntime(cfg)
-	agentRuntime := newAgentRuntime(sessionRuntime, cfg.Dir)
+	home, _ := getUserHome()
+	bundledRoot, err := installBundled(cfg.Dir)
+	if err != nil {
+		return nil, err
+	}
+	discover := func() skills.Catalog {
+		return discoverSkillCatalog(bundledRoot, home, projectDir, sessionRuntime.SkillSettings())
+	}
+	catalog := discover()
+	skillRuntime := skills.NewRuntime(catalog)
+	agentRuntime := newAgentRuntime(sessionRuntime, cfg.Dir, skillRuntime)
 	system := func() string {
 		prompt, promptErr := projectWorkspace.SystemPrompt(config.DefaultSystemPrompt)
 		if promptErr != nil {
-			return config.DefaultSystemPrompt + "\n\nWorking directory: " + projectWorkspace.Root()
+			prompt = config.DefaultSystemPrompt + "\n\nWorking directory: " + projectWorkspace.Root()
+		}
+		skillText := skillRuntime.SystemText()
+		if skillText != "" {
+			prompt += "\n\n" + skillText
 		}
 		return prompt
 	}
-	return &Runtime{controller: newController(sessionRuntime, agentRuntime, system, version), close: close}, nil
+	return &Runtime{controller: newController(sessionRuntime, agentRuntime, skillRuntime, discover, projectWorkspace.InitializeEvidence, projectWorkspace.EvidenceStatus, system, version), close: close}, nil
+}
+
+func discoverSkillCatalog(bundledRoot, home, projectDir string, settings config.SkillsConfig) skills.Catalog {
+	return skills.Discover([]skills.Root{
+		{Path: bundledRoot, Scope: skills.ScopeBundled, Trusted: true},
+		{Path: filepath.Join(home, ".agents", "skills"), Scope: skills.ScopeUser, Trusted: true},
+		{Path: filepath.Join(projectDir, ".agents", "skills"), Scope: skills.ScopeProject, Trusted: settings.TrustProject},
+	}).Without(settings.Disabled)
 }
 
 func applyEnvOverrides(cfg *config.Config) {

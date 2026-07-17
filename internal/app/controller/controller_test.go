@@ -17,6 +17,7 @@ import (
 	"github.com/DohmBoy64Bit/RecompHamr/internal/frontend"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/llm"
 	"github.com/DohmBoy64Bit/RecompHamr/internal/session"
+	"github.com/DohmBoy64Bit/RecompHamr/internal/skills"
 )
 
 type scriptedClient struct{ rounds [][]llm.Event }
@@ -108,7 +109,7 @@ func TestControllerSnapshotBootstrapAndCompletions(t *testing.T) {
 	controller.agent.SetConnected(true)
 	controller.agent.SetLiveContextSize("local", 1234)
 	snapshot := controller.Snapshot()
-	if snapshot.Phase != frontend.PhaseThinking || !snapshot.Connected || snapshot.Active != "local" || len(snapshot.Profiles) != 2 {
+	if snapshot.Phase != frontend.PhaseThinking || !snapshot.Connected || snapshot.Active != "local" || len(snapshot.Profiles) != 3 || snapshot.Profiles[0].Name != "gemma" || snapshot.Profiles[0].Model != "google/gemma-4-12b-qat" {
 		t.Fatalf("snapshot = %#v", snapshot)
 	}
 	snapshot.Profiles[0].Name = "mutated"
@@ -137,6 +138,148 @@ func TestControllerSnapshotBootstrapAndCompletions(t *testing.T) {
 	unknown := controller.capture(func() any { return "unknown" }).Run()
 	if got := controller.Dispatch(frontend.Complete(unknown)); len(got.Events) != 0 {
 		t.Fatalf("unknown completion = %#v", got)
+	}
+}
+
+func TestControllerSkillSnapshotActivationDeduplicationAndReset(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "alpha")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: alpha\ndescription: Use alpha tasks.\n---\nAlpha instructions."), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	skillRuntime := skills.NewRuntime(skills.Discover([]skills.Root{{Path: root, Scope: skills.ScopeUser}}))
+	cfg := config.Default()
+	cfg.Dir = t.TempDir()
+	sessionRuntime := session.NewRuntime(cfg)
+	controller := NewControllerWithSkills(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()), skillRuntime, nil, nil, nil, func() string { return "system" }, "test")
+	snapshot := controller.Snapshot()
+	if len(snapshot.Skills) != 1 || snapshot.Skills[0].Name != "alpha" || snapshot.Skills[0].Active {
+		t.Fatalf("skills snapshot = %#v", snapshot.Skills)
+	}
+	snapshot.Skills[0].Name = "mutated"
+	if controller.Snapshot().Skills[0].Name != "alpha" {
+		t.Fatal("skills snapshot shared storage")
+	}
+	transition := controller.Dispatch(frontend.ActivateSkill("alpha"))
+	if len(transition.Events) != 1 || transition.Events[0].Kind != frontend.EventSkillActivated || transition.Events[0].Text != "loaded skill: alpha" || !transition.Snapshot.Skills[0].Active {
+		t.Fatalf("skill activation = %#v", transition)
+	}
+	if got := controller.Dispatch(frontend.ActivateSkill("alpha")); got.Events[0].Text != "skill alpha is already active" {
+		t.Fatalf("skill dedupe = %#v", got)
+	}
+	if got := controller.Dispatch(frontend.ActivateSkill("missing")); len(got.Events) != 1 || got.Events[0].Kind != frontend.EventWarning || got.Events[0].Text != "unknown skill: missing" {
+		t.Fatalf("missing skill = %#v", got)
+	}
+	controller.Dispatch(frontend.ClearConversation())
+	if controller.Snapshot().Skills[0].Active {
+		t.Fatal("clear retained skill activation")
+	}
+}
+
+func TestControllerSkillDiagnosticsArePathFree(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "wrong")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: different\ndescription: Invalid.\n---\nbody"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	catalog := skills.Discover([]skills.Root{{Path: root, Scope: skills.ScopeUser}, {Path: root, Scope: skills.ScopeProject}})
+	skillRuntime := skills.NewRuntime(catalog)
+	cfg := config.Default()
+	cfg.Dir = t.TempDir()
+	sessionRuntime := session.NewRuntime(cfg)
+	controller := NewControllerWithSkills(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()), skillRuntime, nil, nil, nil, func() string { return "system" }, "test")
+	diagnostics := controller.Snapshot().SkillDiagnostics
+	if len(diagnostics) != 2 || !strings.HasPrefix(diagnostics[0], "different:") || diagnostics[1] != "skills: untrusted project skills skipped" || strings.Contains(strings.Join(diagnostics, " "), root) {
+		t.Fatalf("diagnostics = %#v", diagnostics)
+	}
+}
+
+func TestControllerReloadRefreshesSkillCatalog(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "alpha")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: alpha\ndescription: Use alpha tasks.\n---\nAlpha instructions."), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	skillRuntime := skills.NewRuntime(skills.Discover([]skills.Root{{Path: root, Scope: skills.ScopeUser, Trusted: true}}))
+	cfg := config.Default()
+	project := t.TempDir()
+	cfg.Dir = filepath.Join(project, config.DirName)
+	if err := os.MkdirAll(cfg.Dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	sessionRuntime := session.NewRuntime(cfg)
+	refreshed := 0
+	refreshedRoot := t.TempDir()
+	refreshedDir := filepath.Join(refreshedRoot, "beta")
+	if err := os.MkdirAll(refreshedDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(refreshedDir, "SKILL.md"), []byte("---\nname: beta\ndescription: Use beta tasks.\n---\nBeta instructions."), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	controller := NewControllerWithSkills(sessionRuntime, agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor()).WithSkillTool([]string{"alpha"}), skillRuntime, func() skills.Catalog {
+		refreshed++
+		return skills.Discover([]skills.Root{{Path: refreshedRoot, Scope: skills.ScopeUser, Trusted: true}})
+	}, nil, nil, func() string { return "system" }, "test")
+	controller.Dispatch(frontend.ActivateSkill("alpha"))
+	transition := controller.Dispatch(frontend.Reload())
+	if refreshed != 1 || len(transition.Events) != 0 || len(transition.Snapshot.Skills) != 1 || transition.Snapshot.Skills[0].Name != "beta" || len(skillRuntime.ActiveNames()) != 0 {
+		t.Fatalf("reload refresh = %d %#v active=%#v", refreshed, transition, skillRuntime.ActiveNames())
+	}
+}
+
+func TestControllerEvidenceWorkspaceCommands(t *testing.T) {
+	cfg := config.Default()
+	cfg.Dir = t.TempDir()
+	sessionRuntime := session.NewRuntime(cfg)
+	base := agent.NewRuntime(sessionRuntime, agent.LocalToolExecutor())
+	unavailable := NewController(sessionRuntime, base, func() string { return "system" }, "test")
+	for _, intent := range []frontend.Intent{frontend.InitializeEvidence(), frontend.EvidenceStatus()} {
+		transition := unavailable.Dispatch(intent)
+		if len(transition.Events) != 1 || transition.Events[0].Kind != frontend.EventWarning || transition.Events[0].Text != "evidence workspace unavailable" {
+			t.Fatalf("unavailable = %#v", transition)
+		}
+	}
+
+	initErr, statusErr := false, false
+	controller := NewControllerWithSkills(sessionRuntime, base, skills.NewRuntime(skills.Discover(nil)), nil,
+		func() error {
+			if initErr {
+				return fmt.Errorf("denied")
+			}
+			return nil
+		},
+		func() (string, error) {
+			if statusErr {
+				return "", fmt.Errorf("missing")
+			}
+			return "status text", nil
+		}, func() string { return "system" }, "test")
+	if got := controller.Dispatch(frontend.InitializeEvidence()); got.Events[0].Kind != frontend.EventWorkspace || got.Events[0].Text != ".rehamr/ evidence workspace initialized" {
+		t.Fatalf("init success = %#v", got)
+	}
+	if got := controller.Dispatch(frontend.EvidenceStatus()); got.Events[0].Kind != frontend.EventWorkspace || got.Events[0].Text != "status text" {
+		t.Fatalf("status success = %#v", got)
+	}
+	initErr = true
+	statusErr = true
+	if got := controller.Dispatch(frontend.InitializeEvidence()); got.Events[0].Kind != frontend.EventWarning || got.Events[0].Text != "init-re: denied" {
+		t.Fatalf("init error = %#v", got)
+	}
+	if got := controller.Dispatch(frontend.EvidenceStatus()); got.Events[0].Kind != frontend.EventWarning || got.Events[0].Text != "status-re: missing" {
+		t.Fatalf("status error = %#v", got)
 	}
 }
 

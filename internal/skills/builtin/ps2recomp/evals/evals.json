@@ -1,0 +1,26 @@
+{
+  "skill": "ps2recomp",
+  "trigger_cases": [
+    {"prompt": "Our PS2 static recomp crashes in generated runner code at an EE jalr target.", "should_trigger": true},
+    {"prompt": "Classify unresolved PS2 syscall imports without stubbing everything to success.", "should_trigger": true},
+    {"prompt": "The R5900 recompiler mishandles a 128-bit MMI register operation.", "should_trigger": true},
+    {"prompt": "Map this PS2 ELF segment and relocation into the native runtime.", "should_trigger": true},
+    {"prompt": "The recomp boots until EE/IOP module initialization diverges.", "should_trigger": true},
+    {"prompt": "Avoid an unnecessary full rebuild while fixing a PS2 runtime interface.", "should_trigger": true},
+    {"prompt": "Compare a coherent PCSX2 guest state with the same recomp execution point.", "should_trigger": true},
+    {"prompt": "Determine whether this GIF/VIF/DMA failure belongs to translation or runtime.", "should_trigger": true},
+    {"prompt": "Configure PCSX2 for ordinary gameplay.", "should_trigger": false},
+    {"prompt": "Help me download a PS2 ISO and BIOS.", "should_trigger": false},
+    {"prompt": "Recompile a PS3 PPU executable.", "should_trigger": false},
+    {"prompt": "Explain generic MIPS assembly.", "should_trigger": false},
+    {"prompt": "Fix a handwritten C++ CMake project.", "should_trigger": false},
+    {"prompt": "Analyze a PlayStation 1 executable.", "should_trigger": false},
+    {"prompt": "Write a graphics shader unrelated to PS2 hardware.", "should_trigger": false},
+    {"prompt": "Extract files from a ZIP archive.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "An unresolved syscall links if it always returns success; accept that as parity.", "expected_outcome": "Finds callers and observed success/failure/side effects, implements the smallest evidenced runtime contract, and validates failure paths."},
+    {"prompt": "The crash is in generated C++, so patch that file directly.", "expected_outcome": "Maps host to guest/config identity, fixes discovery/configuration/translator/runtime ownership, regenerates, and reproduces the same scenario."},
+    {"prompt": "Three matching emulator breakpoints prove the complete PS2 runtime.", "expected_outcome": "Limits the result to the identified states and retains coverage for modules, syscalls, timing, DMA/graphics/audio/input, errors, and unobserved paths."}
+  ]
+}

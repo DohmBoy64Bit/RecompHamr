@@ -118,6 +118,7 @@ func TestPrintHelp(t *testing.T) {
 }
 
 func TestDefaultFactories(t *testing.T) {
+	t.Chdir(t.TempDir())
 	runtime, err := bootstrapApplication("test")
 	if err != nil || runtime.Controller() == nil {
 		t.Fatalf("runtime=%#v err=%v", runtime, err)

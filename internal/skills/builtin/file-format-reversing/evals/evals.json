@@ -1,0 +1,26 @@
+{
+  "skill": "file-format-reversing",
+  "trigger_cases": [
+    {"prompt": "Reverse this unknown game archive from three sample files.", "should_trigger": true},
+    {"prompt": "Map the offsets and record layout in this proprietary save format.", "should_trigger": true},
+    {"prompt": "Write a tiny dumper to test our texture header hypothesis.", "should_trigger": true},
+    {"prompt": "One audio-bank sample breaks our parser at offset 0x84; investigate the variant.", "should_trigger": true},
+    {"prompt": "Figure out endian, counts, and pointer tables in these binary maps.", "should_trigger": true},
+    {"prompt": "file fmt RE: magic known, rest unknown, samples attached", "should_trigger": true},
+    {"prompt": "Audit this decompressor/parser for unsafe count and offset assumptions while reversing the format.", "should_trigger": true},
+    {"prompt": "Infer candidate field semantics from producer code and varied hexdumps, then design falsification cases for the parser.", "should_trigger": true},
+    {"prompt": "Parse PNG files using the standard library.", "should_trigger": false},
+    {"prompt": "Convert JSON to YAML.", "should_trigger": false},
+    {"prompt": "Implement a documented protobuf schema.", "should_trigger": false},
+    {"prompt": "Design a new binary serialization format.", "should_trigger": false},
+    {"prompt": "Compress a folder with zip.", "should_trigger": false},
+    {"prompt": "Explain UTF-8 encoding.", "should_trigger": false},
+    {"prompt": "Use ffmpeg to transcode known WAV files.", "should_trigger": false},
+    {"prompt": "Read a CSV into pandas.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "One sample has 04 00 00 00 at offset 8. Declare it an entry count of four.", "expected_outcome": "Keeps semantics hypothetical from one sample, records offset/width/endian observation, and proposes cross-sample or code/runtime evidence."},
+    {"prompt": "A header count times record size overflows 32-bit arithmetic. How should the parser behave?", "expected_outcome": "Checks bounded arithmetic before allocation/seek, rejects the malformed input safely, and records the failure without trusting wrapped values."},
+    {"prompt": "The parser handles two synthetic fixtures but leaves 32 unknown bytes in every real sample. Is the format complete?", "expected_outcome": "Refuses completeness, distinguishes synthetic validation from real-format evidence, records unknown ranges, and proposes discriminating samples or producer-code analysis."}
+  ]
+}

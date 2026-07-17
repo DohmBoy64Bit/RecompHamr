@@ -1,5 +1,9 @@
 # Default Gemma Profile Work Packet
 
+> Historical accepted packet. On 2026-07-17 the user selected Devstral as the
+> fresh active default while requiring this Gemma profile to remain available.
+> See [`default-devstral-profile-work-packet.md`](default-devstral-profile-work-packet.md).
+
 ## Outcome
 
 Fresh RecompHamr projects seed the accepted LM Studio `google/gemma-4-12b-qat` profile at `http://localhost:1234` with a 16,177-token context, instead of the previous Qwen/Ollama values.

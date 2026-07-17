@@ -10,7 +10,6 @@ function Fail([string]$Message) {
 $RemovedDirectories = @(
     'internal/cloud',
     'internal/mcp',
-    'internal/skills',
     'internal/update',
     'internal/classifier',
     'internal/doctor',
@@ -36,11 +35,15 @@ foreach ($Needle in $Pinned) {
     }
 }
 
-$GoFiles = Get-ChildItem -Path $Root -Recurse -File -Filter '*.go'
+# Active Go source is confined to cmd/ and internal/. Do not recurse through
+# project runtime state such as the deliberately protected .rehamr directory.
+$GoFiles = Get-ChildItem -Path @((Join-Path $Root 'cmd'), (Join-Path $Root 'internal')) -Recurse -File -Filter '*.go' -ErrorAction SilentlyContinue
+if ($GoFiles.Count -eq 0) {
+    Fail 'active Go source could not be enumerated'
+}
 $ForbiddenCodePatterns = @(
     'internal/cloud',
     'internal/mcp',
-    'internal/skills',
     'internal/update',
     'internal/classifier',
     'internal/doctor',

@@ -1,0 +1,26 @@
+{
+  "skill": "xboxrecomp",
+  "trigger_cases": [
+    {"prompt": "Parse this original Xbox XBE's sections and kernel imports before lifting x86.", "should_trigger": true},
+    {"prompt": "An OG Xbox native recomp has an ICALL failure through a RenderWare vtable.", "should_trigger": true},
+    {"prompt": "Map an XBE guest virtual address safely through the host runtime.", "should_trigger": true},
+    {"prompt": "Recover a kernel ordinal signature and failure behavior from callers.", "should_trigger": true},
+    {"prompt": "The lifted Xbox x86 code mishandles x87 flags or stack ABI.", "should_trigger": true},
+    {"prompt": "Classify an NV2A push-buffer/MMIO crash versus a translation error.", "should_trigger": true},
+    {"prompt": "A generated dispatch override works but object initialization still corrupts the target.", "should_trigger": true},
+    {"prompt": "Validate the native Xbox recomp's D3D8, audio, input, and save runtime layers.", "should_trigger": true},
+    {"prompt": "Recompile an Xbox 360 Xenon XEX.", "should_trigger": false},
+    {"prompt": "Run a PC static recompiler on a generic Win32 PE.", "should_trigger": false},
+    {"prompt": "Help me download an Xbox ISO and XDK.", "should_trigger": false},
+    {"prompt": "Configure xemu for ordinary gameplay.", "should_trigger": false},
+    {"prompt": "Explain generic x86 assembly.", "should_trigger": false},
+    {"prompt": "Write a Direct3D 11 application.", "should_trigger": false},
+    {"prompt": "Analyze a Windows DLL import table only.", "should_trigger": false},
+    {"prompt": "Create an XInput controller profile.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "The ICALL target is in a remembered kernel range, so dispatch it as a thunk.", "expected_outcome": "Verifies XBE/import mapping, caller and target bytes/provenance, object state and relocation/load identity before classifying or dispatching."},
+    {"prompt": "Patch the generated C function so this title boots.", "expected_outcome": "Maps the failure to loader/discovery/configuration/translator/runtime ownership, fixes the durable source, regenerates, and replays the same scenario."},
+    {"prompt": "The build links and ICALL trace is clean, so mark the Xbox port complete.", "expected_outcome": "Limits the result to build/observed calls and separately validates x86 semantics, kernel failures, D3D8/NV2A, APU/audio, input/network/saves/timing, and cleanup."}
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "skill": "windows-game-decomp",
+  "trigger_cases": [
+    {"prompt": "Classify this Windows game as native PE, Mono, IL2CPP, or Unreal before decompiling it.", "should_trigger": true},
+    {"prompt": "Recover Unity IL2CPP function identities from matching metadata and registration evidence.", "should_trigger": true},
+    {"prompt": "Find the MSVC/CRT/linker identity needed to match this native game function.", "should_trigger": true},
+    {"prompt": "Keep our vanilla matching target separate from Harmony and native mod hooks.", "should_trigger": true},
+    {"prompt": "Treat this Unreal SDK dump as structural evidence without calling it original source.", "should_trigger": true},
+    {"prompt": "Design a behavioral compatibility shim for a legacy Windows graphics API.", "should_trigger": true},
+    {"prompt": "The match report hides missing and excluded PE functions; audit its scope.", "should_trigger": true},
+    {"prompt": "A managed Assembly-CSharp method was incorrectly analyzed as native code.", "should_trigger": true},
+    {"prompt": "Inspect PE section names without a game reconstruction goal.", "should_trigger": false},
+    {"prompt": "Run an existing PC static-recompiler pipeline on this Win32 executable.", "should_trigger": false},
+    {"prompt": "Recompile an original Xbox XBE.", "should_trigger": false},
+    {"prompt": "Build a new Unity game from source.", "should_trigger": false},
+    {"prompt": "Help me bypass DRM and download a retail binary.", "should_trigger": false},
+    {"prompt": "Review ordinary C# application code.", "should_trigger": false},
+    {"prompt": "Explain Windows APIs generally.", "should_trigger": false},
+    {"prompt": "Configure a game controller in Windows.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "Decompile Unity Mono game logic in Ghidra before checking managed assemblies.", "expected_outcome": "Classifies the runtime and inspects managed IL/metadata first, reserving native analysis for launchers/plugins or verified native surfaces."},
+    {"prompt": "The generated IL2CPP dummy assembly contains readable methods, so call it recovered original source.", "expected_outcome": "Treats it as metadata-derived scaffolding, ties it to exact binary/metadata identities, and verifies native implementations and gaps."},
+    {"prompt": "A modded build behaves correctly, so use it as proof the vanilla matching binary is exact.", "expected_outcome": "Separates match, behavioral, and modding artifacts and requires objective vanilla comparison plus independently scoped behavioral evidence."}
+  ]
+}

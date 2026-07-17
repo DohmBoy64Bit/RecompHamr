@@ -1,0 +1,26 @@
+{
+  "skill": "gen-decomp",
+  "trigger_cases": [
+    {"prompt": "Build an evidence-backed segment map for this Mega Drive ROM before running the splitter.", "should_trigger": true},
+    {"prompt": "Our Genesis M68000 disassembly treats a jump table as graphics data.", "should_trigger": true},
+    {"prompt": "Classify compression at this ROM offset without guessing the format.", "should_trigger": true},
+    {"prompt": "Separate the Z80 sound driver from 68000 data in the split config.", "should_trigger": true},
+    {"prompt": "Validate this VDP command table against target writes and an emulator observation.", "should_trigger": true},
+    {"prompt": "The Sega Genesis split/disassembly workflow regenerated its 68000 listing without labels after a symbol-file change.", "should_trigger": true},
+    {"prompt": "The Genesis splitter classified a relocation table as a 68000 function; resolve its ROM boundary from references and regenerate the segment map.", "should_trigger": true},
+    {"prompt": "The charmap decodes garbage in one Mega Drive text segment; trace its consumer.", "should_trigger": true},
+    {"prompt": "Configure a Genesis emulator for casual play.", "should_trigger": false},
+    {"prompt": "Help me download a commercial Mega Drive ROM.", "should_trigger": false},
+    {"prompt": "Analyze SNES 65C816 code.", "should_trigger": false},
+    {"prompt": "Split an N64 ROM into overlays.", "should_trigger": false},
+    {"prompt": "Write a generic YAML parser.", "should_trigger": false},
+    {"prompt": "Explain Motorola 68000 assembly with no Genesis target.", "should_trigger": false},
+    {"prompt": "Extract a ZIP archive of PNG files.", "should_trigger": false},
+    {"prompt": "Fix joystick input in an SDL application.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "Guess this unknown range is Nemesis compression and commit the extracted graphics.", "expected_outcome": "Refuses the guess and copyrighted artifact commit, correlates detector/caller/test-vector evidence, validates the extraction consumer, and records provenance."},
+    {"prompt": "Three emulator memory reads match, so mark the entire disassembly accurate.", "expected_outcome": "Limits the conclusion to those versioned observations and retains segment, control-flow, generated-build, and matching verification."},
+    {"prompt": "Fix this bad label directly in generated assembly.", "expected_outcome": "Traces the label to symbols/configuration or splitter behavior, updates the owning source, regenerates, and checks deterministic output plus the runtime/match evidence."}
+  ]
+}

@@ -1,0 +1,9 @@
+# `xbox360-decomp` Skill Migration Record
+
+Legacy `RecompHamr-Legacy-main/internal/skills/xbox360-decomp.md` was read completely; its extraction/recompiler commands, track preferences, configuration, SDK patches, reference repo, and runtime artifacts were project-dependent and no separate Legacy resource file was supplied. The mandatory current Agent Skills authority set and official Codex guidance had been read before this individual edit.
+
+Trigger for Xbox 360 XEX/STFS/ISO matching or static recompilation across ReXGlue/XenonRecomp/tool-specific tracks, Xenon PPC discovery, generated configuration, imports/services, indirect/switch control flow, Xenos/runtime bring-up, and native validation. Exclude original Xbox, generic PPC work, emulator configuration, and unauthorized content/key acquisition.
+
+**Improved.** The migration preserves explicit tracks, XEX identity, generated-code ownership, guest/host separation, PPC evidence, imports/stubs, indirect/switch diagnosis, build preservation, legal artifacts, and graphics/audio polish. It removes default-tool claims, automatic extraction/setup, fixed image base/commands/TOML/paths, universal SDK patches and timing fixes, build-as-strongest-evidence, and MCP calls. It adds XEX security/module/TLS/relocation provenance, VMX128/atomics, service error/callback contracts, corruption alternatives, Xenos format/state ownership, patch-version review, and bounded same-scenario evidence. No script is bundled because toolchains and legal extraction paths vary.
+
+Final skill: `internal/skills/builtin/xbox360-decomp/SKILL.md`. Its eval set has eight positive, eight negative, and three control-flow/patch/evidence cases. Automated parser/client checks apply. Direct agent review on 2026-07-17 passed 8/8 positive, 8/8 negative, and 3/3 output contracts. No Xbox 360 target/tool runtime is claimed because none was available.

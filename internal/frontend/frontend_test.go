@@ -23,7 +23,7 @@ func TestSnapshotProfilePhaseAndCommands(t *testing.T) {
 	}
 	commands := Commands()
 	commands[0].Name = "changed"
-	if got := Commands(); len(got) != 2 || got[0].Name != "/clear" || got[1].Name != "/models" {
+	if got := Commands(); len(got) != 7 || got[0].Kind != CommandClear || got[0].Name != "/clear" || got[1].Name != "/models" || got[3].Argument != "skill" || got[4].Kind != CommandInitEvidence || got[5].Kind != CommandEvidenceStatus {
 		t.Fatalf("commands = %#v", got)
 	}
 }
@@ -45,6 +45,9 @@ func TestIntentConstructors(t *testing.T) {
 		{Cancel(now), IntentCancel, "", ""},
 		{SubmitGoal("goal", now), IntentSubmitGoal, "goal", ""},
 		{Complete(completion), IntentComplete, "", ""},
+		{ActivateSkill("alpha"), IntentActivateSkill, "alpha", ""},
+		{InitializeEvidence(), IntentInitializeEvidence, "", ""},
+		{EvidenceStatus(), IntentEvidenceStatus, "", ""},
 	}
 	for _, tc := range cases {
 		if tc.intent.kind != tc.kind || tc.intent.text != tc.text || tc.intent.profile != tc.profile {

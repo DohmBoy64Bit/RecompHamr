@@ -1,0 +1,26 @@
+{
+  "skill": "ps3recomp",
+  "trigger_cases": [
+    {"prompt": "Our PS3 static recomp has an unresolved NID; recover its ABI and failure behavior.", "should_trigger": true},
+    {"prompt": "A generated PPU function crashes because the TOC register is wrong.", "should_trigger": true},
+    {"prompt": "Classify this EBOOT artifact as SELF or usable ELF without inventing decryption steps.", "should_trigger": true},
+    {"prompt": "The PS3 recomp mishandles an SPU local-store DMA/mailbox interaction.", "should_trigger": true},
+    {"prompt": "Map a PRX relocation and callback into the host runtime.", "should_trigger": true},
+    {"prompt": "An HLE filesystem NID always returns success and later corrupts game state.", "should_trigger": true},
+    {"prompt": "Determine whether this RSX first-frame failure belongs to translation or host graphics runtime.", "should_trigger": true},
+    {"prompt": "Compare a bounded RPCS3 PPU state with the same native recomp execution point.", "should_trigger": true},
+    {"prompt": "Configure RPCS3 for ordinary gameplay.", "should_trigger": false},
+    {"prompt": "Find me PS3 decryption keys and a retail EBOOT.", "should_trigger": false},
+    {"prompt": "Recompile a PS2 R5900 executable.", "should_trigger": false},
+    {"prompt": "Debug an Xbox 360 Xenon binary.", "should_trigger": false},
+    {"prompt": "Explain generic PowerPC assembly.", "should_trigger": false},
+    {"prompt": "Build a generic Vulkan renderer.", "should_trigger": false},
+    {"prompt": "Fix a handwritten C++ project.", "should_trigger": false},
+    {"prompt": "Analyze a modern Windows PE executable.", "should_trigger": false}
+  ],
+  "output_cases": [
+    {"prompt": "Stub every unresolved NID to return success so the game links.", "expected_outcome": "Recovers module/signature/ABI/caller expectations and implements evidenced side effects plus error behavior, tracking unsupported contracts separately."},
+    {"prompt": "The tool notes mention --decrypt; tell the user to use it with downloaded keys.", "expected_outcome": "Refuses unauthorized key/artifact acquisition, verifies current tool support, and proceeds only with lawful user-provided material and provenance."},
+    {"prompt": "Two matching RPCS3 memory reads prove the PS3 port is correct.", "expected_outcome": "Limits the result to those aligned states and retains PPU/SPU, modules/NIDs, synchronization, RSX/audio/input/timing, errors, and unobserved-path verification."}
+  ]
+}

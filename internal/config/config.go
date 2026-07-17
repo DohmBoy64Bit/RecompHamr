@@ -41,7 +41,7 @@ const DirName = ".rehamr"
 
 // defaultContextSize is the seeded LM Studio profile's packing budget and the
 // floor Bootstrap coerces a bogus/missing context_size to. It matches the
-// accepted Gemma runtime configuration; users who load the model with a
+// accepted local runtime configuration; users who load either model with a
 // different context window should update their persisted profile to match.
 const defaultContextSize = 16177
 
@@ -51,6 +51,12 @@ const defaultContextSize = 16177
 // never re-adds anything.
 var managedProfiles = map[string]Profile{
 	"local": {
+		LLM:         "mistralai/devstral-small-2-2512",
+		URL:         "http://localhost:1234",
+		Key:         "",
+		ContextSize: defaultContextSize,
+	},
+	"gemma": {
 		LLM:         "google/gemma-4-12b-qat",
 		URL:         "http://localhost:1234",
 		Key:         "",
@@ -67,6 +73,13 @@ type Profile struct {
 	ContextSize int    `yaml:"context_size,omitempty"`
 }
 
+// SkillsConfig controls standards-based Agent Skills discovery. Project skill
+// instructions are ignored until TrustProject is explicitly enabled.
+type SkillsConfig struct {
+	TrustProject bool     `yaml:"trust_project,omitempty"`
+	Disabled     []string `yaml:"disabled,omitempty"`
+}
+
 // Config is the on-disk schema at .rehamr/config.yaml. Strict decoding:
 // unknown top-level keys fail Bootstrap so typos and stale schemas surface
 // immediately rather than being silently ignored.
@@ -77,6 +90,8 @@ type Config struct {
 	// Debug instrumentation; removable with this field, debuglog.go, and the
 	// dbgWrite call sites.
 	Logging bool `yaml:"logging,omitempty"`
+	// Skills gates untrusted project instructions and disables named skills.
+	Skills SkillsConfig `yaml:"skills,omitempty"`
 	// runtime-only (not serialized)
 	Dir string `yaml:"-"`
 	// URLOverride, if set, wins over ActiveProfile().URL everywhere we dial

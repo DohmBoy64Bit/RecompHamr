@@ -20,6 +20,23 @@ type Set struct {
 	httpClient     *http.Client
 	now            func() time.Time
 	repomixTimeout time.Duration
+	activateSkill  func(string) (string, error)
+	readSkill      func(string, string) ([]byte, error)
+}
+
+// WithSkillResourceReader returns a copy that serves bounded resources from
+// the application-owned active-skill set.
+func (s Set) WithSkillResourceReader(read func(string, string) ([]byte, error)) Set {
+	s.readSkill = read
+	return s
+}
+
+// WithSkillActivator returns a copy that dispatches activate_skill through the
+// application-owned skills runtime. A nil callback leaves the capability
+// unavailable and unknown-tool behavior unchanged.
+func (s Set) WithSkillActivator(activate func(string) (string, error)) Set {
+	s.activateSkill = activate
+	return s
 }
 
 // NewSet configures the production tool collection beneath an already-secured
@@ -51,6 +68,27 @@ func (s Set) runRaw(parent context.Context, call chmctx.ToolCall) string {
 		return parseErrorResult(msg)
 	}
 	switch call.Name {
+	case ActivateSkillName:
+		name, _ := call.Arguments["name"].(string)
+		if s.activateSkill == nil {
+			return "(activate_skill: unavailable)"
+		}
+		result, err := s.activateSkill(name)
+		if err != nil {
+			return "(activate_skill: " + boundedDiagnostic([]byte(err.Error())) + ")"
+		}
+		return result
+	case ReadSkillResourceName:
+		name, _ := call.Arguments["name"].(string)
+		path, _ := call.Arguments["path"].(string)
+		if s.readSkill == nil {
+			return "(read_skill_resource: unavailable)"
+		}
+		result, err := s.readSkill(name, path)
+		if err != nil {
+			return "(read_skill_resource: " + boundedDiagnostic([]byte(err.Error())) + ")"
+		}
+		return string(result)
 	case RepomixrName:
 		return s.repomix(parent, repomixArgsFrom(call.Arguments))
 	case RecompReferenceName:

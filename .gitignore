@@ -15,3 +15,11 @@ dist/
 # Local Go coverage profiles
 coverage.out
 *.coverprofile
+
+# Local Stage G/runtime caches
+.tmp/
+**/.rehamr/bundled-skills/
+**/.rehamr/history
+**/.rehamr/log.txt
+app-cover
+skills-cover

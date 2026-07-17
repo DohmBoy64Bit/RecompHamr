@@ -1,0 +1,9 @@
+# `windows-game-decomp` Skill Migration Record
+
+Legacy `RecompHamr-Legacy-main/internal/skills/windows-game-decomp.md` was read completely; its named reverse-engineering tools, layouts, track levels, and artifacts were project-dependent and no separate Legacy resource file was supplied. The mandatory current Agent Skills authority set and official Codex guidance had been read before this individual edit.
+
+Trigger for Windows game reconstruction across native PE/matching, managed .NET/Mono, Unity IL2CPP, Unreal, behavioral/compatibility, and clean modding-SDK boundaries. Exclude console targets, isolated PE inspection, ordinary source development, and targets already governed by a concrete static-recompiler pipeline.
+
+**Improved.** The migration preserves runtime-family-first routing, compiler/CRT matching evidence, managed-versus-native and IL2CPP metadata ordering, SDK-dump limitations, vanilla/mod separation, compatibility shims, legal artifacts, and evidence ledgers. It removes `/doctor` and MCP calls, branded tools as universal requirements, fixed directory/track/match-level schemes, all-functions-classified and percentage gates, and build/objdiff as universal strongest evidence. It adds accepted-result definitions, linker/normalization provenance, protection boundaries, failure/cleanup contracts, independently buildable tracks, and explicit missing/excluded denominators. No script is bundled because runtime families and project toolchains vary.
+
+Final skill: `internal/skills/builtin/windows-game-decomp/SKILL.md`. Its eval set has eight positive, eight negative, and three classification/provenance cases. Automated parser/client checks apply. Direct agent review on 2026-07-17 passed 8/8 positive, 8/8 negative, and 3/3 output contracts. No proprietary Windows game target trial is claimed because no lawful fixture was available.
