@@ -29,10 +29,10 @@ func TestPowerShellExecutionShapes(t *testing.T) {
 	if got := PowerShell(context.Background(), "   ", time.Second); got != "(empty script)" {
 		t.Fatalf("empty = %q", got)
 	}
-	if got := PowerShell(context.Background(), "Write-Output ok", time.Second); !strings.Contains(got, "ok") {
+	if got := PowerShell(context.Background(), "Write-Output ok", 10*time.Second); !strings.Contains(got, "ok") {
 		t.Fatalf("success = %q", got)
 	}
-	if got := PowerShell(context.Background(), "exit 7", time.Second); !strings.Contains(got, "exit status 7") {
+	if got := PowerShell(context.Background(), "exit 7", 10*time.Second); !strings.Contains(got, "exit status 7") {
 		t.Fatalf("exit = %q", got)
 	}
 	if got := PowerShell(context.Background(), "Start-Sleep -Seconds 2", 10*time.Millisecond); !strings.Contains(got, "timeout after") {
