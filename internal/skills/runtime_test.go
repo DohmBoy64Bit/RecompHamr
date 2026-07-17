@@ -70,6 +70,14 @@ func TestRuntimeResourcesEmptyCatalogAndConcurrentDeduplication(t *testing.T) {
 		}
 	}
 	runtime := NewRuntime(Discover([]Root{{Path: root, Scope: ScopeUser}}))
+	previousActivationLoaded := activationLoaded
+	ready := make(chan struct{}, 2)
+	release := make(chan struct{})
+	activationLoaded = func() {
+		ready <- struct{}{}
+		<-release
+	}
+	t.Cleanup(func() { activationLoaded = previousActivationLoaded })
 	var wait sync.WaitGroup
 	results := make(chan bool, 2)
 	for range 2 {
@@ -83,6 +91,9 @@ func TestRuntimeResourcesEmptyCatalogAndConcurrentDeduplication(t *testing.T) {
 			results <- fresh
 		}()
 	}
+	<-ready
+	<-ready
+	close(release)
 	wait.Wait()
 	close(results)
 	freshCount := 0

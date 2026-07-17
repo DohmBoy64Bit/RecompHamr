@@ -9,6 +9,8 @@ import (
 
 const maxCatalogPromptBytes = 8 << 10
 
+var activationLoaded = func() {}
+
 // Runtime owns one session's immutable catalog and activated instruction set.
 // Activation is idempotent and safe when invoked by asynchronous tool work.
 type Runtime struct {
@@ -49,6 +51,7 @@ func (r *Runtime) Activate(name string) (Activation, bool, error) {
 	if err != nil {
 		return Activation{}, false, err
 	}
+	activationLoaded()
 	r.mu.Lock()
 	if existing, raced := r.active[name]; raced {
 		r.mu.Unlock()
