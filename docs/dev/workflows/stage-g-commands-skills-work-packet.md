@@ -81,7 +81,7 @@ Stage G closes only when the command registry and skills client are application-
 - verified: Legacy exposes eleven commands, of which `/mcp` is Stage H, and uses a global flat-Markdown loader with custom files overriding embedded files.
 - unverified: all Stage G implementation, focused/canonical verification, skill evaluations, runtime acceptance, CI, and final dispositions.
 
-## Active implementation evidence
+## Accepted implementation evidence
 
 - verified by source and focused tests: `internal/frontend` now provides one typed ordered registry for retained commands plus `/skills`, `/skill`, `/init-re`, `/status-re`, and `/help`; the TUI maps typed command kinds to presentation handlers and does not own their backend side effects.
 - verified by source and focused tests: `internal/skills` performs bounded immediate-child `.agents/skills` discovery, strict current-spec metadata validation, project-over-user precedence, explicit project trust, configured disable filtering, display-safe diagnostics, activation-time revalidation, concurrency-safe deduplication, and reload-time catalog replacement.
@@ -94,5 +94,7 @@ Stage G closes only when the command registry and skills client are application-
 - verified by direct review: all 21 bundled migrations passed 8/8 positive triggers, 8/8 adjacent negative triggers, and 3/3 output-contract cases. The sanitized review is retained at `E:\ReProject\StageG-Manual-Evaluation-Devstral\human-review.md`; it explicitly does not claim 399 generated model responses.
 - verified by exact-build Windows Terminal runtime: Devstral was active; Gemma remained selectable; `/help`, `/models`, `/skills`, `/skill`, `/clear`, `/init-re`, and `/status-re` worked; explicit and implicit activation both loaded an exact resource; 120x36, 80x24, and 50x16 were reviewed; and Ctrl+D restored the shell. Evidence is retained at `E:\ReProject\StageG-Runtime-Acceptance`.
 - verified regression: visual review found a shadow diagnostic containing an absolute user path. The message is now path-free, covered by focused tests, rebuilt, rerun, and visually confirmed.
-- verified: the documentation-synchronized canonical gate passed on Go 1.26.4 at exactly 3183/3183 statements (100.0%), including docs, links, architecture, formatting, all packages, build, CLI smoke, acceptance-scenario validation, and all 21 skill fixture sets.
-- unverified: dual-platform CI, the exact accepted-commit rerun, and final Stage G closure remain open.
+- verified: the documentation-synchronized canonical gate passed on Go 1.26.4 at exactly 3184/3184 statements (100.0%), including docs, links, architecture, formatting, all packages, build, CLI smoke, acceptance-scenario validation, and all 21 skill fixture sets.
+- verified: exact implementation commit `6aaeb81ae01f6b0290c63af94791001fff021960` passed the Devstral Windows Terminal scenario; its executable SHA-256 is `3067cdc85457da674eec098507f5614170274c1956ab7d165da083132e0c851b`, with reviewed evidence at `E:\ReProject\StageG-Runtime-Acceptance`.
+- verified: GitHub Actions run `29603832999` passed independently on `windows-latest` and `ubuntu-latest` against the implementation commit.
+- closure: the stop condition is met. Every Stage G row is verified, no Stage H behavior entered production, and Stage H remains inactive pending a separate work packet.

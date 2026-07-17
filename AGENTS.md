@@ -11,7 +11,7 @@ Order of work:
 3. integrate RecompHamr capabilities one coherent subsystem at a time;
 4. verify each capability against evidence, tests, docs, and runtime behavior.
 
-**Stage A: fresh-source barebones baseline**, **Stage C: separation of concerns**, **Stage D: workspace and configuration foundations**, **Stage E: agent/runtime capabilities**, and **Stage F: RecompHamr tools** are accepted. **Stage G: command registries and standards-based Agent Skills** is active under its established packet after the mandatory current authorities were read; it remains open until canonical verification, dual-platform CI, and accepted-commit evidence close every row. Preserve every accepted behavior and the established ownership boundary; do not add MCP, unapproved diagnostics systems, other reverse-engineering helpers, or a TUI redesign outside approved later-stage work packets.
+**Stage A: fresh-source barebones baseline**, **Stage C: separation of concerns**, **Stage D: workspace and configuration foundations**, **Stage E: agent/runtime capabilities**, **Stage F: RecompHamr tools**, and **Stage G: command registries and standards-based Agent Skills** are accepted. Stage H MCP is next but remains inactive until its own work packet and authorities are established. Preserve every accepted behavior and the established ownership boundary; do not add MCP, unapproved diagnostics systems, other reverse-engineering helpers, or a TUI redesign outside an approved later-stage work packet.
 
 ## Codex reading route
 

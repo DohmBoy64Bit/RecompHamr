@@ -1,6 +1,6 @@
 # Current Transitional Architecture
 
-Stage A, all four Stage C slices, Stage D, Stage E, and Stage F are accepted. Stage G command registries and Agent Skills are implemented, runtime-verified, and canonical-gate clean but remain open pending dual-platform CI and accepted-commit evidence.
+Stage A, all four Stage C slices, Stage D, Stage E, Stage F, and Stage G are accepted. Stage H MCP remains outside the production graph until its own work packet is established.
 
 ```text
 cmd/recomphamr
@@ -73,7 +73,7 @@ Core `internal/app` constructs an immutable `internal/tools.Set` with the protec
 
 Stage F scope is exactly `repomixr` and `recomp_reference`. Unknown tools still fail closed. Complete focused/canonical verification, exact-build Gemma runtime evidence, Windows cache ACL inspection, and dual-platform CI accept the boundary and both improved Legacy parity contracts.
 
-## Active Stage G ownership
+## Accepted Stage G ownership
 
 `internal/frontend` owns one immutable ordered seven-command registry used by dispatch, CLI/TUI help, completion, and argument metadata. The TUI renders registry facts and translates input to typed intents; `internal/app/controller` dispatches command semantics and composes `internal/workspace`, `internal/session`, and `internal/skills` behavior below presentation.
 
@@ -81,4 +81,4 @@ Stage F scope is exactly `repomixr` and `recomp_reference`. Unknown tools still 
 
 Core `internal/app` restores bundled skills into a protected content-addressed directory and composes the skills runtime with the controller/agent. `internal/agent` exposes constrained activation/resource tools and incorporates activated instructions into the system-context budget. Production TUI code imports no skills, filesystem, process, network, persistence, or trust owner.
 
-Exact-build Windows Terminal acceptance with LM Studio Devstral verified the full registry, retained Gemma profile, explicit and implicit activation, exact resource loading, evidence-workspace commands, three representative sizes, and terminal restoration. The documentation-synchronized canonical gate passed at 3183/3183 statements; dual-platform CI and accepted-commit evidence remain required before Stage G acceptance.
+Exact-build Windows Terminal acceptance with LM Studio Devstral verified the full registry, retained Gemma profile, explicit and implicit activation, exact resource loading, evidence-workspace commands, three representative sizes, and terminal restoration. The documentation-synchronized canonical gate passed at 3184/3184 statements, and GitHub Actions run `29603832999` passed independently on Windows and Ubuntu against implementation commit `6aaeb81ae01f6b0290c63af94791001fff021960`.

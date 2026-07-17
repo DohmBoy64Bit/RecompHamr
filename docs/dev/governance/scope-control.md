@@ -1,13 +1,13 @@
 # Scope Control
 
-The accepted Stage A, Stage C, Stage D, Stage E, and Stage F gates plus the active Stage G work packet define the current project boundary. Stage G commands and standards-based Agent Skills are implemented, runtime-verified, and canonical-gate clean but remain open pending dual-platform CI and accepted-commit evidence.
+The accepted Stage A, Stage C, Stage D, Stage E, Stage F, and Stage G gates define the current project boundary. Stage H MCP is next but remains inactive until its own work packet and authorities are established.
 
 ## Allowed now
 
 - preserve and fix evidence-backed defects in the accepted workspace and configuration foundations;
 - preserve and fix evidence-backed defects in the accepted agent/runtime contracts;
 - preserve and fix evidence-backed defects in the accepted six-tool boundary;
-- finish and verify the active Stage G command registry, skills client, migrations, documentation, and closure evidence;
+- preserve and fix evidence-backed defects in the accepted Stage G command registry and skills client;
 - preserve or improve verified Legacy behavior within its current architecture owner;
 - improve tests, verification, rules, or documentation without changing the frozen TUI contract;
 - fix evidence-backed defects in accepted behavior;

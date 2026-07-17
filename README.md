@@ -107,7 +107,7 @@ docs/dev/              governance, memory, verification, architecture, workflows
 scripts/               reproducible baseline checks
 ```
 
-Stage C moved runtime orchestration behind application/frontend contracts while keeping the TUI visually and behaviorally unchanged. Stage D added the secure workspace-state foundation, Stage E verified agent/runtime parity, and Stage F added the two verified Legacy cache tools. Stage G is active for command registries and standards-based Agent Skills; Stage H MCP remains excluded.
+Stage C moved runtime orchestration behind application/frontend contracts while keeping the TUI visually and behaviorally unchanged. Stage D added the secure workspace-state foundation, Stage E verified agent/runtime parity, Stage F added the two verified Legacy cache tools, and Stage G added the accepted command registry and standards-based Agent Skills client. Stage H MCP remains excluded until its own work packet is established.
 
 ## Start here
 
